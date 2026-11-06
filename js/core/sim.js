@@ -3,6 +3,8 @@
 //  sans interface, pour équilibrer la config.
 //    Navigateur : ouvrez la console et tapez  Sim.run(1000)
 //    Node       : node tools/simulate.js 1000
+//  Stratégies : 'sniper' (défaut : Dice à fort multiplicateur), 'blackjack'
+//  (blackjack de base, Dice en dernier recours) ou opts.game pour un seul jeu.
 // =====================================================================
 const Sim = (() => {
   const freshMeta = () => ({ prestige: 0, jackpot: 1, unlocked: [], felt: '', back: '', best: 0, runs: 0, wins: 0 });
@@ -49,11 +51,11 @@ const Sim = (() => {
     return res.settlement;
   }
 
-  // ---- Stratégie du shop : jokers d'abord, en gardant une réserve ----
+  // ---- Stratégie du shop : jokers d'abord, en gardant une réserve de jetons ----
   const RANK = { legendaire: 3, rare: 2, commun: 1 };
   function shop(H) {
     const st = H.state;
-    const reserve = H.roundCfg(st.manche).maxBet * 2;
+    const reserve = Math.max(40, H.objective(st.etage, st.tableType) * 0.6);
     const offers = st.shop.offers.map((o, i) => ({ ...o, i }));
     offers.filter(o => o.kind === 'joker').sort((a, b) => RANK[JOKERS[b.id].rarity] - RANK[JOKERS[a.id].rarity] || a.price - b.price)
       .forEach(o => { if (H.chips() - o.price >= reserve && st.jokers.length < st.jokerSlots) H.buy(o.i); });
@@ -69,36 +71,49 @@ const Sim = (() => {
     }
   }
 
+  // ---- Taille des mises : viser l'objectif en ~2 victoires, sans risquer plus de 40 % du solde ----
+  function betSize(H) {
+    const t = H.state.table;
+    const need = t.target - t.gains;
+    const share = t.bets <= 2 ? 0.6 : 0.4;
+    return Math.max(1, Math.min(Math.floor(H.chips() * share), Math.ceil(need / Math.min(2, t.bets))));
+  }
+
   function playRun(seed, opts = {}) {
     const meta = freshMeta();
     const H = Engine.newRun({ seed, meta, persist: false });
-    const F = CONFIG.rounds.final;
+    const F = CONFIG.progression.etagesPourGagner;
     let won = false, guard = 0;
-    while (guard++ < 2000) {
+    while (guard++ < 3000) {
       const st = H.state;
-      if (st.phase === 'shop') {
-        if (st.summary && st.summary.victory) { won = true; break; }
-        shop(H); H.nextRound(); continue;
-      }
+      if (st.phase === 'victory') { won = true; break; }
+      if (st.phase === 'shop') { shop(H); H.leaveShop(); continue; }
+      if (st.phase === 'choose') { H.chooseTable(); continue; }
       if (st.phase !== 'play') break;
-      if (H.objectiveMet()) { H.endRound(); continue; }
       useConsumables(H);
-      const need = st.round.target - H.profit();
-      const tours = st.round.tours;
-      const bet = Math.max(1, Math.min(H.maxBet('bj'), Math.floor(H.chips())));
-      if (opts.game && opts.game !== 'mixed') {
-        playOne(H, opts.game, bet, need);
-      } else if (tours <= 2 && need > bet) {
-        // dernier recours : un Dice risqué calibré pour atteindre l'objectif
-        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));
+      const t = st.table;
+      const need = t.target - t.gains;
+      const bet = betSize(H);
+      if (opts.strategy !== 'blackjack' && (!opts.game || opts.game === 'mixed')) {
+        // « Sniper » : seules les victoires comptent pour l'objectif, donc une petite
+        // mise sur un multiplicateur élevé, calibré pour finir la table en un coup
+        const f = t.bets <= 2 ? 0.35 : 0.15;
+        const b = Math.max(1, Math.floor(H.chips() * f));
+        const chance = Math.max(2, Math.min(90, Math.floor(99 * b / (need + b))));
+        playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
+      } else if (opts.game && opts.game !== 'mixed') playOne(H, opts.game, bet);
+      else if (t.bets <= 1 && need > bet) {
+        // dernière mise : un Dice risqué calibré pour atteindre l'objectif
+        const b = Math.max(1, Math.floor(H.chips()));
         const chance = Math.max(2, Math.min(95, Math.floor(99 * b / (need + b))));
         playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
-      } else playOne(H, 'bj', bet, need);
+      } else playOne(H, 'bj', bet);
     }
-    return { seed, won, manche: won ? F : Math.min(H.state.manche, F), jokers: H.state.stats.jokersOwned.slice(), plays: H.state.stats.plays, chips: H.chips() };
+    const st = H.state;
+    return { seed, won, etage: won ? F : Math.min(st.etage, F), tables: st.stats.tablesWon, jokers: st.stats.jokersOwned.slice(), plays: st.stats.plays, chips: H.chips() };
   }
-  function playOne(H, game, bet, need) {
-    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(1, Math.min(H.maxBet('uth'), Math.floor(bet / 6))) });
+  function playOne(H, game, bet) {
+    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(1, Math.floor(bet / 3)) });
     if (game === 'dice') return playGame(H, 'dice', { bet, target: 50, mode: 'under' });
     if (game === 'roulette') return playGame(H, 'roulette', { bets: { red: bet } });
     if (game === 'slots') return playGame(H, 'slots', { bet });
@@ -112,7 +127,7 @@ const Sim = (() => {
     for (let i = 0; i < n; i++) results.push(playRun(`${seed}-${i}`, opts));
     const wins = results.filter(r => r.won);
     const dist = {};
-    results.forEach(r => (dist[r.manche] = (dist[r.manche] || 0) + 1));
+    results.forEach(r => (dist[r.etage] = (dist[r.etage] || 0) + 1));
     const jokers = JOKER_DEFS.map(d => {
       const inWins = wins.filter(r => r.jokers.includes(d.id)).length;
       const inAll = results.filter(r => r.jokers.includes(d.id)).length;
@@ -126,15 +141,16 @@ const Sim = (() => {
       parties: n,
       victoires: wins.length,
       tauxVictoire: +(wins.length / n * 100).toFixed(2),
-      mancheMoyenne: +(results.reduce((a, r) => a + r.manche, 0) / n).toFixed(2),
+      etageMoyen: +(results.reduce((a, r) => a + r.etage, 0) / n).toFixed(2),
+      tablesMoyennes: +(results.reduce((a, r) => a + r.tables, 0) / n).toFixed(2),
       coupsMoyens: +(results.reduce((a, r) => a + r.plays, 0) / n).toFixed(1),
-      repartitionManches: dist,
+      repartitionEtages: dist,
       jokers,
       dureeMs: Date.now() - t0,
     };
     if (opts.print !== false && typeof console !== 'undefined') {
-      console.log(`Simulation : ${n} parties en ${stats.dureeMs} ms — victoire ${stats.tauxVictoire} %, manche moyenne ${stats.mancheMoyenne}`);
-      console.log('Manche atteinte :', JSON.stringify(dist));
+      console.log(`Simulation : ${n} parties en ${stats.dureeMs} ms — victoire ${stats.tauxVictoire} %, étage moyen ${stats.etageMoyen}, tables gagnées en moyenne ${stats.tablesMoyennes}`);
+      console.log('Étage atteint :', JSON.stringify(dist));
       (console.table || console.log)(jokers.slice(0, 20));
     }
     return stats;

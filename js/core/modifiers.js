@@ -4,7 +4,7 @@
 //  qui réagissent à des événements. Les jeux n'en connaissent aucun : ils
 //  émettent des événements et lisent un contexte que les modificateurs modifient.
 //
-//  Événements de cycle :   onRoundStart, onRoundEnd, onShopEnter, onBetPlaced,
+//  Événements de cycle :   onRoundStart / onRoundEnd (début / victoire d'une table), onShopEnter, onBetPlaced,
 //                          onCardDrawn, onDraw, onResolve, onSettle, onWin,
 //                          onLoss, onPush, onBankrupt
 //  Requêtes (contexte) :   maxBet, deck.exclude, bj.rules, bj.dealerSkip, bj.info,
@@ -24,7 +24,7 @@ const JOKER_DEFS = [
   { id: 'rouge', name: 'Le Rouge Fidèle', icon: '🌹', desc: () => `Les mises sur le rouge à la roulette paient ×${2 + J.rouge.bonus} au lieu de ×2.`,
     onResolve(e, me) {
       const b = e.info && e.info.bets && e.info.bets.red;
-      if (e.game === 'roulette' && b && e.info.color === 'red') e.adjust(me, b * J.rouge.bonus, 'rouge payé plus');
+      if (e.game === 'roulette' && b && e.info.color === 'red' && !e.info.redVoid) e.adjust(me, b * J.rouge.bonus, 'rouge payé plus');
     } },
   { id: 'septieme', name: 'Le Septième Ciel', icon: '7️⃣', desc: () => `Chaque 7 tiré, quel que soit le jeu, rapporte +${J.septieme.bonus} jetons.`,
     onCardDrawn(e, me) { if (e.card.rank === 7) e.play.flat(me, J.septieme.bonus, '7 tiré'); },
@@ -32,7 +32,7 @@ const JOKER_DEFS = [
       const n = e.kind === 'symbol' ? (e.value === 'sept' ? 1 : 0) : countSevens(e.value);
       if (n) e.play.flat(me, J.septieme.bonus * n, n > 1 ? `${n} × 7 tirés` : '7 tiré');
     } },
-  { id: 'molle', name: 'La Main Molle', icon: '🧤', desc: () => `Au blackjack, ta première défaite de chaque manche est remboursée à ${pct(J.molle.refund)}.`,
+  { id: 'molle', name: 'La Main Molle', icon: '🧤', desc: () => `Au blackjack, ta première défaite de chaque table est remboursée à ${pct(J.molle.refund)}.`,
     onRoundStart(e, me) { me.state.used = false; },
     onLoss(e, me) {
       if (e.game !== 'bj' || me.state.used) return;
@@ -43,7 +43,7 @@ const JOKER_DEFS = [
     'bj.info'(e) { e.lines.push(`🧮 Cartes hautes restantes : <b>${e.high}</b> / ${e.total} (${Math.round(e.high / Math.max(1, e.total) * 100)} %)`); } },
   { id: 'consolation', name: 'Le Lot de Consolation', icon: '🎗️', desc: () => `Chaque perte te rapporte ${J.consolation.bonus} jetons.`,
     onLoss(e, me) { e.flat(me, J.consolation.bonus, 'consolation'); } },
-  { id: 'depipe', name: 'Le Dé Pipé', icon: '🎲', desc: () => 'Une fois par manche, tu peux relancer un dé perdant au Dice.',
+  { id: 'depipe', name: 'Le Dé Pipé', icon: '🎲', desc: () => 'Une relance de plus par table, réservée au Dice.',
     onRoundStart(e, me) { me.host.addCharge(me, 'dice', J.depipe.charges); } },
 
   // ---------------- Rares ----------------
@@ -80,7 +80,7 @@ const JOKER_DEFS = [
       const n = me.host.state.jokers.length - 1;
       if (e.outcome === 'win' && n > 0) e.add(me, n * J.parrain.perJoker, `${n} autre(s) joker(s)`);
     } },
-  { id: 'tricheur', name: 'Le Tricheur Maladroit', icon: '🃏', desc: () => `Tes gains sont multipliés par ${J.tricheur.mult}, mais à chaque fin de manche tu as ${pct(J.tricheur.catchChance)} de chances d'être pris : tu perds un joker au hasard.`,
+  { id: 'tricheur', name: 'Le Tricheur Maladroit', icon: '🃏', desc: () => `Tes gains sont multipliés par ${J.tricheur.mult}, mais à chaque table gagnée tu as ${pct(J.tricheur.catchChance)} de chances d'être pris : tu perds un joker au hasard.`,
     onSettle(e, me) { if (e.outcome === 'win') e.mult(me, J.tricheur.mult); },
     onRoundEnd(e, me) {
       const H = me.host;
@@ -89,7 +89,7 @@ const JOKER_DEFS = [
       e.lines.push({ label: `🃏 Tricheur pris la main dans le sac : ${JOKERS[victim.id].name} confisqué`, value: 0, bad: true });
       H.removeJoker(victim.uid);
     } },
-  { id: 'roue', name: 'La Roue Folle', icon: '🎡', desc: () => 'À chaque manche, une règle du casino change au hasard, toujours un peu en ta faveur.',
+  { id: 'roue', name: 'La Roue Folle', icon: '🎡', desc: () => 'À chaque table, une règle du casino change au hasard, toujours un peu en ta faveur.',
     onRoundStart(e, me) {
       const active = me.host.activeRules();
       const free = RULE_DEFS.filter(r => !active.includes(r.id));
@@ -97,12 +97,12 @@ const JOKER_DEFS = [
     },
     // Les règles tirées agissent comme des modificateurs « enfants » du joker
     children: me => (me.state.rules || []).map(id => RULES[id]).filter(Boolean) },
-  { id: 'banquier', name: 'Le Banquier', icon: '🏦', desc: () => `Tu touches ${pct(J.banquier.rate)} d'intérêts sur tes jetons à la fin de chaque manche (${J.banquier.cap} max).`,
+  { id: 'banquier', name: 'Le Banquier', icon: '🏦', desc: () => `Tu touches ${pct(J.banquier.rate)} d'intérêts sur tes jetons à chaque table gagnée (${J.banquier.cap} max).`,
     onRoundEnd(e, me) {
       const v = Math.min(J.banquier.cap, Math.floor(me.host.chips() * J.banquier.rate));
       if (v > 0) e.reward(me, v, '🏦 Intérêts du Banquier');
     } },
-  { id: 'fantome', name: 'Le Fantôme du Casino', icon: '👻', desc: () => 'Une fois par manche, annule un tirage et refais-le (carte au blackjack, dé, roulette, machine).',
+  { id: 'fantome', name: 'Le Fantôme du Casino', icon: '👻', desc: () => 'Une relance de plus par table : annule un tirage et refais-le (carte au blackjack, dé, roulette, machine).',
     onRoundStart(e, me) { me.host.addCharge(me, 'any', J.fantome.charges); } },
   { id: 'jackpot', name: 'Jackpot Éternel', icon: '💎', desc: h => `Chaque victoire ajoute +${J.jackpot.step} à son multiplicateur de gains. Il ne se réinitialise jamais, même entre les parties.${h ? ` Actuellement ×${h.meta.jackpot.toFixed(1)}.` : ''}`,
     onSettle(e, me) { if (e.outcome === 'win' && me.host.meta.jackpot !== 1) e.mult(me, me.host.meta.jackpot); },
@@ -129,15 +129,22 @@ const RULE_DEFS = [
 RULE_DEFS.forEach(d => (d.kind = 'rule'));
 const RULES = Object.fromEntries(RULE_DEFS.map(d => [d.id, d]));
 
-// ---------------- Patrons (malus) ----------------
+// ---------------- Boss (3e table de chaque étage) ----------------
 const B = CONFIG.bosses;
 const BOSS_DEFS = [
-  { id: 'radin', name: 'Le Radin', desc: () => 'Le Blackjack paie 6:5.', 'bj.rules'(e) { e.bjPay = Math.min(e.bjPay, B.radin.bjPay); } },
-  { id: 'douane', name: 'La Douane', desc: () => `Mise max réduite de ${pct(1 - B.douane.maxBetMult)}.`, maxBet(e) { e.value *= B.douane.maxBetMult; } },
-  { id: 'horloger', name: 'L\'Horloger', desc: () => `${B.horloger.tours} tours de moins.`, onRoundStart(e) { e.round.tours -= B.horloger.tours; } },
-  { id: 'glacon', name: 'Le Glaçon', desc: () => 'Les jokers communs sont désactivés.', disables: def => def.rarity === 'commun' },
-  { id: 'fer', name: 'Le Croupier de fer', desc: () => 'Au Hold\'em, le croupier est toujours qualifié.', 'uth.rules'(e) { e.alwaysQualify = true; } },
-  { id: 'maison', name: 'La Maison', desc: () => `Dice : avantage maison de ${100 - B.maison.edge} %.`, 'dice.edge'(e) { e.edge = Math.min(e.edge, B.maison.edge); } },
+  { id: 'avare', name: 'Le Croupier Avare', desc: () => `Tous les gains sont réduits de ${pct(1 - B.avare.mult)}.`,
+    onSettle(e, me) { if (e.outcome === 'win') e.mult(me, B.avare.mult, 'gains réduits'); } },
+  { id: 'presse', name: 'Le Directeur Pressé', desc: () => `Seulement ${B.presse.bets} mises à cette table.`,
+    onRoundStart(e) { e.table.bets = B.presse.bets; } },
+  { id: 'noir', name: 'La Dame en Noir', desc: () => 'Les mises sur le rouge ne paient rien.',
+    onResolve(e, me) {
+      const b = e.info && e.info.bets && e.info.bets.red;
+      if (e.game === 'roulette' && b && e.info.color === 'red') { e.info.redVoid = true; e.adjust(me, -b * CONFIG.games.roulette.even, 'le rouge ne paie rien'); }
+    } },
+  { id: 'sobre', name: 'Le Videur', desc: () => 'Aucune relance autorisée.', onRoundStart(e) { e.table.noRerolls = true; } },
+  { id: 'endormi', name: 'Le Gardien Endormi', desc: () => 'Le joker le plus à gauche est désactivé.', disablesIndex: i => i === 0 },
+  { id: 'gourmand', name: 'Le Gourmand', desc: () => `Chaque mise coûte ${B.gourmand.fee} jetons en plus.`,
+    betFee(e, me) { e.fee += B.gourmand.fee; e.sources.push(me); } },
 ];
 BOSS_DEFS.forEach(d => (d.kind = 'boss'));
 const BOSSES = Object.fromEntries(BOSS_DEFS.map(d => [d.id, d]));
@@ -145,7 +152,7 @@ const BOSSES = Object.fromEntries(BOSS_DEFS.map(d => [d.id, d]));
 // ---------------- Améliorations de table ----------------
 const U = CONFIG.upgrades;
 const UPGRADE_DEFS = [
-  { id: 'vip', name: 'Table VIP', icon: '👑', desc: () => `Mise max augmentée de ${pct(U.vip.mult - 1)}.`, maxBet(e) { e.value *= U.vip.mult; } },
+  { id: 'vip', name: 'Table VIP', icon: '👑', desc: () => `+${U.vip.bets} mise à chaque table.`, onRoundStart(e) { e.table.bets += U.vip.bets; } },
   { id: 'truque', name: 'Sabot truqué', icon: '🗃️', desc: () => `Retire tous les ${U.truque.ranks.join(' et ')} du paquet (Blackjack et Hold'em).`,
     'deck.exclude'(e) { U.truque.ranks.forEach(r => { if (!e.ranks.includes(r)) e.ranks.push(r); }); } },
   { id: 'doree', name: 'Machine dorée', icon: '💠', desc: () => `Ajoute un symbole Diamant ×${CONFIG.games.slots.diamant.pay} aux machines à sous.`,
@@ -154,15 +161,34 @@ const UPGRADE_DEFS = [
 UPGRADE_DEFS.forEach(d => Object.assign(d, { kind: 'upgrade', price: U[d.id].price }));
 const UPGRADES = Object.fromEntries(UPGRADE_DEFS.map(d => [d.id, d]));
 
-// ---------------- Statuts temporaires ----------------
+// ---------------- Statuts temporaires et tags ----------------
+// Les tags s'obtiennent en passant une petite ou une grande table.
+const T = CONFIG.tags;
 const STATUS_DEFS = [
   { id: 'golden', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise compte double.',
     onSettle(e, me) { if (e.outcome === 'win') e.mult(me, CONFIG.consumables.dore.mult, 'Jeton Doré'); me.remove(); } },
-  { id: 'huissier', name: 'Huissier', icon: '⚖️', desc: () => `Échéance de prêt impayée : ${CONFIG.loans.penaltyTours} tours de moins.`,
-    onRoundStart(e, me) { e.round.tours -= CONFIG.loans.penaltyTours; me.remove(); } },
+  { id: 'huissier', name: 'Huissier', icon: '⚖️', desc: () => `Échéance de prêt impayée : ${CONFIG.loans.penaltyBets} mises de moins à la prochaine table.`,
+    onRoundStart(e, me) { e.table.bets -= CONFIG.loans.penaltyBets; me.remove(); } },
+  { id: 'soldes', tag: true, name: 'Soldes', icon: '🏷️', desc: () => `Prochain shop : tout à −${pct(T.soldes.discount)}.`,
+    onShopEnter(e, me) { e.shop.offers.forEach(o => (o.price = Math.ceil(o.price * (1 - T.soldes.discount)))); me.remove(); } },
+  { id: 'cadeau', tag: true, name: 'Paquet cadeau', icon: '🎁', desc: () => 'Un consommable gratuit, tout de suite.', instant: true },
+  { id: 'turbo', tag: true, name: 'Turbo', icon: '⚡', desc: () => `+${T.turbo.bets} mises à la prochaine table.`,
+    onRoundStart(e, me) { e.table.bets += T.turbo.bets; me.remove(); } },
+  { id: 'collection', tag: true, name: 'Collectionneur', icon: '💜', desc: () => 'Le prochain shop propose un joker rare ou légendaire garanti.',
+    onShopEnter(e, me) {
+      const i = e.shop.offers.findIndex(o => o.kind === 'joker');
+      const id = e.rollJoker({ minRarity: 'rare', exclude: e.shop.offers.map(o => o.id) });
+      if (id) { const o = { kind: 'joker', id, price: JOKERS[id].price, sold: false }; if (i >= 0) e.shop.offers[i] = o; else e.shop.offers.unshift(o); }
+      me.remove();
+    } },
+  { id: 'investisseur', tag: true, name: 'Investisseur', icon: '💼', desc: () => `+${T.investisseur.amount} jetons à la prochaine table gagnée.`,
+    onRoundEnd(e, me) { e.reward(me, T.investisseur.amount, '💼 Tag Investisseur'); me.remove(); } },
+  { id: 'double', tag: true, name: 'Double ou rien', icon: '🔁', desc: () => `+${T.double.rerolls} relances à la prochaine table.`,
+    onRoundStart(e, me) { me.host.addCharge(me, 'any', T.double.rerolls); me.remove(); } },
 ];
 STATUS_DEFS.forEach(d => (d.kind = 'status'));
 const STATUSES = Object.fromEntries(STATUS_DEFS.map(d => [d.id, d]));
+const TAG_DEFS = STATUS_DEFS.filter(d => d.tag);
 
 // ---------------- Consommables ----------------
 // use(host, ctx) → { ok, text } ; ctx = { game, round } du jeu affiché
@@ -171,8 +197,8 @@ const CONSUMABLE_DEFS = [
     capability: 'bonusCard', use: (H, ctx, card) => H.useCapability(ctx, 'bonusCard', card) },
   { id: 'dore', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise compte double : son gain est doublé.', inPlayOnly: true,
     use: H => { H.addStatus('golden'); return { ok: true, text: '🪙 Ta prochaine mise compte double !' }; } },
-  { id: 'boisson', name: 'Boisson du Bar', icon: '🍸', desc: () => '+1 relance pour la manche (dé, roulette, machine ou carte au blackjack).', inPlayOnly: true,
-    use: H => { H.addCharge({ uid: 'boisson', name: 'Boisson du Bar', icon: '🍸' }, 'any', 1); return { ok: true, text: '🍸 +1 relance pour cette manche.' }; } },
+  { id: 'boisson', name: 'Boisson du Bar', icon: '🍸', desc: () => '+1 relance à cette table (dé, roulette, machine ou carte au blackjack).', inPlayOnly: true,
+    use: H => { H.addCharge({ uid: 'boisson', name: 'Boisson du Bar', icon: '🍸' }, 'any', 1); return { ok: true, text: '🍸 +1 relance pour cette table.' }; } },
   { id: 'potdevin', name: 'Pot-de-vin', icon: '💰', desc: () => 'Le croupier révèle sa carte cachée (pendant une main de Blackjack ou de Hold\'em).',
     capability: 'bribe', use: (H, ctx) => H.useCapability(ctx, 'bribe') },
   { id: 'ticket', name: 'Ticket à gratter', icon: '🎟️', desc: () => 'Gain aléatoire de 0 à 100 jetons.',

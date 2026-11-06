@@ -1,6 +1,6 @@
 // =====================================================================
 //  MOTEUR — état unique sérialisable, bus d'événements, règlement des gains,
-//  manches, shop, prêts et sauvegarde. Aucun DOM : fonctionne aussi sous Node
+//  étages et tables, shop, prêts et sauvegarde. Aucun DOM : fonctionne aussi sous Node
 //  (simulation). L'interface s'abonne via host.on(listener).
 // =====================================================================
 
@@ -16,8 +16,8 @@ const Games = (() => {
 })();
 
 const Engine = (() => {
-  const VERSION = 2;
-  const SAVE_KEY = 'boubouzino.run.v2';
+  const VERSION = 3;
+  const SAVE_KEY = 'boubouzino.run.v3';
   const META_KEY = 'boubouzino.meta';
   const FREE_KEY = 'boubouzino.free';
   const round2 = x => Math.round(x * 100) / 100;
@@ -33,20 +33,21 @@ const Engine = (() => {
   function newRunState(seed) {
     return {
       v: VERSION, mode: 'run', seed, rng: { s: RNG.hashSeed(seed) },
-      chips: CONFIG.start.chips, manche: 1, phase: 'play', round: null, reason: '',
+      chips: CONFIG.progression.jetonsDepart, etage: 1, tableType: 'petite', bossId: null, tagOffers: {}, etageLog: {},
+      infinite: false, phase: 'choose', table: null, reason: '',
       jokers: [], jokerSlots: CONFIG.shop.jokerSlots.base, slotBuys: 0,
       consumables: [], consSlots: CONFIG.shop.consumableSlots,
       upgrades: [], statuses: [], charges: [], debts: [],
       shop: null, summary: null, games: {}, uid: 1,
-      stats: { plays: 0, wins: 0, losses: 0, best: 0, jokersOwned: [] },
+      stats: { plays: 0, wins: 0, losses: 0, best: 0, tablesWon: 0, jokersOwned: [] },
     };
   }
   function freeState() {
     const saved = Storage.get(FREE_KEY, {});
     return {
       v: VERSION, mode: 'free', seed: saved.seed || RNG.randomSeed(), rng: saved.rng || { s: RNG.hashSeed(RNG.randomSeed()) },
-      chips: Number.isFinite(saved.chips) ? saved.chips : CONFIG.start.freeChips,
-      phase: 'play', round: null, jokers: [], upgrades: [], statuses: [], charges: [], debts: [], consumables: [],
+      chips: Number.isFinite(saved.chips) ? saved.chips : CONFIG.freeChips,
+      phase: 'play', table: null, jokers: [], upgrades: [], statuses: [], charges: [], debts: [], consumables: [],
       games: {}, uid: 1, stats: { plays: 0, wins: 0, losses: 0, best: 0, jokersOwned: [] },
     };
   }
@@ -99,16 +100,18 @@ const Engine = (() => {
       };
       state.upgrades.forEach(id => push(UPGRADES[id], { uid: 'up:' + id }, 'upgrade'));
       state.statuses.slice().forEach(s => push(STATUSES[s.id], s, 'status'));
-      const boss = state.round && state.round.boss ? BOSSES[state.round.boss] : null;
+      const boss = currentBoss();
       if (boss) push(boss, { uid: 'boss' }, 'boss');
       state.jokers.forEach((j, i) => {
         const def = resolveJoker(i);
-        if (!def || (boss && boss.disables && boss.disables(def))) return;
+        if (!def || disabled(boss, def, i)) return;
         push(def, j, 'joker');
       });
       return out;
     }
     H.mods = mods;
+    function currentBoss() { return state.table && state.table.boss ? BOSSES[state.table.boss] : null; }
+    function disabled(boss, def, i) { return !!(boss && ((boss.disables && boss.disables(def)) || (boss.disablesIndex && boss.disablesIndex(i)))); }
     // Émet un événement ; les modificateurs lisent/modifient e, qui est renvoyé
     H.emit = (name, e = {}) => {
       for (const { def, me } of mods()) {
@@ -119,9 +122,9 @@ const Engine = (() => {
     };
     H.activeRules = () => mods().filter(m => m.def.kind === 'rule').map(m => m.def.id);
     H.isJokerDisabled = j => {
-      const boss = state.round && state.round.boss ? BOSSES[state.round.boss] : null;
-      const def = resolveJoker(state.jokers.indexOf(j));
-      return !!(boss && boss.disables && def && boss.disables(def));
+      const i = state.jokers.indexOf(j);
+      const def = resolveJoker(i);
+      return !!def && disabled(currentBoss(), def, i);
     };
     H.mirrorTarget = uid => {
       const i = state.jokers.findIndex(j => j.uid === uid);
@@ -141,17 +144,21 @@ const Engine = (() => {
     H.give = a => { if (a > 0) { state.chips = round2(state.chips + a); notify('chips'); } };
 
     // ---------------- Limites, règles de deck ----------------
+    // Pas de mise max par défaut (config progression.limiteMise = null)
     H.maxBet = game => {
-      if (!isRun || !state.round) return Infinity;
-      const e = H.emit('maxBet', { value: state.round.maxBase, game });
+      const lim = CONFIG.progression.limiteMise;
+      if (!isRun || !state.table || !lim) return Infinity;
+      const base = lim[Math.min(state.etage, lim.length - 1)];
+      const e = H.emit('maxBet', { value: base, game });
       const m = Math.max(5, Math.round(e.value));
-      return game === 'uth' ? Math.max(2, Math.floor(m * CONFIG.rounds.uthMaxBetRatio)) : m;
+      return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
     H.excludedRanks = () => H.emit('deck.exclude', { ranks: [] }).ranks;
     H.query = (name, ctx) => H.emit(name, ctx);
 
     // ---------------- Relances (Dé Pipé, Fantôme, Boisson) ----------------
     H.addCharge = (src, games, n = 1) => {
+      if (state.table && state.table.noRerolls) return; // Le Videur : aucune relance
       for (let i = 0; i < n; i++) state.charges.push({ src: src.uid, name: src.name, icon: src.icon, games });
       notify('change');
     };
@@ -180,8 +187,8 @@ const Engine = (() => {
     H.canStart = () => {
       if (active) return 'Un coup est déjà en cours.';
       if (!isRun) return null;
-      if (state.phase !== 'play') return 'La manche est terminée.';
-      if (state.round.tours <= 0) return 'Plus de tours dans cette manche.';
+      if (state.phase !== 'play') return 'Aucune table en cours.';
+      if (state.table.bets <= 0) return 'Plus de mises à cette table.';
       return null;
     };
     H.startPlay = (id, params) => {
@@ -190,9 +197,21 @@ const Engine = (() => {
       const G = Games.get(id);
       const play = { game: id, steps: [] };
       play.flat = (me, v, label) => { if (v) play.steps.push(step('flat', me, v, label)); };
+      // Frais par mise (Le Gourmand…) : vérifiés avant, prélevés après la mise
+      const fee = isRun ? H.query('betFee', { fee: 0, sources: [] }) : { fee: 0 };
+      if (fee.fee && !H.canAfford(fee.fee + 1)) return { error: `Il faut au moins ${fee.fee + 1} jetons (frais de ${fee.fee} par mise).` };
       const res = G.start(H, gameState(id), params, play);
       if (res.error) return res;
-      if (isRun) state.round.tours--;
+      if (isRun) {
+        state.table.bets--;
+        if (fee.fee) {
+          // prélevés tout de suite, puis affichés comme étape du règlement (déjà payée)
+          const f = Math.min(fee.fee, state.chips);
+          H.stake(f);
+          play.prepaid = f;
+          fee.sources.forEach(me => play.steps.push(step('flat', me, -f / fee.sources.length, 'frais de mise')));
+        }
+      }
       state.stats.plays++;
       active = { id, round: res.round, play };
       H.emit('onBetPlaced', { game: id, round: res.round, play });
@@ -252,10 +271,11 @@ const Engine = (() => {
       const flats = steps.filter(s => s.kind === 'flat').reduce((a, s) => a + s.value, 0);
       const gainF = e.gain > 0 ? round2(e.gain * (1 + add) * mult) : e.gain;
       const net = round2(gainF + flats);
-      H.give(Math.max(0, round2(e.staked + net)));
+      H.give(Math.max(0, round2(e.staked + net + (play.prepaid || 0))));
       if (e.outcome === 'win') state.stats.wins++; else if (e.outcome === 'loss') state.stats.losses++;
       state.stats.best = Math.max(state.stats.best, net);
       active = null;
+      if (isRun && state.table) state.table.gains = round2(state.table.gains + Math.max(0, net));
       const settlement = {
         game: id, staked: e.staked, baseBack: e.baseBack, back: e.back, gain: e.gain, outcome: e.outcome,
         steps, add, mult: round2(mult), gainFinal: gainF, flats: round2(flats), net, info: e.info,
@@ -265,85 +285,132 @@ const Engine = (() => {
       return settlement;
     }
 
+    // Fin de table : objectif atteint → gagnée ; sinon faillite ou plus de mises → perdu
     function afterPlay() {
       if (!isRun) { save(); return; }
       if (state.phase !== 'play') return;
+      const t = state.table;
+      if (t.gains >= t.target) return tableWon();
       if (checkBankrupt()) return;
-      if (state.round.tours <= 0) endRound(false);
-      else save();
+      if (t.bets <= 0) return gameOver('Plus de mises : objectif non atteint.');
+      save();
       notify('change');
     }
     function checkBankrupt() {
       if (!isRun || active || state.chips >= 1) return false;
       const e = H.emit('onBankrupt', { saved: false });
       if (e.saved && state.chips >= 1) { notify('change'); return false; }
-      gameOver('Faillite : plus un seul jeton…');
+      gameOver('Plus de jetons.');
       return true;
     }
 
-    // ---------------- Manches ----------------
-    H.roundCfg = n => {
-      const R = CONFIG.rounds, F = R.final;
-      const target = n <= F ? R.targets[n - 1] : Math.round(R.targets[F - 1] * Math.pow(R.endless.targetGrowth, n - F));
-      const maxBet = n <= F ? R.maxBets[n - 1] : Math.round(R.maxBets[F - 1] * Math.pow(R.endless.maxBetGrowth, n - F));
-      return { target, maxBet, tours: R.tours, boss: n % R.bossEvery === 0 || n === F };
+    // ---------------- Étages et tables ----------------
+    const P = CONFIG.progression;
+    const NEXT = { petite: 'grande', grande: 'boss' };
+    H.objective = (etage, type) => {
+      const base = etage <= P.etagesPourGagner ? P.objectifBase[etage]
+        : P.objectifBase[P.etagesPourGagner] * Math.pow(P.croissanceInfinie, etage - P.etagesPourGagner);
+      return Math.round(base * P.multiplicateurTable[type]);
     };
-    function startRound() {
-      const cfg = H.roundCfg(state.manche);
-      state.round = {
-        n: state.manche, target: cfg.target, maxBase: cfg.maxBet, tours: cfg.tours, toursMax: cfg.tours,
-        boss: cfg.boss ? rng.pick(BOSS_DEFS).id : null, start: state.chips,
+    // Infos d'une table de l'étage courant (pour l'écran de choix)
+    H.tableInfo = type => ({
+      type, target: H.objective(state.etage, type), reward: P.recompenseTable[type],
+      boss: type === 'boss' ? state.bossId : null, tag: state.tagOffers[type] || null,
+      status: state.etageLog[type] || (state.tableType === type ? 'current' : 'upcoming'),
+    });
+    function newEtage() {
+      state.bossId = rng.pick(BOSS_DEFS).id;
+      state.tagOffers = { petite: rng.pick(TAG_DEFS).id, grande: rng.pick(TAG_DEFS).id };
+      state.etageLog = {};
+      state.tableType = 'petite';
+    }
+    H.chooseTable = () => {
+      if (state.phase !== 'choose') return { error: 'Choisis d\'abord ta table.' };
+      const t = state.table = {
+        type: state.tableType, etage: state.etage, target: H.objective(state.etage, state.tableType), gains: 0,
+        bets: P.misesParTable, betsMax: P.misesParTable, boss: state.tableType === 'boss' ? state.bossId : null, start: state.chips,
       };
       state.charges = [];
       state.phase = 'play';
-      H.emit('onRoundStart', { round: state.round });
-      state.round.tours = Math.max(1, state.round.tours);
-      state.round.toursMax = state.round.tours;
-      notify('round');
+      H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', P.relancesParTable);
+      H.emit('onRoundStart', { table: t, round: t });
+      if (t.noRerolls) state.charges = [];
+      t.bets = Math.max(1, t.bets);
+      t.betsMax = t.bets;
+      notify('table');
       if (!checkBankrupt()) save();
-    }
-    H.profit = () => (isRun && state.round ? round2(state.chips - state.round.start) : 0);
-    H.objectiveMet = () => isRun && state.phase === 'play' && H.profit() >= state.round.target;
+      return { ok: true };
+    };
+    // Passer la petite ou la grande table contre un tag
+    H.skipTable = () => {
+      if (state.phase !== 'choose') return { error: 'Impossible maintenant.' };
+      if (state.tableType === 'boss') return { error: 'Impossible de passer le boss.' };
+      const tag = state.tagOffers[state.tableType];
+      let text = '';
+      if (tag === 'cadeau') {
+        const id = rng.pick(CONSUMABLE_DEFS).id;
+        if (state.consumables.length < state.consSlots) { state.consumables.push(id); text = `🎁 ${CONSUMABLES[id].name} offert !`; }
+        else { H.give(CONSUMABLES[id].price); text = `🎁 Poches pleines : ${CONSUMABLES[id].price} jetons à la place.`; }
+      } else if (tag) { H.addStatus(tag); text = `${STATUSES[tag].icon} Tag ${STATUSES[tag].name} obtenu.`; }
+      state.etageLog[state.tableType] = 'skipped';
+      state.tableType = NEXT[state.tableType];
+      save(); notify('change');
+      return { ok: true, text };
+    };
 
-    function endRound() {
-      if (active || state.phase !== 'play') return { error: 'Termine le coup en cours.' };
-      if (!H.objectiveMet()) { gameOver(`Objectif manqué : ${H.profit() >= 0 ? '+' : ''}${H.profit()} / +${state.round.target} jetons.`); return { over: true }; }
-      const RW = CONFIG.rounds.reward;
+    function tableWon() {
+      const t = state.table;
+      const I = P.interetsParTranche;
       const lines = [];
-      const reward = RW.base + RW.perManche * state.manche;
-      H.give(reward); lines.push({ label: 'Manche gagnée', value: reward });
-      if (state.round.tours > 0) {
-        const b = state.round.tours * RW.perTourLeft;
-        H.give(b); lines.push({ label: `Tours restants (${state.round.tours} × ${RW.perTourLeft})`, value: b });
-      }
-      const e = { lines, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); } };
+      const interest = Math.min(I.max, Math.floor(state.chips / I.tranche) * I.gain);
+      const reward = P.recompenseTable[t.type];
+      H.give(reward); lines.push({ label: { petite: 'Petite table gagnée', grande: 'Grande table gagnée', boss: 'Boss vaincu' }[t.type], value: reward });
+      if (t.bets > 0) { const b = t.bets * P.bonusParMiseRestante; H.give(b); lines.push({ label: `Mises restantes (${t.bets} × ${P.bonusParMiseRestante})`, value: b }); }
+      if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${I.gain} par ${I.tranche} jetons, ${I.max} max)`, value: interest }); }
+      const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); } };
       H.emit('onRoundEnd', e);
       processDebts(lines);
-      const victory = state.manche === CONFIG.rounds.final;
-      meta.prestige += CONFIG.prestige.perManche + (victory ? CONFIG.prestige.victory : 0);
-      meta.best = Math.max(meta.best, state.manche);
-      if (victory) meta.wins++;
+      state.stats.tablesWon++;
+      state.etageLog[t.type] = 'won';
+      let victory = false;
+      if (t.type === 'boss') {
+        meta.prestige += CONFIG.prestige.perBoss;
+        meta.best = Math.max(meta.best, state.etage);
+        if (state.etage === P.etagesPourGagner && !state.infinite) {
+          victory = true;
+          meta.wins++;
+          meta.prestige += CONFIG.prestige.victory;
+        } else { state.etage++; newEtage(); }
+      } else state.tableType = NEXT[t.type];
       H.saveMeta();
-      state.summary = { manche: state.manche, lines, victory };
-      state.manche++;
-      state.phase = 'shop';
+      state.summary = { type: t.type, etage: t.etage, lines, victory };
+      state.table = null;
       state.charges = [];
       state.shop = genShop(CONFIG.shop.reroll.base);
-      H.emit('onShopEnter', { shop: state.shop });
+      H.emit('onShopEnter', { shop: state.shop, rollJoker });
+      state.phase = victory ? 'victory' : 'shop';
       save();
-      notify('shop');
-      return { ok: true };
+      notify(victory ? 'victory' : 'shop');
     }
-    H.endRound = endRound;
-    H.nextRound = () => {
+    // Après la victoire finale : continuer en mode infini
+    H.continueInfinite = () => {
+      if (state.phase !== 'victory') return;
+      state.infinite = true;
+      state.etage++;
+      newEtage();
+      state.phase = 'shop';
+      save(); notify('shop');
+    };
+    H.leaveShop = () => {
       if (state.phase !== 'shop') return;
       state.summary = null;
-      startRound();
+      state.phase = 'choose';
+      save(); notify('choose');
     };
     function gameOver(reason) {
       state.phase = 'over';
       state.reason = reason;
-      meta.best = Math.max(meta.best, state.manche - 1);
+      meta.best = Math.max(meta.best, state.etage - 1);
       H.saveMeta();
       if (persist) Storage.remove(SAVE_KEY);
       notify('over', { reason });
@@ -385,7 +452,7 @@ const Engine = (() => {
       const owned = new Set([...state.jokers.map(j => j.id), ...exclude]);
       const pool = JOKER_DEFS.filter(d => !owned.has(d.id));
       if (!pool.length) return null;
-      const w = CONFIG.shop.rarityWeights(state.manche);
+      const w = CONFIG.shop.rarityWeights(state.etage);
       if (minRarity === 'rare') w.commun = 0;
       const tiers = Object.keys(w).filter(r => w[r] > 0 && pool.some(d => d.rarity === r)).map(r => ({ r, w: w[r] }));
       const tier = tiers.length ? rng.weighted(tiers).r : pool[0].rarity;
@@ -465,7 +532,7 @@ const Engine = (() => {
       const id = state.consumables[i];
       const def = id && CONSUMABLES[id];
       if (!def) return { ok: false, text: 'Consommable introuvable.' };
-      if (def.inPlayOnly && state.phase !== 'play') return { ok: false, text: 'À utiliser pendant une manche.' };
+      if (def.inPlayOnly && state.phase !== 'play') return { ok: false, text: 'À utiliser pendant une table.' };
       if (def.capability && !H.canUseCapability(ctx, def.capability)) return { ok: false, text: 'Utilisable pendant une main de Blackjack ou de Hold\'em, au bon moment.' };
       if (id === 'bonus' && !arg) return { ok: true, needCard: true };
       const r = def.use(H, ctx, arg);
@@ -486,7 +553,7 @@ const Engine = (() => {
       if (!opt) return { error: 'Prêt inconnu.' };
       if (state.debts.length >= CONFIG.loans.maxActive) return { error: 'Rembourse d\'abord ton prêt en cours.' };
       const total = Math.round(opt.amount * (1 + opt.rate));
-      state.debts.push({ id, name: opt.name, total, left: total, per: Math.ceil(total / opt.manches), missed: 0 });
+      state.debts.push({ id, name: opt.name, total, left: total, per: Math.ceil(total / opt.tables), missed: 0 });
       H.give(opt.amount);
       save(); notify('change');
       return { ok: true };
@@ -502,7 +569,7 @@ const Engine = (() => {
         if (unpaid > 0) {
           const pen = Math.round(unpaid * CONFIG.loans.penaltyRate);
           d.left += pen; d.missed++;
-          lines.push({ label: `⚖️ Échéance impayée : pénalité +${pen} et l'huissier confisque ${CONFIG.loans.penaltyTours} tours`, value: 0, bad: true });
+          lines.push({ label: `⚖️ Échéance impayée : pénalité +${pen} et l'huissier confisque ${CONFIG.loans.penaltyBets} mises`, value: 0, bad: true });
           H.addStatus('huissier');
         }
         return d.left > 0;
@@ -517,8 +584,8 @@ const Engine = (() => {
       if (!isRun) Storage.set(FREE_KEY, { chips: state.chips, rng: state.rng, seed: state.seed });
     }
     H.save = save;
-    H.resetFree = () => { if (!isRun) { state.chips = CONFIG.start.freeChips; save(); notify('chips'); } };
-    H.startRound = startRound;
+    H.resetFree = () => { if (!isRun) { state.chips = CONFIG.freeChips; save(); notify('chips'); } };
+    H.newEtage = newEtage;
     return H;
   }
 
@@ -528,7 +595,8 @@ const Engine = (() => {
       const s = (seed && String(seed).trim().toUpperCase()) || RNG.randomSeed();
       const H = createHost(newRunState(s), { meta, persist });
       H.meta.runs++; H.saveMeta();
-      H.startRound();
+      H.newEtage();
+      H.save();
       return H;
     },
     hasSave() { const s = Storage.get(SAVE_KEY); return !!(s && s.v === VERSION && s.phase !== 'over'); },

@@ -806,3 +806,54 @@ footer { position: relative; z-index: 1; text-align: center; color: var(--muted)
 @media (max-width: 640px) {
   .ledger { right: 50%; transform: translateX(50%); bottom: 12px; animation: none; }
 }
+
+/* =========================================================
+   Choix de la table (petite, grande, boss)
+   ========================================================= */
+.choose { max-width: 1100px; margin: 0 auto; padding: 28px 16px; display: flex; flex-direction: column; gap: 22px; }
+.choose-head { text-align: center; }
+.choose-head h2 { font-family: "Cinzel Decorative", var(--serif); color: var(--gold-2); font-size: 36px; margin: 0 0 6px; }
+.choose-head p { color: var(--muted); margin: 0; }
+.choose-foot { text-align: center; }
+.tables { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.tcard {
+  position: relative; border-radius: 22px; padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center;
+  background: radial-gradient(ellipse at 50% 0%, var(--felt-1), var(--felt-2) 70%, var(--felt-3));
+  border: 3px solid var(--gold-dark); box-shadow: 0 16px 30px #000a, inset 0 0 40px #0008;
+  transition: transform .25s, opacity .25s, filter .25s; animation: cardIn .4s both;
+}
+.tcard:nth-child(2) { animation-delay: .08s; } .tcard:nth-child(3) { animation-delay: .16s; }
+.tcard.current { transform: translateY(-8px); border-color: var(--gold-2); box-shadow: 0 0 0 3px #f6dc9455, 0 22px 40px #000c, inset 0 0 40px #0008; }
+.tcard.upcoming { opacity: .55; filter: saturate(.6); }
+.tcard.won, .tcard.skipped { opacity: .45; filter: grayscale(.6); }
+.tcard.boss { background: radial-gradient(ellipse at 50% 0%, #7a1724, #4a0d14 70%, #22060a); border-color: #c4161c; }
+.tc-head { width: 100%; display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-weight: 700; color: var(--gold-2); }
+.tc-head i { font-style: normal; font-size: 11px; font-family: system-ui, sans-serif; background: #0008; padding: 2px 8px; border-radius: 999px; color: var(--text); }
+.tcard.won .tc-head i { color: var(--win); }
+.tc-chip {
+  width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; color: #fff;
+  --c: #128a3f; --e: #fff;
+  background: radial-gradient(circle, var(--c) 0 44%, var(--e) 45% 48%, var(--c) 49% 64%, transparent 65%), repeating-conic-gradient(var(--c) 0 22.5deg, var(--e) 22.5deg 45deg);
+  box-shadow: 0 4px 0 #0007, 0 6px 12px #0008;
+}
+.tcard.grande .tc-chip { --c: #1d4b9a; }
+.tcard.boss .tc-chip { --c: #17171b; --e: #c4161c; }
+.tcard.current .tc-chip { animation: spinChip 6s linear infinite; }
+@keyframes spinChip { to { transform: rotate(360deg); } }
+.tc-goal { display: flex; flex-direction: column; }
+.tc-goal small { color: #ffffffaa; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+.tc-goal b { font-size: 34px; color: var(--gold-2); font-variant-numeric: tabular-nums; text-shadow: 0 2px 6px #000; }
+.tc-meta { font-size: 12.5px; color: #ffffffcc; }
+.tc-meta b { color: var(--gold-2); }
+.tc-boss { background: #0009; border: 1px solid #ff7b7b66; border-radius: 12px; padding: 8px 10px; font-size: 13px; color: #ffd0d0; width: 100%; }
+.tc-tag { background: #0007; border: 1px dashed #c9b8ff88; border-radius: 12px; padding: 8px 10px; font-size: 13px; width: 100%; }
+.tc-tag span { color: var(--muted); }
+.tc-tag small { color: #e4dcff; }
+.tc-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+.ri-table { font-size: 16px !important; }
+.ri-table.boss { color: var(--lose) !important; }
+@media (max-width: 760px) {
+  .tables { grid-template-columns: 1fr; }
+  .tcard.current { transform: none; order: -1; }
+  .choose-head h2 { font-size: 28px; }
+}

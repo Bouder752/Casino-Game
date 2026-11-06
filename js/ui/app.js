@@ -100,8 +100,10 @@ const App = (() => {
         case 'flash': fire('flash', data); break;
         case 'toast': fire('toast', data.text); break;
         case 'sound': Sfx.play(data.name); break;
-        case 'round': fire('round'); break;
+        case 'table': fire('table'); break;
+        case 'choose': defer(() => fire('choose')); break;
         case 'shop': setTimeout(() => defer(() => fire('shop')), 700); break;
+        case 'victory': setTimeout(() => defer(() => fire('victory')), 700); break;
         case 'over': setTimeout(() => defer(() => fire('over', data)), 700); break;
       }
     });

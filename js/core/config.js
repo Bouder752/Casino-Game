@@ -4,24 +4,44 @@
 //  console, ou `node tools/simulate.js 1000`) pour mesurer l'effet.
 // =====================================================================
 const CONFIG = {
-  start: { chips: 100, freeChips: 1000 },
+  // ---------- Progression (structure en étages) ----------
+  progression: {
+    etagesPourGagner: 8,
+    jetonsDepart: 100,
+    misesParTable: 6,          // nombre de mises autorisées par table
+    relancesParTable: 2,       // « défausses » : refaire un tirage sans miser
 
-  rounds: {
-    final: 8,                                        // manches à survivre pour gagner
-    targets: [25, 40, 60, 90, 130, 180, 250, 350],   // objectif de gain par manche
-    maxBets: [25, 35, 50, 70, 100, 140, 200, 280],   // mise max de base par manche
-    tours: 10,                                       // coups par manche
-    bossEvery: 3,                                    // un Patron toutes les N manches (+ la finale)
-    endless: { targetGrowth: 1.5, maxBetGrowth: 1.4 },
-    reward: { base: 8, perManche: 2, perTourLeft: 2 },
-    uthMaxBetRatio: 0.5,                             // l'Ante est limité à 50 % de la mise max (Ante + Blind)
+    // Objectif de gains de la petite table, par étage (index = étage)
+    objectifBase: [0, 60, 150, 350, 800, 1600, 3000, 5000, 8000],
+    multiplicateurTable: { petite: 1, grande: 1.5, boss: 2 },
+    croissanceInfinie: 1.6,    // après l'étage 8, objectif ×1,6 par étage
+
+    recompenseTable: { petite: 30, grande: 45, boss: 70 },
+    bonusParMiseRestante: 10,  // bonus pour chaque mise non utilisée
+    interetsParTranche: { tranche: 50, gain: 5, max: 25 }, // 5 jetons par 50 possédés, 25 max
+
+    // La petite ou la grande table (pas le boss) peut être passée contre un tag bonus
+    passerTableRecompense: 'tag',
+    limiteMise: null,          // null = pas de mise max ; sinon tableau par étage
   },
-  prestige: { perManche: 1, victory: 5 },
+  freeChips: 1000,
+  prestige: { perBoss: 1, victory: 5 },
+
+  // Tags obtenus en passant une table
+  tags: {
+    soldes: { discount: 0.5 },
+    cadeau: {},
+    turbo: { bets: 2 },
+    collection: {},
+    investisseur: { amount: 40 },
+    double: { rerolls: 2 },
+  },
 
   shop: {
     jokers: 3, consumables: 2, packs: 1, upgrades: 1,
     // Poids de rareté selon la manche (n = numéro de la manche)
-    rarityWeights: n => ({ commun: 70 - 2 * n, rare: 25 + 1.5 * n, legendaire: 5 + 0.5 * n }),
+    // Poids de rareté selon l'étage (n)
+    rarityWeights: n => ({ commun: 70 - 3 * n, rare: 25 + 2 * n, legendaire: 5 + n }),
     reroll: { base: 5, step: 5 },
     sellRatio: 0.5,
     jokerSlots: { base: 4, prices: [100, 200, 400] },
@@ -30,12 +50,12 @@ const CONFIG = {
 
   loans: {
     options: [
-      { id: 'petit', name: 'Petit prêt', amount: 100, rate: 0.2, manches: 3 },
-      { id: 'gros', name: 'Gros prêt', amount: 300, rate: 0.35, manches: 4 },
+      { id: 'petit', name: 'Petit prêt', amount: 100, rate: 0.2, tables: 3 },
+      { id: 'gros', name: 'Gros prêt', amount: 300, rate: 0.35, tables: 4 },
     ],
     maxActive: 1,
     penaltyRate: 0.5,      // la part impayée d'une échéance augmente de 50 %
-    penaltyTours: 2,       // et l'huissier confisque 2 tours à la manche suivante
+    penaltyBets: 2,        // et l'huissier confisque 2 mises à la table suivante
   },
 
   jokers: {
@@ -72,7 +92,7 @@ const CONFIG = {
     ] },
   },
   upgrades: {
-    vip: { price: 150, mult: 1.5 },
+    vip: { price: 150, bets: 1 },
     truque: { price: 120, ranks: [2, 3] },
     doree: { price: 180 },
   },
@@ -80,13 +100,14 @@ const CONFIG = {
     petit: { price: 50, choices: 2 },
     mystere: { price: 120, legendaryChance: 0.25 },
   },
+  // Boss : règles spéciales de la 3e table de chaque étage
   bosses: {
-    radin: { bjPay: 1.2 },
-    douane: { maxBetMult: 0.6 },
-    horloger: { tours: 3 },
-    glacon: {},
-    fer: {},
-    maison: { edge: 95 },
+    avare: { mult: 0.75 },
+    presse: { bets: 3 },
+    noir: {},
+    sobre: {},
+    endormi: {},
+    gourmand: { fee: 5 },
   },
   rules: {
     bj21: { bjPay: 2 },

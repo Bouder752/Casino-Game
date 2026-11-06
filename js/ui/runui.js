@@ -9,7 +9,7 @@ const UI = (() => {
 
   // ---------- Écrans et onglets ----------
   function screen(name) {
-    ['menu', 'game', 'shop', 'cosmetics'].forEach(n => ($('screen-' + n).hidden = n !== name));
+    ['menu', 'choose', 'game', 'shop', 'cosmetics'].forEach(n => ($('screen-' + n).hidden = n !== name));
     document.body.dataset.screen = name;
     closePopover();
     window.scrollTo(0, 0);
@@ -94,7 +94,7 @@ const UI = (() => {
     const s = j.state || {};
     if (j.id === 'martingale' && s.streak) return `<p class="pop-extra">Série de pertes : ${s.streak} (+${s.streak * CONFIG.jokers.martingale.pct * 100} % au prochain gain)</p>`;
     if (j.id === 'roue' && s.rules && s.rules.length) return `<p class="pop-extra">Règle active : ${RULES[s.rules[0]].desc()}</p>`;
-    if (j.id === 'molle') return `<p class="pop-extra">${s.used ? 'Déjà utilisée cette manche' : 'Prête pour cette manche'}</p>`;
+    if (j.id === 'molle') return `<p class="pop-extra">${s.used ? 'Déjà utilisée à cette table' : 'Prête pour cette table'}</p>`;
     if (j.id === 'miroir') { const t = H().mirrorTarget(j.uid); return `<p class="pop-extra">Copie : ${t ? t.name : 'rien (aucun joker à droite)'}</p>`; }
     return '';
   }
@@ -160,55 +160,96 @@ const UI = (() => {
     }
   }
 
+  const TABLE_NAME = { petite: 'Petite table', grande: 'Grande table', boss: 'Table du Boss' };
+  const F = () => CONFIG.progression.etagesPourGagner;
+  const etageText = st => `Étage ${st.etage}${st.etage <= F() ? ' / ' + F() : ' · infini'}`;
+
   // ---------- Barre de partie ----------
   function renderRunBar() {
     const run = isRun();
     $('run-bar').hidden = !run;
     $('reset').hidden = run || !App.host;
     document.querySelector('.wallet').hidden = !App.host;
-    $('top-mode').textContent = !App.host ? '' : run ? `Manche ${S().manche}${S().manche <= CONFIG.rounds.final ? ' / ' + CONFIG.rounds.final : ' · infini'}` : 'Mode libre';
+    $('top-mode').textContent = !App.host ? '' : run ? etageText(S()) + (S().table ? ' — ' + TABLE_NAME[S().table.type] : '') : 'Mode libre';
     if (!run) return;
     const st = S();
     renderJokers($('joker-slots'));
     renderConsumables();
-    if (st.phase !== 'play' || !st.round) return;
-    const p = H().profit();
-    const pct = Math.max(0, Math.min(100, p / st.round.target * 100));
-    const boss = st.round.boss ? BOSSES[st.round.boss] : null;
+    const t = st.table;
+    if (st.phase !== 'play' || !t) return;
+    const pct = Math.max(0, Math.min(100, t.gains / t.target * 100));
+    const boss = t.boss ? BOSSES[t.boss] : null;
     const rules = H().activeRules().map(id => RULES[id].desc());
-    const charges = st.charges.length;
     const debt = st.debts[0];
+    const tags = st.statuses.filter(x => STATUSES[x.id].tag || x.id === 'golden' || x.id === 'huissier');
     $('run-info').innerHTML = `
-      <div class="ri-block ri-manche"><span>Manche</span><b>${st.manche}${st.manche <= CONFIG.rounds.final ? `<small>/${CONFIG.rounds.final}</small>` : ''}</b></div>
+      <div class="ri-block ri-manche"><span>${etageText(st)}</span><b class="ri-table ${t.type}">${TABLE_NAME[t.type]}</b></div>
       <div class="ri-block ri-goal">
-        <span>Objectif : gagner <b>+${Util.fmt(st.round.target)}</b> jetons</span>
-        <div class="goal-bar ${H().objectiveMet() ? 'met' : ''}"><i style="width:${pct}%"></i></div>
-        <small>${Util.signed(p) || '0'} / +${Util.fmt(st.round.target)}</small>
+        <span>Gains de la table</span>
+        <div class="goal-bar ${t.gains >= t.target ? 'met' : ''}"><i style="width:${pct}%"></i></div>
+        <small><b>${Util.fmt(t.gains)}</b> / ${Util.fmt(t.target)}</small>
       </div>
-      <div class="ri-block"><span>Tours</span><b class="${st.round.tours <= 2 ? 'low' : ''}">${st.round.tours}<small>/${st.round.toursMax}</small></b></div>
-      <div class="ri-block"><span>Mise max</span><b>${Util.fmt(H().maxBet('bj'))}</b></div>
-      ${charges ? `<div class="ri-block"><span>Relances</span><b>${charges}</b></div>` : ''}
-      ${debt ? `<div class="ri-chip debt">💳 Dette : ${Util.fmt(debt.left)} (échéance ${Util.fmt(Math.min(debt.per, debt.left))})</div>` : ''}
-      ${st.statuses.map(s => `<div class="ri-chip">${STATUSES[s.id].icon} ${STATUSES[s.id].name}</div>`).join('')}
+      <div class="ri-block"><span>Mises</span><b class="${t.bets <= 2 ? 'low' : ''}">${t.bets}<small>/${t.betsMax}</small></b></div>
+      <div class="ri-block"><span>Relances</span><b>${st.charges.length}</b></div>
       ${boss ? `<div class="ri-chip boss">☠ ${boss.name} : ${boss.desc()}</div>` : ''}
       ${rules.map(r => `<div class="ri-chip rule">🎡 ${r}</div>`).join('')}
-      <div class="ri-chip seed" title="Rejouer cette seed donne exactement la même partie">🌱 Seed ${st.seed}</div>
-      <div class="ri-actions"><button class="btn primary small" id="ri-cash" ${H().objectiveMet() && !H().busy() ? '' : 'disabled'}>Encaisser ➜ Shop</button></div>`;
-    $('ri-cash').onclick = () => { if (report(H().endRound())) Sfx.play('click'); };
+      ${tags.map(x => `<div class="ri-chip">${STATUSES[x.id].icon} ${STATUSES[x.id].name}</div>`).join('')}
+      ${debt ? `<div class="ri-chip debt">💳 Dette : ${Util.fmt(debt.left)} (échéance ${Util.fmt(Math.min(debt.per, debt.left))})</div>` : ''}
+      <div class="ri-chip seed" title="Rejouer cette seed donne exactement la même partie">🌱 Seed ${st.seed}</div>`;
+  }
+
+  // ---------- Choix de la table (petite, grande, boss) ----------
+  function renderChoose() {
+    const st = S();
+    const P = CONFIG.progression;
+    const card = type => {
+      const info = H().tableInfo(type);
+      const boss = info.boss ? BOSSES[info.boss] : null;
+      const tag = info.tag ? STATUSES[info.tag] : null;
+      const current = info.status === 'current';
+      const badge = { won: '✓ Gagnée', skipped: '⏭ Passée', upcoming: 'À venir', current: 'Maintenant' }[info.status];
+      return `<div class="tcard ${type} ${info.status}">
+        <div class="tc-head"><span>${TABLE_NAME[type]}</span><i>${badge}</i></div>
+        <div class="tc-chip">${type === 'boss' ? '☠' : type === 'grande' ? '♦' : '♣'}</div>
+        <div class="tc-goal"><small>Objectif de gains</small><b>${Util.fmt(info.target)}</b></div>
+        <div class="tc-meta">${P.misesParTable} mises · ${P.relancesParTable} relances · récompense <b>${info.reward}</b></div>
+        ${boss ? `<div class="tc-boss"><b>${boss.name}</b><br>${boss.desc()}</div>` : ''}
+        ${tag ? `<div class="tc-tag"><span>Passer pour :</span> ${tag.icon} <b>${tag.name}</b><br><small>${tag.desc()}</small></div>` : ''}
+        ${current ? `<div class="tc-actions"><button class="btn primary" data-act="play">Jouer</button>${type !== 'boss' ? '<button class="btn" data-act="skip">Passer</button>' : ''}</div>` : ''}
+      </div>`;
+    };
+    $('choose').innerHTML = `<div class="choose-head"><h2>${etageText(st)}</h2>
+        <p>Atteins l'objectif de gains de chaque table en ${P.misesParTable} mises. Seules les mises gagnantes comptent.</p></div>
+      <div class="tables">${['petite', 'grande', 'boss'].map(card).join('')}</div>
+      <div class="choose-foot"><span class="ri-chip seed">🌱 Seed ${st.seed}</span></div>`;
+    $('choose').querySelectorAll('[data-act]').forEach(b => (b.onclick = () => {
+      Sfx.play('click');
+      if (b.dataset.act === 'play') { if (report(H().chooseTable())) startTableUI(); }
+      else { const r = H().skipTable(); if (report(r)) { if (r.text) toast(r.text); Sfx.play('joker'); renderChoose(); App.syncBalance(); } }
+    }));
+  }
+  function startTableUI() {
+    App.views().forEach(v => v.reset && v.reset());
+    enterGame();
+    const t = S().table;
+    if (t.boss) {
+      const b = BOSSES[t.boss];
+      modal(`<div class="intro"><div class="intro-n">☠ ${b.name}</div><div class="intro-boss">${b.desc()}</div>
+        <div class="intro-goal">Gagne <b>${Util.fmt(t.target)}</b> jetons en <b>${t.bets}</b> mises</div></div>`, [['Affronter le boss', () => {}, 'primary big']], 'intro-box');
+    }
   }
 
   // ---------- Shop ----------
   function renderShop() {
     const st = S();
-    const next = H().roundCfg(st.manche);
+    const nextInfo = H().tableInfo(st.tableType);
     const sum = st.summary;
-    const vipMult = st.upgrades.includes('vip') ? CONFIG.upgrades.vip.mult : 1;
     const debt = st.debts[0];
     $('shop').innerHTML = `
       <div class="shop-head">
         <h2>Le Comptoir</h2>
         ${sum ? `<div class="shop-summary">
-          <div class="ss-title">${sum.victory ? '🏆 Manche finale remportée !' : `Manche ${sum.manche} remportée`}</div>
+          <div class="ss-title">${sum.victory ? '🏆 Boss final vaincu !' : `${TABLE_NAME[sum.type]} de l'étage ${sum.etage} gagnée`}</div>
           ${sum.lines.map(l => `<div class="ss-line ${l.bad || l.value < 0 ? 'bad' : ''}"><span>${l.label}</span>${l.value ? `<b>${Util.signed(l.value)}</b>` : ''}</div>`).join('')}
         </div>` : ''}
       </div>
@@ -221,20 +262,19 @@ const UI = (() => {
         <div class="shop-side">
           <div class="ss-bal"><span class="wallet-chip"></span>${Util.fmt(H().chips())}</div>
           <div class="ss-next">
-            <div>Prochaine manche : <b>${st.manche}${st.manche <= CONFIG.rounds.final ? '/' + CONFIG.rounds.final : ''}</b></div>
-            <div>Objectif : <b>+${Util.fmt(next.target)}</b> en ${next.tours} tours</div>
-            <div>Mise max : <b>${Util.fmt(Math.round(next.maxBet * vipMult))}</b></div>
-            ${next.boss ? '<div class="boss-warn">☠ Manche du Patron</div>' : ''}
+            <div>Prochaine table : <b>${TABLE_NAME[st.tableType]}</b> — ${etageText(st)}</div>
+            <div>Objectif de gains : <b>${Util.fmt(nextInfo.target)}</b> en ${CONFIG.progression.misesParTable} mises</div>
+            ${nextInfo.boss ? `<div class="boss-warn">☠ ${BOSSES[nextInfo.boss].name} : ${BOSSES[nextInfo.boss].desc()}</div>` : ''}
           </div>
           <button class="btn" id="shop-reroll">🔄 Relancer le shop (${st.shop.rerollCost})</button>
           <button class="btn" id="shop-slot" ${H().slotPrice() ? '' : 'disabled'}>➕ Emplacement de joker ${H().slotPrice() ? `(${H().slotPrice()})` : '(max)'}</button>
           <div class="loans">
             <div class="shop-row-title">💳 Le Prêteur</div>
-            ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque fin de manche.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
-              : CONFIG.loans.options.map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${o.amount} maintenant<br><small>${Math.round(o.amount * (1 + o.rate))} à rendre en ${o.manches} manches</small></button>`).join('')}
-            <p class="hint">Échéance impayée : +${CONFIG.loans.penaltyRate * 100} % sur la part manquante et ${CONFIG.loans.penaltyTours} tours confisqués.</p>
+            ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque table gagnée.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
+              : CONFIG.loans.options.map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${o.amount} maintenant<br><small>${Math.round(o.amount * (1 + o.rate))} à rendre en ${o.tables} tables</small></button>`).join('')}
+            <p class="hint">Échéance impayée : +${CONFIG.loans.penaltyRate * 100} % sur la part manquante et ${CONFIG.loans.penaltyBets} mises confisquées.</p>
           </div>
-          <button class="btn primary big" id="shop-next">Manche suivante ➜</button>
+          <button class="btn primary big" id="shop-next">Continuer ➜</button>
         </div>
       </div>
       <div class="shop-owned">
@@ -257,7 +297,7 @@ const UI = (() => {
     $('shop-reroll').onclick = () => { if (report(H().reroll())) { Sfx.play('buy'); App.syncBalance(); } };
     $('shop-slot').onclick = () => { if (report(H().buySlot())) { Sfx.play('buy'); App.syncBalance(); } };
     document.querySelectorAll('.loan').forEach(b => (b.onclick = () => { if (report(H().takeLoan(b.dataset.id))) { Sfx.play('coins'); App.syncBalance(); toast('💳 Prêt accordé. Attention aux échéances !'); } }));
-    $('shop-next').onclick = () => { Sfx.play('click'); H().nextRound(); };
+    $('shop-next').onclick = () => { Sfx.play('click'); H().leaveShop(); };
   }
   function buy(i) {
     const r = H().buy(i);
@@ -285,7 +325,7 @@ const UI = (() => {
   function renderMenu() {
     $('m-continue').hidden = !Engine.hasSave();
     $('m-prestige').textContent = `✦ ${META.prestige}`;
-    $('m-stats').innerHTML = `Meilleure manche : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b> · Jackpot Éternel : <b>×${META.jackpot.toFixed(1)}</b>`;
+    $('m-stats').innerHTML = `Meilleur étage : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b> · Jackpot Éternel : <b>×${META.jackpot.toFixed(1)}</b>`;
   }
   function renderCosmetics() {
     const root = $('cosmetics');
@@ -298,7 +338,7 @@ const UI = (() => {
         <button class="btn small ${owned ? '' : 'primary'}" ${!owned && META.prestige < it.price ? 'disabled' : ''}>${sel ? 'Équipé' : owned ? 'Équiper' : `✦ ${it.price}`}</button></div>`;
     };
     root.innerHTML = `<div class="cos-head"><h2>Cosmétiques</h2><div class="prestige-badge big">✦ ${META.prestige} prestige</div>
-      <p>Le prestige se gagne en mode roguelike : ✦${CONFIG.prestige.perManche} par manche remportée, ✦${CONFIG.prestige.victory} de plus pour la manche finale.</p></div>
+      <p>Le prestige se gagne en mode roguelike : ✦${CONFIG.prestige.perBoss} par boss vaincu, ✦${CONFIG.prestige.victory} de plus pour la victoire finale.</p></div>
       <h3>Tapis</h3><div class="cos-grid">${Cosmetics.FELTS.map(item).join('')}</div>
       <h3>Dos de cartes</h3><div class="cos-grid">${Cosmetics.BACKS.map(item).join('')}</div>
       <div class="cos-foot"><button class="btn big" id="cos-back">⬅ Retour</button></div>`;
@@ -313,42 +353,43 @@ const UI = (() => {
     $('cos-back').onclick = () => { renderMenu(); screen('menu'); };
   }
   function howTo() {
-    const R = CONFIG.rounds;
+    const P = CONFIG.progression;
     modal(`<h2>Comment jouer</h2>
       <ul class="howto">
-        <li>Tu démarres avec <b>${CONFIG.start.chips} jetons</b>. Chaque <b>manche</b> te donne <b>${R.tours} tours</b> (une main, un tirage ou un lancer = 1 tour) pour gagner un <b>objectif</b> de jetons, dans la limite d'une <b>mise max</b>.</li>
-        <li>Objectif atteint : encaisse (bonus de ${R.reward.perTourLeft} jetons par tour restant) ou continue. Tours épuisés avant l'objectif, ou faillite : perdu.</li>
-        <li>Entre les manches, le <b>Comptoir</b> vend des <b>jokers</b>, des consommables, des packs et des améliorations. Le <b>Prêteur</b> avance des jetons, à rembourser à chaque fin de manche.</li>
-        <li>Les jokers s'appliquent de <b>gauche à droite</b> : le Miroir copie son voisin de droite. Chaque gain affiche son détail : gain brut → bonus en % → multiplicateurs → bonus fixes.</li>
-        <li>Toutes les ${R.bossEvery} manches, un <b>Patron</b> impose un malus. Survis aux ${R.final} manches pour gagner.</li>
-        <li>Chaque partie a une <b>seed</b> : la même seed et les mêmes choix donnent exactement la même partie.</li>
+        <li>Tu démarres avec <b>${P.jetonsDepart} jetons</b>. Il y a <b>${P.etagesPourGagner} étages</b>, chacun avec 3 tables : <b>petite</b>, <b>grande</b> et <b>table du Boss</b>.</li>
+        <li>À chaque table, atteins l'<b>objectif de gains</b> en <b>${P.misesParTable} mises</b> maximum (une main, un tirage ou un lancer = 1 mise), sur le jeu de ton choix. Seules les mises gagnantes font avancer l'objectif : les pertes ne coûtent que des jetons.</li>
+        <li>Tu as <b>${P.relancesParTable} relances</b> par table pour refaire un tirage raté sans miser à nouveau.</li>
+        <li>Table gagnée : récompense, +${P.bonusParMiseRestante} par mise restante et ${P.interetsParTranche.gain} jetons d'intérêts par tranche de ${P.interetsParTranche.tranche} (${P.interetsParTranche.max} max), puis le <b>Comptoir</b>.</li>
+        <li>Tu peux <b>passer</b> la petite ou la grande table pour gagner un <b>tag</b> (bonus), mais pas le Boss, qui impose une règle spéciale.</li>
+        <li>Plus de mises sans l'objectif, ou plus de jetons : perdu. Bats le boss de l'étage ${P.etagesPourGagner} pour gagner, puis continue en mode infini.</li>
+        <li>Les jokers s'appliquent de <b>gauche à droite</b>. Chaque gain affiche son détail. Chaque partie a une <b>seed</b> : même seed et mêmes choix = même partie.</li>
       </ul>`, [['Compris !', () => {}, 'primary']]);
-  }
-  function mancheIntro() {
-    const st = S();
-    const boss = st.round.boss ? BOSSES[st.round.boss] : null;
-    const rules = H().activeRules().map(id => RULES[id].desc());
-    modal(`<div class="intro"><div class="intro-n">Manche ${st.manche}${st.manche <= CONFIG.rounds.final ? ' / ' + CONFIG.rounds.final : ''}</div>
-      <div class="intro-goal">Gagne <b>+${Util.fmt(st.round.target)}</b> jetons en <b>${st.round.tours}</b> tours</div>
-      <div>Mise max : <b>${Util.fmt(H().maxBet('bj'))}</b> · Solde : <b>${Util.fmt(H().chips())}</b></div>
-      ${boss ? `<div class="intro-boss">☠ Manche du Patron — <b>${boss.name}</b><br>${boss.desc()}</div>` : ''}
-      ${rules.map(r => `<div class="intro-rule">🎡 La Roue Folle : ${r}</div>`).join('')}
-      ${st.statuses.some(s => s.id === 'huissier') ? '<div class="intro-boss">⚖️ L\'huissier est passé : tours confisqués.</div>' : ''}</div>`, [['C\'est parti !', () => {}, 'primary big']], 'intro-box');
   }
   function enterGame() { screen('game'); renderRunBar(); refreshGames(); }
 
   // ---------- Sessions ----------
-  function startRun(seed) {
-    App.attach(Engine.newRun({ seed, meta: META }));
-    enterGame(); mancheIntro();
+  function showPhase() {
+    const ph = S().phase;
+    renderRunBar();
+    if (ph === 'choose') { renderChoose(); screen('choose'); }
+    else if (ph === 'shop' || ph === 'victory') { renderShop(); screen('shop'); if (ph === 'victory') victoryModal(); }
+    else enterGame();
   }
+  function startRun(seed) { App.attach(Engine.newRun({ seed, meta: META })); showPhase(); }
   function resume() {
     const h = Engine.load({ meta: META });
     if (!h) { toast('Aucune partie à reprendre.'); return renderMenu(); }
     App.attach(h);
-    if (h.state.phase === 'shop') { renderRunBar(); renderShop(); screen('shop'); } else enterGame();
+    showPhase();
   }
   function freeMode() { App.attach(Engine.free({ meta: META })); enterGame(); }
+  function victoryModal() {
+    const st = S();
+    Sfx.play('fanfare');
+    modal(`<div class="intro"><div class="intro-n">🏆 Victoire !</div><p>Tu as fait sauter la banque du Boubouz'ino : ${CONFIG.progression.etagesPourGagner} étages vaincus.</p>
+      <p>Seed : <b>${st.seed}</b> · Tables gagnées : <b>${st.stats.tablesWon}</b></p><p>✦ +${CONFIG.prestige.perBoss + CONFIG.prestige.victory} prestige</p></div>`,
+    [['Continuer en mode infini', () => H().continueInfinite(), 'primary'], ['Terminer la partie', () => { Engine.clearSave(); App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
+  }
 
   // ---------- Événements ----------
   App.on('session', () => renderRunBar());
@@ -357,22 +398,16 @@ const UI = (() => {
     renderRunBar();
     if (isRun() && S().phase === 'shop' && !$('screen-shop').hidden) renderShop();
   });
-  App.on('round', () => { App.views().forEach(v => v.reset && v.reset()); enterGame(); mancheIntro(); });
-  App.on('shop', () => {
-    closeModal(); renderRunBar(); renderShop(); screen('shop');
-    Sfx.play(S().summary && S().summary.victory ? 'fanfare' : 'win');
-    if (S().summary && S().summary.victory) {
-      modal(`<div class="intro"><div class="intro-n">🏆 Victoire !</div><p>Tu as fait sauter la banque du Boubouz'ino en ${CONFIG.rounds.final} manches.</p>
-        <p>Seed : <b>${S().seed}</b></p><p>✦ +${CONFIG.prestige.perManche + CONFIG.prestige.victory} prestige</p></div>`,
-      [['Continuer en mode infini', () => {}, 'primary'], ['Terminer la partie', () => { Engine.clearSave(); App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
-    }
-  });
+  App.on('table', () => renderRunBar());
+  App.on('choose', () => { closeModal(); renderRunBar(); renderChoose(); screen('choose'); });
+  App.on('shop', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); Sfx.play('win'); });
+  App.on('victory', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); victoryModal(); });
   App.on('over', () => {
     const st = S();
     Sfx.play('gameover');
     modal(`<div class="intro"><div class="intro-n lose">Partie terminée</div><p>${st.reason}</p>
-      <div class="over-stats"><div><span>Manche atteinte</span><b>${st.manche}</b></div><div><span>Coups joués</span><b>${st.stats.plays}</b></div>
-      <div><span>Victoires</span><b>${st.stats.wins}</b></div><div><span>Plus gros gain</span><b>${Util.fmt(st.stats.best)}</b></div></div>
+      <div class="over-stats"><div><span>Étage atteint</span><b>${st.etage}</b></div><div><span>Tables gagnées</span><b>${st.stats.tablesWon}</b></div><div><span>Coups joués</span><b>${st.stats.plays}</b></div>
+      <div><span>Plus gros gain</span><b>${Util.fmt(st.stats.best)}</b></div></div>
       <p>Seed : <b>${st.seed}</b></p>
       <div class="over-jokers">${st.jokers.map(j => JOKERS[j.id].icon).join(' ')}</div></div>`,
     [['Nouvelle partie', () => startRun()], ['Rejouer cette seed', () => startRun(st.seed)], ['Menu principal', () => { App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
