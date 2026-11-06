@@ -8,13 +8,14 @@ const Dice = (() => {
     profit: $('dice-profit'), rule: $('dice-rule'), marker: $('dice-marker'), track: $('dice-track'),
     history: $('dice-history'), actions: $('dice-actions'), msg: $('dice-msg'),
   };
-  const bet = new BetControl($('dice-bet'), { label: 'Mise', initial: 10 });
+  const bet = new BetControl($('dice-bet'), { label: 'Mise', initial: 10, max: () => Casino.maxBet('dice') });
   let mode = 'under';
   const history = [];
 
   const target = () => +els.slider.value;
   const chance = () => (mode === 'under' ? target() : 100 - target());
-  const multiplier = () => Math.floor((99 / chance()) * 10000) / 10000;
+  const edge = () => (Casino.rule('diceFair') ? 100 : Casino.boss('maison') ? 95 : 99);
+  const multiplier = () => Math.floor((edge() / chance()) * 10000) / 10000;
 
   function update() {
     const t = target();
@@ -25,47 +26,84 @@ const Dice = (() => {
     els.rule.textContent = mode === 'under' ? `Gagné si le résultat < ${t.toFixed(2)}` : `Gagné si le résultat ≥ ${t.toFixed(2)}`;
     els.under.classList.toggle('active', mode === 'under');
     els.over.classList.toggle('active', mode === 'over');
-    const pct = t + '%';
-    els.track.style.setProperty('--t', pct);
+    els.track.style.setProperty('--t', t + '%');
     els.track.classList.toggle('over', mode === 'over');
   }
   els.slider.oninput = update;
-  els.under.onclick = () => { mode = 'under'; update(); };
-  els.over.onclick = () => { mode = 'over'; update(); };
+  els.under.onclick = () => { if (!busy) { mode = 'under'; update(); } };
+  els.over.onclick = () => { if (!busy) { mode = 'over'; update(); } };
   bet.onChange = update;
 
   function msg(text, cls = '') { els.msg.textContent = text; els.msg.className = 'msg ' + cls; }
+  let busy = false;
 
-  async function roll() {
-    const amount = bet.value;
-    if (amount <= 0) return msg('Choisissez une mise.', 'warn');
-    if (!Wallet.take(amount)) return msg('Solde insuffisant.', 'warn');
-    bet.setEnabled(false); els.slider.disabled = true;
-    const r = Util.randInt(10000) / 100;
+  async function animateRoll(r, win) {
     els.result.className = 'dice-result rolling';
-    for (let i = 0; i < 12; i++) {
+    Sfx.play('roll');
+    for (let i = 0; i < 14; i++) {
       els.result.textContent = (Util.randInt(10000) / 100).toFixed(2);
-      await Util.sleep(35);
+      if (i % 3 === 0) Sfx.play('tick');
+      await Util.sleep(35 + i * 3);
     }
-    const t = target();
-    const win = mode === 'under' ? r < t : r >= t;
     els.result.textContent = r.toFixed(2);
     els.result.className = 'dice-result ' + (win ? 'win' : 'lose');
     els.marker.style.left = r + '%';
     els.marker.className = 'dice-marker show ' + (win ? 'win' : 'lose');
-    if (win) {
-      const payout = Util.round2(amount * multiplier());
-      Wallet.give(payout);
-      msg(`Gagné ! +${Util.fmt(Util.round2(payout - amount))} jetons`, 'win');
-    } else msg(`Perdu ! −${Util.fmt(amount)} jetons`, 'lose');
+  }
+
+  // Un tirage complet ; renvoie true si perdu (pour proposer une relance)
+  async function resolve(amount) {
+    const r = Util.randInt(10000) / 100;
+    const t = target();
+    const win = mode === 'under' ? r < t : r >= t;
+    await animateRoll(r, win);
+    const back = win ? Util.round2(amount * multiplier()) : 0;
+    const sevens = (r.toFixed(2).match(/7/g) || []).length;
+    const res = Casino.settle('dice', { staked: amount, back, sevens });
+    if (res.net > 0) { msg(`Gagné ! +${Util.fmt(res.net)} jetons`, 'win'); Sfx.play(multiplier() >= 4 ? 'bigwin' : 'win'); }
+    else if (res.net < 0) { msg(`Perdu ! −${Util.fmt(-res.net)} jetons`, 'lose'); Sfx.play('lose'); }
+    else { msg(`Perdu, mais les jokers compensent.`, 'push'); Sfx.play('push'); }
     history.unshift({ r, win });
     if (history.length > 14) history.pop();
     els.history.innerHTML = '';
     history.forEach(h => els.history.appendChild(Util.el('span', 'pill ' + (h.win ? 'win' : 'lose'), h.r.toFixed(2))));
-    bet.setEnabled(true); els.slider.disabled = false;
+    return !win;
   }
 
-  setActions(els.actions, [['Lancer', async () => { await roll(); idleBtn(); }, { cls: 'primary' }]]);
-  function idleBtn() { els.actions.querySelectorAll('button').forEach(b => (b.disabled = false)); }
+  async function roll() {
+    const err = Casino.canStart();
+    if (err) return msg(err, 'warn');
+    const amount = bet.value;
+    if (amount <= 0) return msg('Choisissez une mise.', 'warn');
+    if (!Wallet.take(amount)) return msg('Solde insuffisant.', 'warn');
+    Casino.begin();
+    busy = true;
+    bet.setEnabled(false); els.slider.disabled = true;
+    let snap = Casino.snapshot();
+    let lost = await resolve(amount);
+    // Relances (Dé Pipé, Fantôme, Boisson du Bar)
+    while (lost && Casino.charges('dice') > 0) {
+      Casino.hold();
+      const again = await choice([`🎲 Relancer (${Casino.charges('dice')})`, 'Accepter']);
+      if (!again) { Casino.release(); break; }
+      Casino.useCharge('dice');
+      Casino.restore(snap);
+      history.shift();
+      snap = Casino.snapshot();
+      lost = await resolve(amount);
+    }
+    busy = false;
+    bet.setEnabled(true); els.slider.disabled = false;
+    idle();
+  }
+
+  // Petite décision à deux boutons ; résout true pour le premier
+  function choice([a, b]) {
+    return new Promise(res => setActions(els.actions, [[a, () => res(true), { cls: 'ghost' }], [b, () => res(false)]]));
+  }
+
+  function idle() { setActions(els.actions, [['Lancer', roll, { cls: 'primary' }]]); }
+  idle();
   update();
+  return { update };
 })();

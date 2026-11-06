@@ -14,8 +14,8 @@ const UTH = (() => {
     spots: { ante: $('uth-spot-ante'), blind: $('uth-spot-blind'), play: $('uth-spot-play'), trips: $('uth-spot-trips') },
     odds: $('uth-odds'), mini: $('uth-mini-odds'),
   };
-  const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10 });
-  const trips = new BetControl($('uth-trips'), { label: 'Trips (optionnel)', initial: 0 });
+  const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10, max: () => Casino.maxBet('uth') });
+  const trips = new BetControl($('uth-trips'), { label: 'Trips (optionnel)', initial: 0, max: () => Casino.maxBet('uth') });
   let s = null;
 
   function msg(text, cls = '') { els.msg.textContent = text; els.msg.className = 'msg ' + cls; }
@@ -35,11 +35,12 @@ const UTH = (() => {
       return;
     }
     const hl = final ? final.cards : null;
-    renderCards(els.dealer, s.dealer, () => !s.reveal);
+    renderCards(els.dealer, s.dealer, () => !s.reveal && !s.bribed);
     renderCards(els.board, s.board, i => i >= s.shown, hl);
     renderCards(els.player, s.player, () => false, hl);
     els.playerName.textContent = describeHand([...s.player, ...s.board.slice(0, s.shown)]);
-    els.dealerName.textContent = s.reveal ? describeHand([...s.dealer, ...s.board]) : '';
+    els.dealerName.textContent = s.reveal ? describeHand([...s.dealer, ...s.board])
+      : s.bribed ? describeHand([...s.dealer, ...s.board.slice(0, s.shown)]) + ' 👁' : '';
   }
 
   // ---------- Encart de probabilités ----------
@@ -89,7 +90,7 @@ const UTH = (() => {
     const board = s.board.slice(0, s.shown);
     const made = eval7([...s.player, ...board]) >> 20;
     const label = { 0: 'Pré-flop', 3: 'Flop', 5: 'River' }[s.shown];
-    Odds.compute(s.player, board, r => showOdds(r, made, label));
+    Odds.compute(s.player, board, r => showOdds(r, made, label + (s.bribed ? ' · croupier connu' : '')), s.bribed ? s.dealer : []);
   }
   function resetOdds() {
     Odds.cancel();
@@ -100,20 +101,44 @@ const UTH = (() => {
   }
 
   // ---------- Déroulement ----------
+  // Consommables (Carte Bonus, Pot-de-vin) pendant une main
+  function updateCtx() {
+    const live = s && ['preflop', 'flop', 'river'].includes(s.stage);
+    Casino.setCtx('uth', live ? {
+      bonusCard: s.player.length < 3 ? card => bonusCard(card) : null,
+      bribe: !s.bribed ? () => { s.bribed = true; render(); updateOdds(); updateCtx(); } : null,
+      used: [...s.player, ...s.board.slice(0, s.shown), ...(s.bribed ? s.dealer : [])],
+    } : null);
+  }
+  function bonusCard(card) {
+    const same = c => c.rank === card.rank && c.suit === card.suit;
+    // Si la carte choisie est cachée (tableau ou croupier), elle est remplacée par une autre
+    const fresh = () => { let c; do { c = s.deck.draw(); } while (same(c)); return c; };
+    s.board.forEach((c, i) => { if (same(c)) s.board[i] = fresh(); });
+    s.dealer.forEach((c, i) => { if (same(c)) s.dealer[i] = fresh(); });
+    s.player.push({ rank: card.rank, suit: card.suit });
+    Sfx.play('joker');
+    render(); updateOdds(); updateCtx();
+  }
+
   function idle() {
     ante.setEnabled(true); trips.setEnabled(true);
+    updateCtx();
     setActions(els.actions, [['Distribuer', deal, { cls: 'primary' }]]);
   }
 
   async function deal() {
+    const err = Casino.canStart();
+    if (err) return idle(), msg(err, 'warn');
     const a = ante.value, t = trips.value;
     if (a <= 0) return idle(), msg('Placez une mise Ante.', 'warn');
     if (!Wallet.take(a * 2 + t)) return idle(), msg(`Solde insuffisant (il faut ${Util.fmt(a * 2 + t)} : Ante + Blind${t ? ' + Trips' : ''}).`, 'warn');
+    Casino.begin();
     ante.setEnabled(false); trips.setEnabled(false);
     msg(''); els.results.innerHTML = '';
     resetOdds();
     const deck = new Shoe(1);
-    s = { ante: a, blind: a, trips: t, play: 0, player: [], dealer: [], board: [], shown: 0, reveal: false };
+    s = { ante: a, blind: a, trips: t, play: 0, player: [], dealer: [], board: [], shown: 0, reveal: false, deck };
     render();
     for (let i = 0; i < 2; i++) {
       s.player.push(deck.draw()); render(); await Util.sleep(260);
@@ -134,6 +159,7 @@ const UTH = (() => {
   function stage(name) {
     s.stage = name;
     render();
+    updateCtx();
     if (name === 'preflop') {
       msg('Pré-flop : misez 3x ou 4x l\'Ante, ou checkez.');
       setActions(els.actions, [playBtn(4), playBtn(3), ['Check', () => reveal(3, 'flop')]]);
@@ -168,6 +194,8 @@ const UTH = (() => {
   }
 
   async function showdown() {
+    s.stage = 'showdown';
+    updateCtx();
     setActions(els.actions, []);
     await Util.sleep(400);
     s.reveal = true;
@@ -176,7 +204,7 @@ const UTH = (() => {
     render(s.folded ? null : ph);
     await Util.sleep(700);
 
-    const qual = dh.cat >= 1;
+    const qual = dh.cat >= 1 || Casino.boss('fer');
     const cmp = compareHands(ph, dh);
     const lines = [];
     let back = 0, staked = 0;
@@ -193,7 +221,7 @@ const UTH = (() => {
     } else if (cmp > 0) {
       add('play', 'Play', s.play, s.play * 2, '1:1');
       add('ante', 'Ante', s.ante, qual ? s.ante * 2 : s.ante, qual ? '1:1' : nq);
-      const bp = BLIND_PAY[ph.cat];
+      const bp = BLIND_PAY[ph.cat] || (ph.cat === 3 && Casino.rule('uthTrips') ? 1 : 0);
       add('blind', 'Blind', s.blind, s.blind * (1 + (bp || 0)), bp ? `${ph.name} ${bp === 1.5 ? '3:2' : bp + ':1'}` : 'rendu (moins qu\'une quinte)');
     } else if (cmp === 0) {
       add('play', 'Play', s.play, s.play, 'égalité');
@@ -209,8 +237,12 @@ const UTH = (() => {
       add('trips', 'Trips', s.trips, tp ? s.trips * (tp + 1) : 0, tp ? `${ph.name} ${tp}:1` : 'moins qu\'un brelan');
     }
     lines.forEach(l => settleSpot(els.spots[l.key], l.net > 0 ? 'win' : l.net < 0 ? 'lose' : 'push', l.net));
-    Wallet.give(Util.round2(back));
-    const net = Util.round2(back - staked);
+    const sevens = [...s.player, ...s.board, ...s.dealer].filter(c => c.rank === 7).length;
+    const res = Casino.settle('uth', { staked: Util.round2(staked), back: Util.round2(back), sevens });
+    const bonus = Util.round2(res.net - (back - staked));
+    if (bonus) lines.push({ key: 'jokers', name: 'Jokers', net: bonus, note: res.mult > 1 ? `gains ×${Util.fmt(Util.round2(res.mult))}` : 'bonus' });
+    const net = res.net;
+    Sfx.play(net > 0 ? (net >= staked ? 'bigwin' : 'win') : net < 0 ? 'lose' : 'push');
 
     let verdict;
     if (s.folded) verdict = 'Vous vous êtes couché.';

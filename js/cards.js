@@ -17,9 +17,10 @@ class Shoe {
   }
   shuffle() {
     this.cards = [];
+    const skip = typeof Casino !== 'undefined' ? Casino.excludedRanks() : [];
     for (let d = 0; d < this.decks; d++)
       for (let s = 0; s < 4; s++)
-        for (let r = 2; r <= 14; r++) this.cards.push({ rank: r, suit: s });
+        for (let r = 2; r <= 14; r++) if (!skip.includes(r)) this.cards.push({ rank: r, suit: s });
     for (let i = this.cards.length - 1; i > 0; i--) {
       const j = Util.randInt(i + 1);
       [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
@@ -59,12 +60,12 @@ const CardArt = (() => {
   defs.style.position = 'absolute';
   defs.innerHTML = `<defs>
     ${SUIT_PATHS.map((d, i) => `<symbol id="suit-${i}" viewBox="0 0 100 100"><path d="${d}" fill="currentColor"/></symbol>`).join('')}
-    <pattern id="back-pat" width="18" height="18" patternUnits="userSpaceOnUse">
-      <rect width="18" height="18" fill="#9e1b2a"/>
-      <path d="M0 9L9 0L18 9L9 18Z" fill="none" stroke="#d65a68" stroke-width="1.3"/>
-      <circle cx="9" cy="9" r="2" fill="#f3c6cb"/><circle cx="0" cy="0" r="1.4" fill="#f3c6cb"/>
-      <circle cx="18" cy="0" r="1.4" fill="#f3c6cb"/><circle cx="0" cy="18" r="1.4" fill="#f3c6cb"/><circle cx="18" cy="18" r="1.4" fill="#f3c6cb"/>
-    </pattern>
+    ${Cosmetics.BACKS.map(b => `<pattern id="pat-${b.id}" width="18" height="18" patternUnits="userSpaceOnUse">
+      <rect width="18" height="18" fill="${b.c[0]}"/>
+      <path d="M0 9L9 0L18 9L9 18Z" fill="none" stroke="${b.c[1]}" stroke-width="1.3"/>
+      <circle cx="9" cy="9" r="2" fill="${b.c[2]}"/><circle cx="0" cy="0" r="1.4" fill="${b.c[2]}"/>
+      <circle cx="18" cy="0" r="1.4" fill="${b.c[2]}"/><circle cx="0" cy="18" r="1.4" fill="${b.c[2]}"/><circle cx="18" cy="18" r="1.4" fill="${b.c[2]}"/>
+    </pattern>`).join('')}
     <linearGradient id="card-sheen" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f1ebdc"/>
     </linearGradient></defs>`;
@@ -156,20 +157,23 @@ const CardArt = (() => {
     return svg;
   }
 
-  const BACK = `<svg viewBox="0 0 200 290" aria-hidden="true">
+  function back() {
+    const b = Cosmetics.back();
+    return `<svg viewBox="0 0 200 290" aria-hidden="true">
     <rect x="1.5" y="1.5" width="197" height="287" rx="14" fill="#fbf8f0" stroke="#c9c1ad" stroke-width="2"/>
-    <rect x="11" y="11" width="178" height="268" rx="8" fill="url(#back-pat)"/>
-    <rect x="16" y="16" width="168" height="258" rx="5" fill="none" stroke="#f3c6cb" stroke-width="1.5"/>
-    <ellipse cx="100" cy="145" rx="44" ry="56" fill="#7a1220" stroke="#e2bd62" stroke-width="3"/>
+    <rect x="11" y="11" width="178" height="268" rx="8" fill="url(#pat-${b.id})"/>
+    <rect x="16" y="16" width="168" height="258" rx="5" fill="none" stroke="${b.c[2]}" stroke-width="1.5"/>
+    <ellipse cx="100" cy="145" rx="44" ry="56" fill="${b.c[3]}" stroke="#e2bd62" stroke-width="3"/>
     <ellipse cx="100" cy="145" rx="37" ry="49" fill="none" stroke="#e2bd62" stroke-width="1"/>
     <text x="100" y="165" text-anchor="middle" font-size="58" font-family="Georgia,serif" font-style="italic" font-weight="700" fill="#e2bd62">B</text></svg>`;
+  }
 
-  return { front, BACK };
+  return { front, back };
 })();
 
 function cardEl(card) {
   const e = Util.el('div', 'card');
-  e.innerHTML = `<div class="card-inner"><div class="face front">${CardArt.front(card)}</div><div class="face back">${CardArt.BACK}</div></div>`;
+  e.innerHTML = `<div class="card-inner"><div class="face front">${CardArt.front(card)}</div><div class="face back">${CardArt.back()}</div></div>`;
   e._key = card.rank + '-' + card.suit;
   e.setAttribute('aria-label', `${RANK_NAME[card.rank]} de ${SUITS[card.suit].name}`);
   return e;
@@ -201,10 +205,12 @@ function renderCards(container, cards, isHidden = () => false, highlight = null)
       e.classList.add('down');
       container.appendChild(e);
       dealFromShoe(e);
+      Sfx.play('deal');
       if (!hidden) {
         e._pending = setTimeout(() => { e._pending = null; if (!e._wantHidden) e.classList.remove('down'); }, 330);
       }
     } else if (!e._pending) {
+      if (e.classList.contains('down') && !hidden) Sfx.play('flip');
       e.classList.toggle('down', hidden);
     }
     e._wantHidden = hidden;

@@ -12,19 +12,51 @@
 <body>
   <div class="lights" aria-hidden="true"></div>
   <header class="top">
-    <div class="brand"><span class="brand-suits">♠<i>♥</i></span>Boubouz'ino<span class="brand-suits"><i>♦</i>♣</span></div>
-    <nav class="tabs">
-      <button class="tab" data-tab="uth">Ultimate Hold'em</button>
-      <button class="tab" data-tab="bj">Blackjack</button>
-      <button class="tab" data-tab="dice">Dice</button>
-    </nav>
-    <div class="wallet" title="Jetons fictifs">
+    <button class="brand" id="home" title="Menu principal"><span class="brand-suits">♠<i>♥</i></span>Boubouz'ino<span class="brand-suits"><i>♦</i>♣</span></button>
+    <div class="top-mode" id="top-mode"></div>
+    <div class="wallet" title="Jetons">
       <span class="wallet-chip"></span><span id="balance">0</span>
-      <button id="reset" class="btn small" title="Réinitialiser le solde">↺</button>
+      <button id="reset" class="btn small" title="Réinitialiser le solde (mode libre)">↺</button>
     </div>
+    <button class="btn small icon" id="sound" title="Son">🔊</button>
   </header>
 
-  <main>
+  <!-- ÉCRAN TITRE -->
+  <section class="screen" id="screen-menu">
+    <div class="menu">
+      <div class="menu-logo">
+        <div class="menu-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h1>Boubouz'ino</h1>
+        <p class="tagline">Le casino roguelike — jetons fictifs, vraies sueurs froides</p>
+      </div>
+      <div class="menu-buttons">
+        <button class="btn primary big" id="m-new">Nouvelle partie</button>
+        <button class="btn big" id="m-continue" hidden>Continuer la partie</button>
+        <button class="btn big" id="m-free">Mode libre</button>
+        <button class="btn big" id="m-cosmetics">Cosmétiques <span class="prestige-badge" id="m-prestige"></span></button>
+        <button class="btn big" id="m-howto">Comment jouer</button>
+      </div>
+      <div class="menu-stats" id="m-stats"></div>
+    </div>
+  </section>
+
+  <!-- ÉCRAN DE JEU -->
+  <section class="screen" id="screen-game" hidden>
+    <div class="run-bar" id="run-bar" hidden>
+      <div class="run-info" id="run-info"></div>
+      <div class="joker-row">
+        <div class="joker-slots" id="joker-slots"></div>
+        <div class="cons-slots" id="cons-slots"></div>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab" data-tab="uth">Hold'em</button>
+      <button class="tab" data-tab="bj">Blackjack</button>
+      <button class="tab" data-tab="roulette">Roulette</button>
+      <button class="tab" data-tab="slots">Machine</button>
+      <button class="tab" data-tab="dice">Dice</button>
+    </nav>
+    <main>
     <!-- ULTIMATE TEXAS HOLD'EM -->
     <section class="game" id="uth" hidden>
       <div class="layout">
@@ -106,11 +138,13 @@
               <div class="zone-title">Croupier <span class="hand-name" id="bj-dealer-val"></span></div>
               <div class="cards" id="bj-dealer"></div>
             </div>
-            <svg class="felt-print" viewBox="0 0 640 132" aria-hidden="true">
+            <svg class="felt-print" viewBox="0 0 640 168" aria-hidden="true">
               <path id="arc-bj-1" d="M30 14 Q320 104 610 14" fill="none"/>
               <path id="arc-bj-2" d="M70 74 Q320 138 570 74" fill="none"/>
+              <path id="arc-bj-3" d="M150 124 Q320 162 490 124" fill="none"/>
               <text class="print-big"><textPath href="#arc-bj-1" startOffset="50%" text-anchor="middle">Le Blackjack paie 3 contre 2</textPath></text>
               <text class="print-small"><textPath href="#arc-bj-2" startOffset="50%" text-anchor="middle">Le croupier tire à 16 et reste à 17</textPath></text>
+              <text class="print-small"><textPath href="#arc-bj-3" startOffset="50%" text-anchor="middle">L'assurance paie 2 contre 1</textPath></text>
             </svg>
             <div class="zone">
               <div class="bj-hands" id="bj-hands"></div>
@@ -122,6 +156,7 @@
         <aside class="panel">
           <div id="bj-bet"></div>
           <div class="shoe-info" id="bj-shoe"></div>
+          <div class="counter" id="bj-counter" hidden></div>
           <details class="rules" open>
             <summary>Règles</summary>
             <ul>
@@ -130,12 +165,84 @@
               <li>Le croupier tire jusqu'à 17 et reste sur 17 souple.</li>
               <li>Doubler sur n'importe quelles 2 cartes.</li>
               <li>Séparer jusqu'à 4 mains ; les As séparés ne reçoivent qu'une carte.</li>
+              <li>Assurance proposée quand le croupier montre un As (moitié de la mise, payée 2:1).</li>
             </ul>
           </details>
         </aside>
       </div>
     </section>
 
+    <!-- ROULETTE -->
+    <section class="game" id="roulette" hidden>
+      <div class="layout">
+        <div class="table">
+          <div class="felt rl-felt">
+            <div class="rl-top">
+              <div class="rl-wheel-wrap">
+                <svg id="rl-wheel" viewBox="0 0 320 320" aria-hidden="true"></svg>
+                <div class="rl-ball-track" id="rl-ball-track"><i class="rl-ball"></i></div>
+                <div class="rl-pointer"></div>
+              </div>
+              <div class="rl-side">
+                <div class="rl-result" id="rl-result">?</div>
+                <div class="rl-history" id="rl-history"></div>
+                <div class="rl-ai" id="rl-ai"></div>
+              </div>
+            </div>
+            <div class="rl-board-wrap"><div class="rl-board" id="rl-board"></div></div>
+            <div class="rl-total" id="rl-total"></div>
+            <div class="msg" id="rl-msg"></div>
+            <div class="actions" id="rl-actions"></div>
+          </div>
+        </div>
+        <aside class="panel">
+          <div class="betctl">
+            <div class="betctl-head"><span class="betctl-label">Jeton à placer</span></div>
+            <div class="betctl-chips" id="rl-chips"></div>
+            <p class="hint">Touchez une case du tapis pour y poser le jeton. Clic droit : retirer la mise.</p>
+          </div>
+          <details class="rules" open>
+            <summary>Paiements</summary>
+            <table>
+              <tr><th>Mise</th><th>Paie</th></tr>
+              <tr><td>Numéro plein</td><td>35:1</td></tr>
+              <tr><td>Douzaine, colonne</td><td>2:1</td></tr>
+              <tr><td>Rouge/Noir, Pair/Impair, 1-18/19-36</td><td>1:1</td></tr>
+            </table>
+            <ul><li>Roulette européenne : un seul zéro. Sur le 0, les mises extérieures perdent.</li></ul>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <!-- MACHINE A SOUS -->
+    <section class="game" id="slots" hidden>
+      <div class="layout">
+        <div class="table">
+          <div class="felt sl-felt">
+            <div class="sl-machine">
+              <div class="sl-lights" id="sl-lights"></div>
+              <div class="sl-title">Boubouz'ino <span>★ Slots ★</span></div>
+              <div class="sl-window">
+                <div class="sl-reels" id="sl-reels"></div>
+                <div class="sl-line"></div>
+                <div class="sl-win" id="sl-win"></div>
+              </div>
+              <div class="sl-lever" id="sl-lever" title="Tirer le levier"><i></i></div>
+            </div>
+            <div class="msg" id="sl-msg"></div>
+            <div class="actions" id="sl-actions"></div>
+          </div>
+        </div>
+        <aside class="panel">
+          <div id="sl-bet"></div>
+          <details class="rules" open>
+            <summary>Table des gains</summary>
+            <table id="sl-paytable"></table>
+          </details>
+        </aside>
+      </div>
+    </section>
     <!-- DICE -->
     <section class="game" id="dice" hidden>
       <div class="layout">
@@ -182,18 +289,40 @@
         </aside>
       </div>
     </section>
-  </main>
+    </main>
+  </section>
+
+  <!-- SHOP -->
+  <section class="screen" id="screen-shop" hidden>
+    <div class="shop" id="shop"></div>
+  </section>
+
+  <!-- COSMÉTIQUES -->
+  <section class="screen" id="screen-cosmetics" hidden>
+    <div class="cosmetics" id="cosmetics"></div>
+  </section>
+
+  <div class="modal" id="modal" hidden><div class="modal-box" id="modal-box"></div></div>
+  <div class="popover" id="popover" hidden></div>
+  <div class="toasts" id="toasts"></div>
 
   <footer>Boubouz'ino — jeu gratuit avec des jetons fictifs, aucun argent réel. Jouer comporte des risques : si le jeu devient un problème, appelez le 09 74 75 13 13 (Joueurs Info Service).</footer>
 
   <script src="js/util.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/meta.js"></script>
   <script src="js/wallet.js"></script>
+  <script src="js/jokers.js"></script>
+  <script src="js/run.js"></script>
   <script src="js/cards.js"></script>
   <script src="js/handEval.js"></script>
   <script src="js/odds.js"></script>
   <script src="js/uth.js"></script>
   <script src="js/blackjack.js"></script>
+  <script src="js/roulette.js"></script>
+  <script src="js/slots.js"></script>
   <script src="js/dice.js"></script>
+  <script src="js/runui.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

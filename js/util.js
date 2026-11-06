@@ -22,23 +22,29 @@ const Util = {
   },
 };
 
+// Liste globale des contrôles de mise (pour ré-appliquer les limites)
+const BetControls = [];
+
 // Contrôle de mise réutilisable (jetons)
 class BetControl {
-  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500] }) {
+  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500], max = () => Infinity }) {
     this.value = initial;
+    this.maxFn = max;
+    this.base = initial;
     this.enabled = true;
     this.onChange = null;
     container.classList.add('betctl');
     container.innerHTML = `
-      <div class="betctl-head"><span class="betctl-label"></span><span class="betctl-amount"></span></div>
+      <div class="betctl-head"><span class="betctl-label"></span><span class="betctl-max"></span><span class="betctl-amount"></span></div>
       <div class="betctl-chips"></div>`;
     container.querySelector('.betctl-label').textContent = label;
     this.amountEl = container.querySelector('.betctl-amount');
+    this.maxEl = container.querySelector('.betctl-max');
     const chipsEl = container.querySelector('.betctl-chips');
     chips.forEach(v => {
       const b = Util.el('button', `chip chip-${v}`, v);
       b.title = `+${v}`;
-      b.onclick = () => this.set(this.value + v);
+      b.onclick = () => { Sfx.play('chip'); this.set(this.value + v); };
       chipsEl.appendChild(b);
     });
     [['½', () => this.set(Math.floor(this.value / 2)), 'Diviser par 2'],
@@ -51,14 +57,27 @@ class BetControl {
     });
     this.buttons = [...container.querySelectorAll('button')];
     this.update();
+    BetControls.push(this);
   }
   set(v) {
     if (!this.enabled) return;
-    this.value = Math.max(0, Util.round2(v));
+    const m = this.maxFn();
+    this.value = Math.max(0, Math.min(m, Util.round2(v)));
     this.update();
     if (this.onChange) this.onChange(this.value);
   }
-  update() { this.amountEl.textContent = Util.fmt(this.value); }
+  update() {
+    const m = this.maxFn();
+    this.amountEl.textContent = Util.fmt(this.value);
+    this.maxEl.textContent = Number.isFinite(m) ? `max ${Util.fmt(m)}` : '';
+  }
+  // Ré-applique la limite (changement de manche / de mode)
+  refresh() {
+    const m = this.maxFn();
+    if (this.value > m) this.value = m;
+    this.update();
+    if (this.onChange) this.onChange(this.value);
+  }
   setEnabled(e) {
     this.enabled = e;
     this.buttons.forEach(b => (b.disabled = !e));
@@ -73,9 +92,16 @@ function setActions(container, list) {
     b.disabled = opts.disabled || false;
     b.onclick = async () => {
       if (container.dataset.busy === '1') return;
+      Sfx.play('click');
       container.dataset.busy = '1';
-      container.querySelectorAll('button').forEach(x => (x.disabled = true));
-      try { await fn(); } finally { container.dataset.busy = '0'; }
+      const all = [...container.querySelectorAll('button')];
+      const was = all.map(x => x.disabled);
+      all.forEach(x => (x.disabled = true));
+      try { await fn(); } finally {
+        container.dataset.busy = '0';
+        // Si l'action n'a pas remplacé les boutons, on les réactive
+        all.forEach((x, i) => { if (x.isConnected && container.contains(x)) x.disabled = was[i]; });
+      }
     };
     container.appendChild(b);
   });
@@ -98,6 +124,7 @@ function chipStack(amount, cls = '') {
     c.style.animationDelay = `${i * 45}ms`;
     st.appendChild(c);
   });
+  Sfx.play('chip');
   st.appendChild(Util.el('div', 'stack-amt', Util.fmt(amount)));
   return st;
 }
