@@ -55,7 +55,8 @@ const Sim = (() => {
   const RANK = { legendaire: 3, rare: 2, commun: 1 };
   function shop(H) {
     const st = H.state;
-    const reserve = Math.max(60, H.objective(st.etage, st.tableType) * 1.2);
+    // garder de quoi atteindre le prochain palier : n'acheter qu'avec le surplus
+    const reserve = Math.max(60, H.objective(st.etage, st.tableType) * 0.75);
     const offers = st.shop.offers.map((o, i) => ({ ...o, i }));
     offers.filter(o => o.kind === 'joker').sort((a, b) => RANK[JOKERS[b.id].rarity] - RANK[JOKERS[a.id].rarity] || a.price - b.price)
       .forEach(o => { if (H.chips() - o.price >= reserve && st.jokers.length < st.jokerSlots) H.buy(o.i); });
@@ -72,11 +73,11 @@ const Sim = (() => {
   }
 
   // ---- Taille des mises : viser l'objectif en ~2 victoires, sans risquer plus de 40 % du solde ----
+  // ---- Taille des mises : « jeu audacieux » (le plus efficace contre un jeu à espérance
+  // négative) : viser ce qui manque pour atteindre le palier, dans la limite de la mise max ----
   function betSize(H) {
-    const t = H.state.table;
-    const need = t.target - t.gains;
-    const share = t.bets <= 2 ? 0.6 : 0.4;
-    return Math.max(1, Math.min(H.maxBet('bj'), Math.floor(H.chips() * share), Math.ceil(need / Math.min(2, t.bets))));
+    const need = H.state.table.target - H.bankroll();
+    return Math.max(1, Math.min(H.maxBet('bj'), Math.floor(H.chips()), Math.ceil(need)));
   }
 
   function playRun(seed, opts = {}) {
@@ -84,36 +85,28 @@ const Sim = (() => {
     const H = Engine.newRun({ seed, meta, persist: false });
     const F = CONFIG.progression.etagesPourGagner;
     let won = false, guard = 0;
-    while (guard++ < 3000) {
+    while (guard++ < 20000) {
       const st = H.state;
       if (st.phase === 'victory') { won = true; break; }
       if (st.phase === 'shop') { shop(H); H.leaveShop(); continue; }
       if (st.phase === 'choose') { H.chooseTable(); continue; }
       if (st.phase !== 'play') break;
       useConsumables(H);
-      const t = st.table;
-      const need = t.target - t.gains;
+      const need = st.table.target - H.bankroll();
       const bet = betSize(H);
       if (opts.strategy !== 'blackjack' && (!opts.game || opts.game === 'mixed')) {
-        // « Sniper » : seules les victoires comptent pour l'objectif, donc une petite
-        // mise sur un multiplicateur élevé, calibré pour finir la table en un coup
-        const f = t.bets <= 2 ? 0.4 : 0.25;
-        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips() * f)));
+        // « Sniper » : mise max au Dice, avec la chance calibrée pour combler l'écart en un coup
+        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));
         const chance = Math.max(CONFIG.games.dice.minTarget, Math.min(90, Math.floor(99 * b / (need + b))));
         playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
       } else if (opts.game && opts.game !== 'mixed') playOne(H, opts.game, bet);
-      else if (t.bets <= 1 && need > bet) {
-        // dernière mise : un Dice risqué calibré pour atteindre l'objectif
-        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));
-        const chance = Math.max(CONFIG.games.dice.minTarget, Math.min(95, Math.floor(99 * b / (need + b))));
-        playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
-      } else playOne(H, 'bj', bet);
+      else playOne(H, 'bj', bet);
     }
     const st = H.state;
     return { seed, won, etage: won ? F : Math.min(st.etage, F), tables: st.stats.tablesWon, jokers: st.stats.jokersOwned.slice(), plays: st.stats.plays, chips: H.chips() };
   }
   function playOne(H, game, bet) {
-    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(1, Math.floor(bet / 3)) });
+    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(1, Math.min(H.maxBet('uth'), Math.floor(H.chips() / 6), Math.floor(bet / 3))) });
     if (game === 'dice') return playGame(H, 'dice', { bet, target: 50, mode: 'under' });
     if (game === 'roulette') return playGame(H, 'roulette', { bets: { red: bet } });
     if (game === 'slots') return playGame(H, 'slots', { bet });

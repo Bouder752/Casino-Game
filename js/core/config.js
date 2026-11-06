@@ -4,30 +4,27 @@
 //  console, ou `node tools/simulate.js 1000`) pour mesurer l'effet.
 // =====================================================================
 const CONFIG = {
-  // ---------- Progression (structure en étages) ----------
+  // ---------- Progression : des paliers de bankroll ----------
+  // Chaque étage a 3 tables (petite, grande, boss). Une table est gagnée dès que ta
+  // bankroll (jetons − dettes) atteint le palier. Pas de limite de mises :
+  // on ne perd que par faillite. La mise max suit le palier.
   progression: {
     etagesPourGagner: 8,
     jetonsDepart: 100,
-    misesParTable: 6,          // nombre de mises autorisées par table
-    relancesParTable: 3,       // « défausses » : refaire un tirage sans miser (2 → 3 après les tests joueurs)
-    relancesParMise: 1,        // relances utilisables sur une même mise (null = sans limite)
+    // Bankroll à atteindre à la petite table de chaque étage (index = étage)
+    objectifBase: [0, 125, 310, 700, 1550, 3400, 7500, 16500, 36000],
+    multiplicateurTable: { petite: 1, grande: 1.25, boss: 1.5 },
+    croissanceInfinie: 1.7,    // après l'étage 8, palier ×1,7 par étage
+    miseMaxRatio: 0.25,        // mise max = 25 % du palier visé (arrondie)
+    miseMin: 1,                // en dessous, c'est la faillite
+    relancesParTable: 3,       // refaire un tirage raté sans miser à nouveau
+    relancesParMise: 1,        // relances utilisables sur une même mise
 
-    // Objectif de gains de la petite table, par étage (index = étage)
-    // Après les tests joueurs : étage 1 plus doux (60 → 35), montée plus raide ensuite
-    objectifBase: [0, 35, 100, 280, 700, 1600, 3400, 6500, 12000],
-    multiplicateurTable: { petite: 1, grande: 1.5, boss: 2 },
-    croissanceInfinie: 1.6,    // après l'étage 8, objectif ×1,6 par étage
-
-    recompenseTable: { petite: 30, grande: 45, boss: 70 },
-    bonusParMiseRestante: 10,  // bonus pour chaque mise non utilisée
+    recompenseTable: { petite: 15, grande: 25, boss: 40 },
     interetsParTranche: { tranche: 50, gain: 5, max: 25 }, // 5 jetons par 50 possédés, 25 max
 
     // La petite ou la grande table (pas le boss) peut être passée contre un tag bonus
     passerTableRecompense: 'tag',
-    // Mise max par étage (contre l'effet boule de neige) ; null = pas de limite
-    limiteMise: [0, 50, 100, 200, 400, 875, 1750, 3250, 6250],
-    // Poids des gains pour l'objectif : les jeux d'adresse comptent plus que les jeux de pur hasard
-    poidsObjectif: { bj: 2, uth: 2, roulette: 1.5, slots: 1, dice: 1 },
   },
   freeChips: 1000,
   prestige: { perBoss: 1, victory: 5 },
@@ -36,7 +33,7 @@ const CONFIG = {
   tags: {
     soldes: { discount: 0.5 },
     cadeau: {},
-    turbo: { bets: 2 },
+    turbo: { maxBet: 1.5 },
     collection: {},
     investisseur: { amount: 40 },
     double: { rerolls: 2 },
@@ -61,7 +58,7 @@ const CONFIG = {
     ],
     maxActive: 1,
     penaltyRate: 0.5,      // la part impayée d'une échéance augmente de 50 %
-    penaltyBets: 2,        // et l'huissier confisque 2 mises à la table suivante
+    penaltyMaxBet: 0.7,    // et l'huissier réduit la mise max de 30 % à la table suivante
   },
 
   jokers: {
@@ -98,7 +95,7 @@ const CONFIG = {
     ] },
   },
   upgrades: {
-    vip: { price: 150, bets: 1 },
+    vip: { price: 150, maxBet: 1.25 },
     truque: { price: 120, ranks: [2, 3] },
     doree: { price: 180 },
   },
@@ -109,7 +106,7 @@ const CONFIG = {
   // Boss : règles spéciales de la 3e table de chaque étage
   bosses: {
     avare: { mult: 0.75 },
-    presse: { bets: 3 },
+    presse: { maxBet: 0.5 },
     noir: {},
     sobre: {},
     endormi: {},

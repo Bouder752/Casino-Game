@@ -150,12 +150,11 @@ const Engine = (() => {
     H.give = a => { if (a > 0) { state.chips = round2(state.chips + a); notify('chips'); } };
 
     // ---------------- Limites, règles de deck ----------------
-    // Pas de mise max par défaut (config progression.limiteMise = null)
+    // Mise max : une part du palier visé (et les effets des boss, tags, améliorations)
     H.maxBet = game => {
-      const lim = CONFIG.progression.limiteMise;
-      if (!isRun || !state.table || !lim) return Infinity;
-      const base = lim[Math.min(state.etage, lim.length - 1)];
-      const e = H.emit('maxBet', { value: base, game });
+      if (!isRun) return Infinity;
+      const target = state.table ? state.table.target : H.objective(state.etage, state.tableType);
+      const e = H.emit('maxBet', { value: target * CONFIG.progression.miseMaxRatio, game });
       const m = Math.max(5, Math.round(e.value));
       return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
@@ -198,7 +197,6 @@ const Engine = (() => {
       if (active) return 'Un coup est déjà en cours.';
       if (!isRun) return null;
       if (state.phase !== 'play') return 'Aucune table en cours.';
-      if (state.table.bets <= 0) return 'Plus de mises à cette table.';
       return null;
     };
     H.startPlay = (id, params) => {
@@ -213,7 +211,6 @@ const Engine = (() => {
       const res = G.start(H, gameState(id), params, play);
       if (res.error) return res;
       if (isRun) {
-        state.table.bets--;
         if (fee.fee) {
           // prélevés tout de suite, puis affichés comme étape du règlement (déjà payée)
           const f = Math.min(fee.fee, state.chips);
@@ -289,9 +286,7 @@ const Engine = (() => {
       if (net > state.stats.best) { state.stats.best = net; state.stats.bestPlay = { game: id, net, staked: e.staked }; }
       active = null;
       // Seules les mises gagnantes font avancer l'objectif (un bonus sur une perte ne compte pas)
-      // Les jeux de table (adresse) comptent davantage : CONFIG.progression.poidsObjectif
-      const weight = (CONFIG.progression.poidsObjectif || {})[id] || 1;
-      if (isRun && state.table && e.outcome === 'win') state.table.gains = round2(state.table.gains + Math.max(0, net) * weight);
+      if (isRun && state.table && e.outcome === 'win') state.table.gains = round2(state.table.gains + Math.max(0, net));
       const settlement = {
         game: id, staked: e.staked, baseBack: e.baseBack, back: e.back, gain: e.gain, outcome: e.outcome,
         steps, add, mult: round2(mult), gainFinal: gainF, flats: round2(flats), net, info: e.info,
@@ -330,24 +325,24 @@ const Engine = (() => {
     function afterPlay() {
       if (!isRun) { save(); return; }
       if (state.phase !== 'play') return;
-      const t = state.table;
-      if (t.gains >= t.target) return tableWon();
+      if (H.bankroll() >= state.table.target) return tableWon();
       if (checkBankrupt()) return;
-      if (t.bets <= 0) return gameOver('Plus de mises : objectif non atteint.');
       save();
       notify('change');
     }
     function checkBankrupt() {
-      if (!isRun || active || state.chips >= 1) return false;
+      if (!isRun || active || state.chips >= CONFIG.progression.miseMin) return false;
       const e = H.emit('onBankrupt', { saved: false });
-      if (e.saved && state.chips >= 1) { notify('change'); return false; }
-      gameOver('Plus de jetons.');
+      if (e.saved && state.chips >= CONFIG.progression.miseMin) { notify('change'); return false; }
+      gameOver('Faillite : plus assez de jetons pour miser.');
       return true;
     }
 
     // ---------------- Étages et tables ----------------
     const P = CONFIG.progression;
     const NEXT = { petite: 'grande', grande: 'boss' };
+    // Bankroll = jetons − dettes (un prêt ne fait pas gagner une table)
+    H.bankroll = () => round2(state.chips - state.debts.reduce((a, d) => a + d.left, 0));
     H.objective = (etage, type) => {
       const base = etage <= P.etagesPourGagner ? P.objectifBase[etage]
         : P.objectifBase[P.etagesPourGagner] * Math.pow(P.croissanceInfinie, etage - P.etagesPourGagner);
@@ -369,16 +364,16 @@ const Engine = (() => {
       if (state.phase !== 'choose') return { error: 'Choisis d\'abord ta table.' };
       const t = state.table = {
         type: state.tableType, etage: state.etage, target: H.objective(state.etage, state.tableType), gains: 0,
-        bets: P.misesParTable, betsMax: P.misesParTable, boss: state.tableType === 'boss' ? state.bossId : null, start: state.chips,
+        boss: state.tableType === 'boss' ? state.bossId : null, start: H.bankroll(),
       };
       state.charges = [];
       state.phase = 'play';
       H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', P.relancesParTable);
       H.emit('onRoundStart', { table: t, round: t });
       if (t.noRerolls) state.charges = [];
-      t.bets = Math.max(1, t.bets);
-      t.betsMax = t.bets;
       notify('table');
+      // Bankroll déjà au palier : table gagnée d'office
+      if (H.bankroll() >= t.target) { tableWon(); return { ok: true, instant: true }; }
       if (!checkBankrupt()) save();
       return { ok: true };
     };
@@ -406,7 +401,6 @@ const Engine = (() => {
       const interest = Math.min(I.max, Math.floor(state.chips / I.tranche) * I.gain);
       const reward = P.recompenseTable[t.type];
       H.give(reward); lines.push({ label: { petite: 'Petite table gagnée', grande: 'Grande table gagnée', boss: 'Boss vaincu' }[t.type], value: reward });
-      if (t.bets > 0) { const b = t.bets * P.bonusParMiseRestante; H.give(b); lines.push({ label: `Mises restantes (${t.bets} × ${P.bonusParMiseRestante})`, value: b }); }
       if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${I.gain} par ${I.tranche} jetons, ${I.max} max)`, value: interest }); }
       const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); attribute([{ kind: 'flat', value: v, src: { uid: me.uid } }], 0, 0, 1); } };
       H.emit('onRoundEnd', e);
@@ -641,7 +635,7 @@ const Engine = (() => {
         if (unpaid > 0) {
           const pen = Math.round(unpaid * CONFIG.loans.penaltyRate);
           d.left += pen; d.missed++;
-          lines.push({ label: `⚖️ Échéance impayée : pénalité +${pen} et l'huissier confisque ${CONFIG.loans.penaltyBets} mises`, value: 0, bad: true });
+          lines.push({ label: `⚖️ Échéance impayée : pénalité +${pen} et l'huissier réduit la mise max`, value: 0, bad: true });
           H.addStatus('huissier');
         }
         return d.left > 0;

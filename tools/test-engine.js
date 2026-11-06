@@ -15,7 +15,7 @@ const newTable = (H, realTarget = false) => { H.state.phase = 'choose'; H.choose
 api.Games.register({ id: 'test', name: 'Test', start: (H, gs, p) => (H.stake(p.bet) ? { round: { ...p, done: true } } : { error: 'solde' }),
   actions: () => [], act() {}, resolve: (H, gs, r) => ({ staked: r.bet, back: r.back, info: r.info || {}, draws: r.draws || [] }) });
 const play = (H, bet, back, extra = {}) => H.startPlay('test', { bet, back, ...extra }).settlement;
-const winTable = H => play(H, 1, 1 + H.state.table.target - H.state.table.gains);
+const winTable = H => play(H, 1, 1 + Math.max(0, H.state.table.target - H.bankroll()));
 
 // 1. Déterminisme
 ok(JSON.stringify(Sim.playRun('SEED-X')) === JSON.stringify(Sim.playRun('SEED-X')), 'même seed → même partie');
@@ -30,19 +30,17 @@ ok(H.objective(9, 'petite') === Math.round(P.objectifBase[8] * P.croissanceInfin
 ok(H.state.phase === 'choose' && H.state.tableType === 'petite', 'la partie commence au choix de la petite table');
 ok(!!H.startPlay('test', { bet: 1, back: 0 }).error, 'pas de mise sans table ouverte');
 H.chooseTable();
-ok(H.state.table.bets === P.misesParTable && H.charges('dice') === P.relancesParTable, 'mises et relances par table');
+ok(H.charges('dice') === P.relancesParTable, 'relances par table');
+ok(H.maxBet('bj') === Math.round(H.state.table.target * P.miseMaxRatio), 'mise max = part du palier');
 
-// 3. Les gains (pas le solde) font avancer l'objectif ; les pertes ne le réduisent pas
-play(H, 10, 30); play(H, 10, 0);
-ok(H.state.table.gains === 20 && H.state.table.bets === P.misesParTable - 2, `gains cumulés (${H.state.table.gains})`);
-const chipsBefore = H.chips();
+// 3. Palier de bankroll : la table est gagnée dès que la bankroll l'atteint, sans limite de mises
+for (let i = 0; i < 12; i++) play(H, 1, 0.5); // beaucoup de petites mises perdantes : pas de limite
+ok(H.state.phase === 'play', 'pas de limite de mises');
 winTable(H);
-ok(H.state.phase === 'shop' && H.state.tableType === 'grande', 'table gagnée → shop puis grande table');
+ok(H.state.phase === 'shop' && H.state.tableType === 'grande', 'palier atteint → shop puis grande table');
 const I = P.interetsParTranche;
-const expected = P.recompenseTable.petite + (P.misesParTable - 3) * P.bonusParMiseRestante;
-ok(H.state.summary.lines[0].value === P.recompenseTable.petite && H.state.summary.lines[1].value === (P.misesParTable - 3) * P.bonusParMiseRestante, 'récompense + bonus de mises restantes');
-ok(H.state.summary.lines[2].label.startsWith('Intérêts') && H.state.summary.lines[2].value <= I.max, 'intérêts plafonnés');
-void chipsBefore; void expected;
+ok(H.state.summary.lines[0].value === P.recompenseTable.petite, 'récompense de table');
+ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= I.max), 'intérêts plafonnés');
 H.leaveShop();
 ok(H.state.phase === 'choose', 'sortie du shop → choix de table');
 
@@ -57,13 +55,13 @@ ok(!!H.state.table.boss, 'table du boss');
 winTable(H);
 ok(H.state.etage === 2 && H.state.tableType === 'petite', 'boss vaincu → étage suivant');
 
-// 5. Plus de mises sans objectif → game over ; plus de jetons → game over
-H = run('GO1', true);
-for (let i = 0; i < P.misesParTable; i++) play(H, 1, 0);
-ok(H.state.phase === 'over' && /mises/.test(H.state.reason), 'plus de mises → perdu');
+// 5. On ne perd que par faillite
 H = run('GO2', true);
 play(H, H.chips(), 0);
-ok(H.state.phase === 'over' && /jetons/.test(H.state.reason), 'plus de jetons → perdu');
+ok(H.state.phase === 'over' && /[Ff]aillite/.test(H.state.reason), 'faillite → perdu');
+// Un prêt ne fait pas gagner la table (bankroll = jetons − dettes)
+H = Engine.newRun({ seed: 'LOAN', meta: meta(), persist: false }); H.chooseTable(); H.takeLoan('gros');
+ok(H.state.phase === 'play' && H.bankroll() < H.state.table.target, 'un prêt ne compte pas dans la bankroll');
 
 // 6. Victoire à l'étage 8 puis mode infini
 H = run('WIN');
@@ -75,7 +73,7 @@ ok(H.state.phase === 'shop' && H.state.etage === P.etagesPourGagner + 1 && H.sta
 
 // 7. Boss
 const withBoss = (id, seed = 'B') => { const h = Engine.newRun({ seed, meta: meta(), persist: false }); h.state.tableType = 'boss'; h.state.bossId = id; h.chooseTable(); h.state.table.target = 1e9; return h; };
-H = withBoss('presse'); ok(H.state.table.bets === 3, 'Directeur Pressé : 3 mises');
+H = withBoss('presse'); ok(H.maxBet('dice') === Math.max(5, Math.round(H.state.table.target * P.miseMaxRatio * CONFIG.bosses.presse.maxBet)), 'Directeur Pressé : mise max réduite');
 H = withBoss('sobre'); H.addJoker('fantome');
 ok(H.charges('dice') === 0, 'Le Videur : aucune relance');
 H = withBoss('avare'); let s = play(H, 10, 30);
@@ -147,8 +145,8 @@ ok(H.chips() - before === Math.floor(JOKERS[j0.id].price / 2), 'revente à 50 %'
 // 13. Tags : Soldes (−50 % au prochain shop), Turbo (+2 mises)
 H = run('T8', true); H.addStatus('soldes'); H.state.chips = 10000; winTable(H);
 ok(H.state.shop.offers.every(o => o.price === Math.ceil(api.CATALOG[o.id].price * 0.5)), 'Soldes : prix divisés par 2');
-H.leaveShop(); H.addStatus('turbo'); H.chooseTable();
-ok(H.state.table.bets === P.misesParTable + 2, 'Turbo : +2 mises');
+H.leaveShop(); const mb = H.maxBet('dice'); H.addStatus('turbo'); H.chooseTable();
+ok(H.maxBet('dice') > mb, 'Turbo : mise max augmentée');
 
 // 14. Vente d'un joker actif : ses relances disparaissent
 H = run('T9'); H.addJoker('fantome'); newTable(H);
@@ -163,12 +161,8 @@ ok(H.chips() === P.jetonsDepart + 100 && H.state.debts[0].left === 120, 'prêt a
 ok(!!H.takeLoan('gros').error, 'un seul prêt à la fois');
 winTable(H);
 ok(H.state.debts[0].left === 80, `échéance prélevée (reste ${H.state.debts[0].left})`);
-H.leaveShop(); H.chooseTable();
-H.state.debts[0].per = H.state.debts[0].left = 1e6; // échéance impossible à payer
-winTable(H);
-ok(H.state.statuses.some(st => st.id === 'huissier'), 'huissier si échéance impayée');
-H.leaveShop(); H.chooseTable();
-ok(H.state.table.bets === P.misesParTable - CONFIG.loans.penaltyBets, 'huissier : mises confisquées');
+H.leaveShop(); H.state.chips = 100; H.chooseTable();
+ok(H.bankroll() === H.chips() - H.state.debts[0].left, 'bankroll = jetons − dettes');
 
 // 16. Sabot vide en pleine main : remélange sans les cartes en jeu
 const rng = RNG.fromSeed('deck');
@@ -179,7 +173,7 @@ ok(Deck.draw(shoe, rng, inPlay) && shoe.cards.length === 52 - 3 - 1, 'sabot vide
 
 // 17. Mise supérieure aux jetons
 H = run('T11'); H.state.chips = 3;
-ok(!!H.startPlay('bj', { bet: 5 }).error && H.chips() === 3 && H.state.table.bets === P.misesParTable, 'mise > jetons refusée, aucune mise consommée');
+ok(!!H.startPlay('bj', { bet: 5 }).error && H.chips() === 3, 'mise > jetons refusée');
 
 // 18. Sérialisation : l'état complet survit à JSON
 H = run('T12'); ['martingale', 'roue'].forEach(id => H.addJoker(id)); newTable(H);
@@ -224,14 +218,6 @@ ok(fsSeen, 'tours gratuits déclenchés en 2000 lancers');
 void st;
 
 // 23. Retours des testeurs : poids de l'objectif, bonus sur perte, relance par mise, sauvegarde
-H = run('P1');
-api.Games.register({ ...api.Games.get('test'), id: 'bjfake' });
-play(H, 10, 20);
-ok(H.state.table.gains === 10, 'gain normal compté une fois');
-const realBJ2 = api.Games.get('bj'); api.Games.register({ ...api.Games.get('test'), id: 'bj' });
-H.startPlay('bj', { bet: 10, back: 20 });
-ok(H.state.table.gains === 10 + 10 * (P.poidsObjectif.bj || 1), 'blackjack compte ×2 pour l\'objectif');
-api.Games.register(realBJ2);
 H = run('P2'); H.addJoker('consolation');
 const g0 = H.state.table.gains; play(H, 1, 0);
 ok(H.state.table.gains === g0, 'un bonus sur une perte ne compte pas pour l\'objectif');

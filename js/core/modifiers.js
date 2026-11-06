@@ -134,8 +134,8 @@ const B = CONFIG.bosses;
 const BOSS_DEFS = [
   { id: 'avare', name: 'Le Croupier Avare', desc: () => `Tous les gains sont réduits de ${pct(1 - B.avare.mult)}.`,
     onSettle(e, me) { if (e.outcome === 'win') e.mult(me, B.avare.mult, 'gains réduits'); } },
-  { id: 'presse', name: 'Le Directeur Pressé', desc: () => `Seulement ${B.presse.bets} mises à cette table.`,
-    onRoundStart(e) { e.table.bets = B.presse.bets; } },
+  { id: 'presse', name: 'Le Directeur Pressé', desc: () => `Mise max divisée par ${Math.round(1 / B.presse.maxBet)} à cette table.`,
+    maxBet(e) { e.value *= B.presse.maxBet; } },
   { id: 'noir', name: 'La Dame en Noir', desc: () => 'Les mises sur le rouge ne paient rien.',
     onResolve(e, me) {
       const b = e.info && e.info.bets && e.info.bets.red;
@@ -152,7 +152,7 @@ const BOSSES = Object.fromEntries(BOSS_DEFS.map(d => [d.id, d]));
 // ---------------- Améliorations de table ----------------
 const U = CONFIG.upgrades;
 const UPGRADE_DEFS = [
-  { id: 'vip', name: 'Table VIP', icon: '👑', desc: () => `+${U.vip.bets} mise à chaque table.`, onRoundStart(e) { e.table.bets += U.vip.bets; } },
+  { id: 'vip', name: 'Table VIP', icon: '👑', desc: () => `Mise max augmentée de ${pct(U.vip.maxBet - 1)}.`, maxBet(e) { e.value *= U.vip.maxBet; } },
   { id: 'truque', name: 'Sabot truqué', icon: '🗃️', desc: () => `Retire tous les ${U.truque.ranks.join(' et ')} du paquet (Blackjack et Hold'em).`,
     'deck.exclude'(e) { U.truque.ranks.forEach(r => { if (!e.ranks.includes(r)) e.ranks.push(r); }); } },
   { id: 'doree', name: 'Machine dorée', icon: '💠', desc: () => `Ajoute un symbole Diamant ×${CONFIG.games.slots.diamant.pay} aux machines à sous.`,
@@ -167,13 +167,13 @@ const T = CONFIG.tags;
 const STATUS_DEFS = [
   { id: 'golden', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise : si elle gagne, son gain est doublé.',
     onSettle(e, me) { if (e.outcome === 'win') e.mult(me, CONFIG.consumables.dore.mult, 'Jeton Doré'); me.remove(); } },
-  { id: 'huissier', name: 'Huissier', icon: '⚖️', desc: () => `Échéance de prêt impayée : ${CONFIG.loans.penaltyBets} mises de moins à la prochaine table.`,
-    onRoundStart(e, me) { e.table.bets -= CONFIG.loans.penaltyBets; me.remove(); } },
+  { id: 'huissier', name: 'Huissier', icon: '⚖️', desc: () => `Échéance de prêt impayée : mise max réduite de ${pct(1 - CONFIG.loans.penaltyMaxBet)} à la prochaine table.`,
+    maxBet(e) { e.value *= CONFIG.loans.penaltyMaxBet; }, onRoundEnd(e, me) { me.remove(); } },
   { id: 'soldes', tag: true, name: 'Soldes', icon: '🏷️', desc: () => `Prochain shop : tout à −${pct(T.soldes.discount)}.`,
     onShopEnter(e, me) { e.shop.offers.forEach(o => (o.price = Math.ceil(o.price * (1 - T.soldes.discount)))); me.remove(); } },
   { id: 'cadeau', tag: true, name: 'Paquet cadeau', icon: '🎁', desc: () => 'Un consommable gratuit, tout de suite.', instant: true },
-  { id: 'turbo', tag: true, name: 'Turbo', icon: '⚡', desc: () => `+${T.turbo.bets} mises à la prochaine table.`,
-    onRoundStart(e, me) { e.table.bets += T.turbo.bets; me.remove(); } },
+  { id: 'turbo', tag: true, name: 'Turbo', icon: '⚡', desc: () => `Mise max ×${String(T.turbo.maxBet).replace('.', ',')} à la prochaine table.`,
+    maxBet(e) { e.value *= T.turbo.maxBet; }, onRoundEnd(e, me) { me.remove(); } },
   { id: 'collection', tag: true, name: 'Collectionneur', icon: '💜', desc: () => 'Le prochain shop propose un joker rare ou légendaire garanti.',
     onShopEnter(e, me) {
       const i = e.shop.offers.findIndex(o => o.kind === 'joker');
