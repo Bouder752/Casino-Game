@@ -27,27 +27,38 @@ const Blackjack = (() => {
 
   function render() {
     els.shoe.textContent = `Sabot : ${shoe.cards.length} cartes`;
-    if (!s) { renderCards(els.dealer, []); els.dealerVal.textContent = ''; els.hands.innerHTML = ''; return; }
+    if (!s) {
+      renderCards(els.dealer, []); els.dealerVal.textContent = '';
+      els.hands.innerHTML = '';
+      els.hands.appendChild(handBox());
+      setSpot(els.hands.firstChild.querySelector('.spot'), bet.value);
+      return;
+    }
     renderCards(els.dealer, s.dealer, i => i === 1 && s.hideHole);
     els.dealerVal.textContent = !s.dealer.length ? '' : s.hideHole ? valText([s.dealer[0]]) : isBJ(s.dealer) ? 'Blackjack' : valText(s.dealer);
     // Mains du joueur
     while (els.hands.children.length > s.hands.length) els.hands.lastChild.remove();
     s.hands.forEach((h, i) => {
       let box = els.hands.children[i];
-      if (!box) {
-        box = Util.el('div', 'bj-hand');
-        box.innerHTML = '<div class="cards"></div><div class="hand-info"><span class="val"></span><span class="hbet"></span></div><div class="hand-result"></div>';
-        els.hands.appendChild(box);
-      }
+      if (!box) els.hands.appendChild(box = handBox());
       box.classList.toggle('active', s.stage === 'player' && i === s.active && s.hands.length > 1);
       renderCards(box.querySelector('.cards'), h.cards);
       box.querySelector('.val').textContent = h.isBJ ? 'Blackjack' : valText(h.cards);
-      box.querySelector('.hbet').textContent = `Mise ${Util.fmt(h.bet)}${h.doubled ? ' (doublée)' : ''}`;
+      box.querySelector('.hbet').textContent = h.doubled ? 'doublée' : '';
+      if (!h.settled) setSpot(box.querySelector('.spot'), h.bet);
       const r = box.querySelector('.hand-result');
       r.textContent = h.result || '';
       r.className = 'hand-result ' + (h.resultCls || '');
     });
   }
+
+  function handBox() {
+    const box = Util.el('div', 'bj-hand');
+    box.innerHTML = '<div class="cards"></div><div class="hand-info"><span class="val"></span><span class="hbet"></span></div>' +
+      '<div class="spot bj-spot"><div class="spot-chips"></div></div><div class="hand-result"></div>';
+    return box;
+  }
+  bet.onChange = () => { if (!s || s.stage === 'done') { s = null; render(); } };
 
   function idle() {
     bet.setEnabled(true);
@@ -64,6 +75,7 @@ const Blackjack = (() => {
     s = { hands: [{ cards: [], bet: amount }], dealer: [], active: 0, hideHole: true, stage: 'deal' };
     els.hands.innerHTML = '';
     renderCards(els.dealer, []);
+    els.dealerVal.textContent = '';
     const h = s.hands[0];
     for (const target of [h.cards, s.dealer, h.cards, s.dealer]) {
       target.push(shoe.draw()); render(); await Util.sleep(280);
@@ -170,10 +182,15 @@ const Blackjack = (() => {
       else if (p === d) { back = h.bet; h.result = 'Égalité'; h.resultCls = 'push'; }
       else { h.result = 'Perdu'; h.resultCls = 'lose'; }
       totalBet += h.bet; totalBack += back;
+      h.net = Util.round2(back - h.bet);
     });
     Wallet.give(Util.round2(totalBack));
     const net = Util.round2(totalBack - totalBet);
     render();
+    s.hands.forEach((h, i) => {
+      h.settled = true;
+      settleSpot(els.hands.children[i].querySelector('.spot'), h.net > 0 ? 'win' : h.net < 0 ? 'lose' : 'push', h.net);
+    });
     const text = net > 0 ? `Vous gagnez ${Util.fmt(net)} jetons !` : net < 0 ? `Vous perdez ${Util.fmt(-net)} jetons.` : 'Égalité, mise rendue.';
     msg((s.note ? s.note + ' ' : '') + text, net > 0 ? 'win' : net < 0 ? 'lose' : 'push');
     idle();

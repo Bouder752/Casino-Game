@@ -80,3 +80,46 @@ function setActions(container, list) {
     container.appendChild(b);
   });
 }
+
+// Piles de jetons posées sur le tapis
+const CHIP_VALUES = [500, 100, 25, 5, 1];
+function chipBreakdown(amount) {
+  const out = [];
+  let a = Math.round(amount * 100) / 100;
+  for (const v of CHIP_VALUES) while (a >= v - 1e-9 && out.length < 14) { out.push(v); a = Util.round2(a - v); }
+  if (!out.length && amount > 0) out.push(1);
+  return out;
+}
+function chipStack(amount, cls = '') {
+  const st = Util.el('div', 'stack ' + cls);
+  chipBreakdown(amount).slice(0, 10).forEach((v, i) => {
+    const c = Util.el('div', `chipv chip-${v}`);
+    c.style.setProperty('--i', i);
+    c.style.animationDelay = `${i * 45}ms`;
+    st.appendChild(c);
+  });
+  st.appendChild(Util.el('div', 'stack-amt', Util.fmt(amount)));
+  return st;
+}
+// Met à jour la mise d'une case du tapis (anime seulement si le montant change)
+function setSpot(spot, amount) {
+  const holder = spot.querySelector('.spot-chips');
+  if (holder._amount === amount && !spot.classList.contains('settled')) return;
+  spot.classList.remove('settled');
+  holder._amount = amount;
+  holder.innerHTML = '';
+  if (amount > 0) holder.appendChild(chipStack(amount));
+  spot.classList.toggle('filled', amount > 0);
+}
+// Animation de règlement : 'win' (gains apportés), 'lose' (jetons ramassés), 'push'
+function settleSpot(spot, outcome, payout = 0) {
+  const holder = spot.querySelector('.spot-chips');
+  spot.classList.add('settled');
+  if (outcome === 'lose') {
+    holder.querySelector('.stack')?.classList.add('collected');
+  } else if (outcome === 'win' && payout > 0) {
+    holder.appendChild(chipStack(payout, 'payout'));
+  }
+  spot.classList.add('flash-' + outcome);
+  setTimeout(() => spot.classList.remove('flash-' + outcome), 1200);
+}

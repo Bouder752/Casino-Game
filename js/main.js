@@ -22,3 +22,12 @@
   try { saved = localStorage.getItem('casino.tab') || 'uth'; } catch (e) { /* ignore */ }
   show(document.getElementById(saved) ? saved : 'uth');
 })();
+
+// Râtelier de jetons du croupier (décor)
+document.querySelectorAll('.rack').forEach(rack => {
+  [500, 100, 25, 5, 1, 1, 5, 25, 100, 500].forEach(v => {
+    const col = Util.el('div', 'rack-col');
+    for (let i = 0; i < 9; i++) col.appendChild(Util.el('div', `rack-chip chip-${v}`));
+    rack.appendChild(col);
+  });
+});
