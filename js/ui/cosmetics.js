@@ -1,15 +1,6 @@
-// Progression permanente (entre les parties) : prestige, cosmétiques, Jackpot Éternel, records
-const Meta = (() => {
-  const KEY = 'boubouzino.meta';
-  const data = {
-    prestige: 0, jackpot: 1, unlocked: ['felt-vert', 'back-bordeaux'],
-    felt: 'felt-vert', back: 'back-bordeaux',
-    best: 0, runs: 0, wins: 0,
-  };
-  try { Object.assign(data, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* ignore */ }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } };
-  return { data, save };
-})();
+// Progression permanente partagée par l'interface et le moteur, et cosmétiques
+const META = Engine.loadMeta();
+const saveMeta = () => Storage.set('boubouzino.meta', META);
 
 const Cosmetics = (() => {
   const FELTS = [
@@ -28,26 +19,25 @@ const Cosmetics = (() => {
     { id: 'back-rose', name: 'Flamant rose', price: 6, c: ['#c2457c', '#ec8ab4', '#ffe0ee', '#8e2556'] },
   ];
   const all = () => [...FELTS, ...BACKS];
-  const owned = id => Meta.data.unlocked.includes(id);
-
+  const owned = id => META.unlocked.includes(id);
   function apply() {
-    const f = FELTS.find(x => x.id === Meta.data.felt) || FELTS[0];
+    const f = FELTS.find(x => x.id === META.felt) || FELTS[0];
     const r = document.documentElement.style;
     r.setProperty('--felt-1', f.c[0]); r.setProperty('--felt-2', f.c[1]); r.setProperty('--felt-3', f.c[2]);
   }
-  function back() { return BACKS.find(x => x.id === Meta.data.back) || BACKS[0]; }
+  const back = () => BACKS.find(x => x.id === META.back) || BACKS[0];
   function buy(id) {
     const it = all().find(x => x.id === id);
-    if (!it || owned(id) || Meta.data.prestige < it.price) return false;
-    Meta.data.prestige -= it.price;
-    Meta.data.unlocked.push(id);
-    Meta.save();
+    if (!it || owned(id) || META.prestige < it.price) return false;
+    META.prestige -= it.price;
+    META.unlocked.push(id);
+    saveMeta();
     return true;
   }
   function select(id) {
     if (!owned(id)) return;
-    if (id.startsWith('felt')) Meta.data.felt = id; else Meta.data.back = id;
-    Meta.save(); apply();
+    if (id.startsWith('felt')) META.felt = id; else META.back = id;
+    saveMeta(); apply();
     document.querySelectorAll('.card .face.back').forEach(f => (f.innerHTML = CardArt.back()));
   }
   return { FELTS, BACKS, owned, apply, back, buy, select };

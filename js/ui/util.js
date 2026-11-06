@@ -1,13 +1,5 @@
 // Utilitaires partagés
 const Util = {
-  // Entier aléatoire uniforme dans [0, n) via crypto (sans biais modulo)
-  randInt(n) {
-    const buf = new Uint32Array(1);
-    const limit = Math.floor(0x100000000 / n) * n;
-    let x;
-    do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
-    return x % n;
-  },
   sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
   round2(x) { return Math.round(x * 100) / 100; },
   fmt(n) {
@@ -150,3 +142,11 @@ function settleSpot(spot, outcome, payout = 0) {
   spot.classList.add('flash-' + outcome);
   setTimeout(() => spot.classList.remove('flash-' + outcome), 1200);
 }
+
+// Affiche les actions proposées par un moteur de jeu ({ id, label, primary… })
+function engineActions(container, actions, onAct) {
+  setActions(container, actions.map(a => [a.label, () => onAct(a.id),
+    { cls: a.primary ? 'primary' : a.danger ? 'danger' : a.ghost ? 'ghost' : '', disabled: a.disabled }]));
+}
+// Limite de mise : plafond de la manche et jetons disponibles
+const betLimit = (game, ratio = 1) => () => (App.host ? Math.max(0, Math.min(App.host.maxBet(game), Math.floor(App.host.chips() * ratio * 100) / 100)) : 0);

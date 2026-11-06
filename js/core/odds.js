@@ -5,9 +5,10 @@
 const Odds = (() => {
   let token = 0;
 
+  let excluded = [];
   function remaining(known) {
     const used = new Set(known.map(c => c.rank * 4 + c.suit));
-    const skip = typeof Casino !== 'undefined' ? Casino.excludedRanks() : [];
+    const skip = excluded;
     const out = [];
     for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) if (!used.has(r * 4 + s) && !skip.includes(r)) out.push({ rank: r, suit: s });
     return out;
@@ -19,8 +20,13 @@ const Odds = (() => {
   }
 
   // hole : 2 ou 3 cartes ; board : 0, 3 ou 5 cartes visibles ; dealer : [] ou 2 cartes connues
-  function compute(hole, board, onUpdate, dealer = []) {
+  // excl : rangs retirés du paquet (Sabot truqué)
+  function compute(hole, board, onUpdate, dealer = [], excl = []) {
     const my = ++token;
+    excluded = excl;
+    // Générateur dédié, seedé par la situation : même situation → même estimation,
+    // sans jamais toucher au générateur de la partie.
+    const rng = RNG.fromSeed([...hole, ...board, ...dealer].map(c => c.rank * 4 + c.suit).join(','));
     const knownDealer = dealer.length === 2;
     const rem = remaining([...hole, ...board, ...dealer]);
     const cats = new Float64Array(10);
@@ -60,7 +66,7 @@ const Odds = (() => {
         while (n < N) {
           for (let it = 0; it < CHUNK; it++) {
             for (let j = 0; j < need; j++) {
-              const k = j + Math.floor(Math.random() * (pool.length - j));
+              const k = j + Math.floor(rng.next() * (pool.length - j));
               const t = pool[j]; pool[j] = pool[k]; pool[k] = t;
             }
             for (let j = 0; j < 5; j++) p[H + j] = d[2 + j] = pool[j];

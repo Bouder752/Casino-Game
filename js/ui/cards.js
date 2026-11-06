@@ -1,41 +1,4 @@
-// Cartes au style « portrait français » (SVG), sabot et rendu animé
-const SUITS = [
-  { sym: '♠', color: 'black', name: 'Pique' },
-  { sym: '♥', color: 'red', name: 'Cœur' },
-  { sym: '♦', color: 'red', name: 'Carreau' },
-  { sym: '♣', color: 'black', name: 'Trèfle' },
-];
-const RANK_LABEL = { 11: 'V', 12: 'D', 13: 'R', 14: 'A' };
-const RANK_NAME = { 2: 'Deux', 3: 'Trois', 4: 'Quatre', 5: 'Cinq', 6: 'Six', 7: 'Sept', 8: 'Huit',
-  9: 'Neuf', 10: 'Dix', 11: 'Valet', 12: 'Dame', 13: 'Roi', 14: 'As' };
-
-class Shoe {
-  constructor(decks = 1, penetration = 0.75) {
-    this.decks = decks;
-    this.penetration = penetration;
-    this.shuffle();
-  }
-  shuffle() {
-    this.cards = [];
-    const skip = typeof Casino !== 'undefined' ? Casino.excludedRanks() : [];
-    for (let d = 0; d < this.decks; d++)
-      for (let s = 0; s < 4; s++)
-        for (let r = 2; r <= 14; r++) if (!skip.includes(r)) this.cards.push({ rank: r, suit: s });
-    for (let i = this.cards.length - 1; i > 0; i--) {
-      const j = Util.randInt(i + 1);
-      [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
-    }
-    this.cutAt = Math.floor(this.cards.length * (1 - this.penetration));
-  }
-  needsShuffle() { return this.cards.length <= this.cutAt; }
-  draw() {
-    if (this.cards.length === 0) this.shuffle();
-    return this.cards.pop();
-  }
-}
-
-function cardLabel(c) { return RANK_LABEL[c.rank] || String(c.rank); }
-
+// Rendu des cartes au style « portrait français » (SVG) et animations de distribution
 const CardArt = (() => {
   const INK = { red: '#c4161c', black: '#141414' };
   const C = { red: '#c4161c', blue: '#1d4b9a', yellow: '#e9b81c', skin: '#f7d9bb', hair: '#7a4a22', line: '#1a1a1a' };

@@ -31,6 +31,7 @@
       </div>
       <div class="menu-buttons">
         <button class="btn primary big" id="m-new">Nouvelle partie</button>
+        <input class="seed-input" id="m-seed" maxlength="24" placeholder="Seed (optionnelle, ex. BOUBOU)" aria-label="Seed de la partie" autocomplete="off">
         <button class="btn big" id="m-continue" hidden>Continuer la partie</button>
         <button class="btn big" id="m-free">Mode libre</button>
         <button class="btn big" id="m-cosmetics">Cosmétiques <span class="prestige-badge" id="m-prestige"></span></button>
@@ -305,24 +306,37 @@
   <div class="modal" id="modal" hidden><div class="modal-box" id="modal-box"></div></div>
   <div class="popover" id="popover" hidden></div>
   <div class="toasts" id="toasts"></div>
+  <div class="ledger" id="ledger" hidden></div>
 
   <footer>Boubouz'ino — jeu gratuit avec des jetons fictifs, aucun argent réel. Jouer comporte des risques : si le jeu devient un problème, appelez le 09 74 75 13 13 (Joueurs Info Service).</footer>
 
-  <script src="js/util.js"></script>
-  <script src="js/sound.js"></script>
-  <script src="js/meta.js"></script>
-  <script src="js/wallet.js"></script>
-  <script src="js/jokers.js"></script>
-  <script src="js/run.js"></script>
-  <script src="js/cards.js"></script>
-  <script src="js/handEval.js"></script>
-  <script src="js/odds.js"></script>
-  <script src="js/uth.js"></script>
-  <script src="js/blackjack.js"></script>
-  <script src="js/roulette.js"></script>
-  <script src="js/slots.js"></script>
-  <script src="js/dice.js"></script>
-  <script src="js/runui.js"></script>
-  <script src="js/main.js"></script>
+  <!-- Moteur (sans DOM) -->
+  <script src="js/core/rng.js"></script>
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/config.js"></script>
+  <script src="js/core/deck.js"></script>
+  <script src="js/core/handEval.js"></script>
+  <script src="js/core/odds.js"></script>
+  <script src="js/core/modifiers.js"></script>
+  <script src="js/core/engine.js"></script>
+  <script src="js/core/games/blackjack.js"></script>
+  <script src="js/core/games/uth.js"></script>
+  <script src="js/core/games/dice.js"></script>
+  <script src="js/core/games/roulette.js"></script>
+  <script src="js/core/games/slots.js"></script>
+  <script src="js/core/sim.js"></script>
+  <!-- Interface -->
+  <script src="js/ui/util.js"></script>
+  <script src="js/ui/sound.js"></script>
+  <script src="js/ui/cosmetics.js"></script>
+  <script src="js/ui/cards.js"></script>
+  <script src="js/ui/app.js"></script>
+  <script src="js/ui/views/uth.js"></script>
+  <script src="js/ui/views/blackjack.js"></script>
+  <script src="js/ui/views/roulette.js"></script>
+  <script src="js/ui/views/slots.js"></script>
+  <script src="js/ui/views/dice.js"></script>
+  <script src="js/ui/runui.js"></script>
+  <script src="js/ui/main.js"></script>
 </body>
 </html>

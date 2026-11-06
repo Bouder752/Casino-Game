@@ -2,8 +2,8 @@
 const Sfx = (() => {
   let ctx = null, master = null;
   const settings = { on: true, volume: 0.6 };
-  try { Object.assign(settings, JSON.parse(localStorage.getItem('boubouzino.sound') || '{}')); } catch (e) { /* ignore */ }
-  const save = () => { try { localStorage.setItem('boubouzino.sound', JSON.stringify(settings)); } catch (e) { /* ignore */ } };
+  Object.assign(settings, Storage.get('boubouzino.sound', {}));
+  const save = () => Storage.set('boubouzino.sound', settings);
 
   function ac() {
     if (!ctx) {
@@ -34,7 +34,7 @@ const Sfx = (() => {
     const t = c.currentTime + at;
     const buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    for (let i = 0; i < d.length; i++) d[i] = (RNG.fx.next() * 2 - 1) * (1 - i / d.length);
     const src = c.createBufferSource(); src.buffer = buf;
     const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
     const g = c.createGain(); g.gain.value = vol;
@@ -52,7 +52,7 @@ const Sfx = (() => {
     push: () => tone(440, 0.18, { type: 'triangle', vol: 0.12 }),
     tick: () => tone(1800, 0.025, { type: 'square', vol: 0.05 }),
     reelstop: () => { noise(0.08, { vol: 0.3, freq: 600 }); tone(140, 0.1, { vol: 0.2 }); },
-    coins: () => { for (let i = 0; i < 6; i++) tone(2000 + Math.random() * 1600, 0.08, { type: 'triangle', vol: 0.07, at: i * 0.05 }); },
+    coins: () => { for (let i = 0; i < 6; i++) tone(2000 + RNG.fx.next() * 1600, 0.08, { type: 'triangle', vol: 0.07, at: i * 0.05 }); },
     buy: () => { tone(1318, 0.09, { type: 'square', vol: 0.06 }); tone(1760, 0.25, { type: 'square', vol: 0.06, at: 0.08 }); SOUNDS.coins(); },
     joker: () => { tone(880, 0.12, { type: 'triangle', vol: 0.12, slide: 1.5 }); tone(1320, 0.15, { type: 'sine', vol: 0.1, at: 0.06 }); },
     error: () => tone(160, 0.2, { type: 'square', vol: 0.06 }),
