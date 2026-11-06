@@ -1,6 +1,19 @@
+// Réglages d'interface (vitesse d'animation 1x / 2x / 4x)
+const Settings = (() => {
+  const st = Object.assign({ speed: 1 }, Storage.get('boubouzino.settings', {}));
+  const apply = () => document.documentElement.style.setProperty('--spd', String(1 / st.speed));
+  apply();
+  return {
+    get speed() { return st.speed; },
+    setSpeed(v) { st.speed = v; Storage.set('boubouzino.settings', st); apply(); },
+  };
+})();
+
 // Utilitaires partagés
 const Util = {
-  sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
+  // Toutes les attentes d'animation passent par ici : la vitesse 2x / 4x les raccourcit
+  sleep(ms) { return new Promise(r => setTimeout(r, ms / Settings.speed)); },
+  dur(ms) { return ms / Settings.speed; },
   round2(x) { return Math.round(x * 100) / 100; },
   fmt(n) {
     return n.toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
@@ -150,3 +163,7 @@ function engineActions(container, actions, onAct) {
 }
 // Limite de mise : plafond de la manche et jetons disponibles
 const betLimit = (game, ratio = 1) => () => (App.host ? Math.max(0, Math.min(App.host.maxBet(game), Math.floor(App.host.chips() * ratio * 100) / 100)) : 0);
+
+// Symboles des messages (lisibles sans les couleurs)
+const MSG_ICON = { win: '✓ ', lose: '✗ ', push: '= ', warn: '⚠ ' };
+const iconMsg = (t, c) => (t && MSG_ICON[c] && !/^[✓✗=⚠]/.test(t) ? MSG_ICON[c] : '') + t;

@@ -11,7 +11,7 @@ App.register((() => {
   const bet = new BetControl($('dice-bet'), { label: 'Mise', initial: 10, max: betLimit('dice') });
   let mode = 'under', busy = false;
   const history = [];
-  const msg = (t, c = '') => { els.msg.textContent = t; els.msg.className = 'msg ' + c; };
+  const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
   const target = () => +els.slider.value;
 
   function update() {

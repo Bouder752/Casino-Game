@@ -11,7 +11,7 @@ App.register((() => {
   const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10, max: () => Math.min(App.host ? App.host.maxBet('uth') : 0, App.host ? Math.floor(App.host.chips() / 2) : 0) });
   const trips = new BetControl($('uth-trips'), { label: 'Trips (optionnel)', initial: 0, max: betLimit('uth') });
   let r = null, anim = false;
-  const msg = (t, c = '') => { els.msg.textContent = t; els.msg.className = 'msg ' + c; };
+  const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
 
   function spots() {
     const v = r ? { ante: r.ante, blind: r.blind, play: r.play, trips: r.trips } : { ante: ante.value, blind: ante.value, play: 0, trips: trips.value };

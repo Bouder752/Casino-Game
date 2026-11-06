@@ -9,7 +9,7 @@ App.register((() => {
   const SEG = 360 / 37;
   let bets = {}, lastBets = null, chip = 5, rot = 0, ballRot = 0, busy = false;
   const history = [];
-  const msg = (t, c = '') => { els.msg.textContent = t; els.msg.className = 'msg ' + c; };
+  const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
 
   (function drawWheel() {
     const R = 150, r2 = 112, cx = 160, cy = 160;
@@ -96,6 +96,7 @@ App.register((() => {
     const cur = ((rot % 360) + 360) % 360;
     rot += 360 * 5 + ((want - cur + 360) % 360);
     ballRot -= 360 * 7 + (((ballRot % 360) + 360) % 360);
+    els.wheel.style.transitionDuration = els.ballTrack.style.transitionDuration = Util.dur(4200) + 'ms';
     els.wheel.style.transform = `rotate(${rot}deg)`;
     els.ballTrack.style.transform = `rotate(${ballRot}deg)`;
     els.ballTrack.classList.add('spinning');

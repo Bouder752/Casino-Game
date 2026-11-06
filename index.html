@@ -6,7 +6,7 @@
   <title>Boubouz'ino</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Limelight&family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,6 +19,7 @@
       <button id="reset" class="btn small" title="Réinitialiser le solde (mode libre)">↺</button>
     </div>
     <button class="btn small icon" id="sound" title="Son">🔊</button>
+    <button class="btn small icon" id="settings" title="Options">⚙</button>
   </header>
 
   <!-- ÉCRAN TITRE -->
@@ -34,6 +35,7 @@
         <input class="seed-input" id="m-seed" maxlength="24" placeholder="Seed (optionnelle, ex. BOUBOU)" aria-label="Seed de la partie" autocomplete="off">
         <button class="btn big" id="m-continue" hidden>Continuer la partie</button>
         <button class="btn big" id="m-free">Mode libre</button>
+        <button class="btn big" id="m-collection">Collection</button>
         <button class="btn big" id="m-cosmetics">Cosmétiques <span class="prestige-badge" id="m-prestige"></span></button>
         <button class="btn big" id="m-howto">Comment jouer</button>
       </div>
@@ -50,10 +52,6 @@
   <section class="screen" id="screen-game" hidden>
     <div class="run-bar" id="run-bar" hidden>
       <div class="run-info" id="run-info"></div>
-      <div class="joker-row">
-        <div class="joker-slots" id="joker-slots"></div>
-        <div class="cons-slots" id="cons-slots"></div>
-      </div>
     </div>
     <nav class="tabs">
       <button class="tab" data-tab="uth">Hold'em</button>
@@ -221,20 +219,24 @@
       </div>
     </section>
 
-    <!-- MACHINE A SOUS -->
+    <!-- MACHINE A SOUS : Le Palace des Chats -->
     <section class="game" id="slots" hidden>
       <div class="layout">
         <div class="table">
           <div class="felt sl-felt">
-            <div class="sl-machine">
-              <div class="sl-lights" id="sl-lights"></div>
-              <div class="sl-title">Boubouz'ino <span>★ Slots ★</span></div>
+            <div class="palace">
+              <div class="palace-roof" aria-hidden="true"></div>
+              <div class="palace-top">
+                <div class="palace-title">Le Palace des Chats</div>
+                <div class="palace-sub">5 rouleaux · 20 lignes · Wilds ×2 / ×3 collants en tours gratuits</div>
+              </div>
+              <div class="fs-banner" id="sl-fs" hidden></div>
               <div class="sl-window">
-                <div class="sl-reels" id="sl-reels"></div>
-                <div class="sl-line"></div>
+                <div class="sl-grid" id="sl-reels"></div>
+                <svg class="sl-lines" id="sl-lines" aria-hidden="true"></svg>
                 <div class="sl-win" id="sl-win"></div>
               </div>
-              <div class="sl-lever" id="sl-lever" title="Tirer le levier"><i></i></div>
+              <div class="sl-lights" id="sl-lights"></div>
             </div>
             <div class="msg" id="sl-msg"></div>
             <div class="actions" id="sl-actions"></div>
@@ -244,11 +246,12 @@
           <div id="sl-bet"></div>
           <details class="rules" open>
             <summary>Table des gains</summary>
-            <table id="sl-paytable"></table>
+            <div id="sl-paytable"></div>
           </details>
         </aside>
       </div>
     </section>
+
     <!-- DICE -->
     <section class="game" id="dice" hidden>
       <div class="layout">
@@ -303,6 +306,11 @@
     <div class="shop" id="shop"></div>
   </section>
 
+  <!-- COLLECTION -->
+  <section class="screen" id="screen-collection" hidden>
+    <div class="collection" id="collection"></div>
+  </section>
+
   <!-- COSMÉTIQUES -->
   <section class="screen" id="screen-cosmetics" hidden>
     <div class="cosmetics" id="cosmetics"></div>
@@ -312,6 +320,14 @@
   <div class="popover" id="popover" hidden></div>
   <div class="toasts" id="toasts"></div>
   <div class="ledger" id="ledger" hidden></div>
+  <!-- Rangée de jokers en bas d'écran (glisser-déposer pour changer l'ordre) -->
+  <div class="dock" id="dock" hidden>
+    <div class="dock-inner">
+      <div class="joker-slots" id="joker-slots"></div>
+      <div class="cons-slots" id="cons-slots"></div>
+    </div>
+  </div>
+  <div class="jsheet" id="jsheet" hidden></div>
 
   <footer>Boubouz'ino — jeu gratuit avec des jetons fictifs, aucun argent réel. Jouer comporte des risques : si le jeu devient un problème, appelez le 09 74 75 13 13 (Joueurs Info Service).</footer>
 
@@ -335,6 +351,8 @@
   <script src="js/ui/sound.js"></script>
   <script src="js/ui/cosmetics.js"></script>
   <script src="js/ui/cards.js"></script>
+  <script src="js/ui/jokerArt.js"></script>
+  <script src="js/ui/slotArt.js"></script>
   <script src="js/ui/app.js"></script>
   <script src="js/ui/views/uth.js"></script>
   <script src="js/ui/views/blackjack.js"></script>

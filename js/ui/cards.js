@@ -170,7 +170,7 @@ function renderCards(container, cards, isHidden = () => false, highlight = null)
       dealFromShoe(e);
       Sfx.play('deal');
       if (!hidden) {
-        e._pending = setTimeout(() => { e._pending = null; if (!e._wantHidden) e.classList.remove('down'); }, 330);
+        e._pending = setTimeout(() => { e._pending = null; if (!e._wantHidden) e.classList.remove('down'); }, Util.dur(330));
       }
     } else if (!e._pending) {
       if (e.classList.contains('down') && !hidden) Sfx.play('flip');

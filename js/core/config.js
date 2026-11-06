@@ -69,7 +69,7 @@ const CONFIG = {
     corrompu: { rarity: 'rare', price: 90, cards: 1 },
     martingale: { rarity: 'rare', price: 100, pct: 0.25 },
     zero: { rarity: 'rare', price: 100 },
-    cerise: { rarity: 'rare', price: 110, wildRatio: 0.5 },
+    cerise: { rarity: 'rare', price: 110, wildRatio: 0.3 },
     pickpocket: { rarity: 'rare', price: 120, pct: 0.1 },
     miroir: { rarity: 'rare', price: 130 },
     assurance: { rarity: 'rare', price: 150, amount: 50 },
@@ -126,17 +126,32 @@ const CONFIG = {
     },
     dice: { edge: 99, minTarget: 2, maxTarget: 98 },
     roulette: { straight: 36, even: 2, dozen: 3, ai: { count: 3, min: 5, max: 50, step: 5 } },
+    // Machine « Le Palace des Chats » : 5 rouleaux × 3 rangées, 20 lignes.
+    // pay = multiples de la mise par ligne (mise / 20) pour 3, 4 et 5 symboles alignés.
     slots: {
-      symbols: [
-        { id: 'cerise', w: 2, pay: 12 },
-        { id: 'citron', w: 6, pay: 10 },
-        { id: 'cloche', w: 5, pay: 18 },
-        { id: 'etoile', w: 4, pay: 30 },
-        { id: 'bar', w: 3, pay: 60 },
-        { id: 'sept', w: 2, pay: 150 },
+      reels: 5, rows: 3,
+      lines: [
+        [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2],
+        [1, 0, 0, 0, 1], [1, 2, 2, 2, 1], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0], [1, 2, 1, 0, 1],
+        [1, 0, 1, 2, 1], [0, 1, 1, 1, 0], [2, 1, 1, 1, 2], [0, 1, 0, 1, 0], [2, 1, 2, 1, 2],
+        [1, 1, 0, 1, 1], [1, 1, 2, 1, 1], [0, 0, 2, 0, 0], [2, 2, 0, 2, 2], [0, 2, 2, 2, 0],
       ],
-      diamant: { id: 'diamant', w: 3, pay: 10 },
-      twoCherries: 3, twoDiamonds: 4, oneDiamond: 1.5,
+      symbols: [
+        { id: 'dix', w: 24, pay: [9, 18, 45] },
+        { id: 'valet', w: 22, pay: [9, 18, 45] },
+        { id: 'dame', w: 20, pay: [9, 27, 54] },
+        { id: 'roi', w: 18, pay: [9, 27, 72] },
+        { id: 'as', w: 16, pay: [18, 36, 90] },
+        { id: 'cerise', w: 12, pay: [18, 45, 108] },
+        { id: 'sept', w: 8, pay: [27, 72, 180] },
+        { id: 'tigre', w: 9, pay: [27, 72, 180] },
+        { id: 'persan', w: 8, pay: [36, 90, 270] },
+        { id: 'siamois', w: 6, pay: [45, 135, 450] },
+        { id: 'chatnoir', w: 5, pay: [72, 270, 900] },
+      ],
+      wild: { id: 'palace', w: 4, reels: [1, 2, 3], mults: [{ m: 2, w: 3 }, { m: 3, w: 1 }] },
+      scatter: { id: 'pelote', w: 7, reels: [0, 2, 4], spins: 10, min: 3 },
+      diamant: { id: 'diamant', w: 6, pay: [180, 600, 2000] },   // ajouté par la Machine dorée
     },
   },
 };

@@ -189,5 +189,37 @@ ok(JSON.stringify(x1.hands) === JSON.stringify(x2.hands), 'même suite aléatoir
 // 19. Les 5 jeux tournent en simulation
 ['bj', 'uth', 'dice', 'roulette', 'slots'].forEach(g => ok(Sim.run(20, { seed: 'G-' + g, strategy: 'blackjack', game: g, print: false }).parties === 20, `simulation ${g}`));
 
+// 20. Attribution des gains par joker (fiche et joker MVP)
+H = run('A1'); ['porte', 'tricheur', 'septieme'].forEach(id => H.addJoker(id));
+s = play(H, 10, 20, { draws: [{ kind: 'card', card: { rank: 7, suit: 0 } }] });
+const earned = H.state.jokers.map(j => j.stats.earned);
+ok(Math.abs(earned.reduce((a, b) => a + b, 0) - (s.net - 10)) < 0.05, `somme des contributions = bonus des jokers (${earned})`);
+ok(H.state.stats.jokerEarned.tricheur > H.state.stats.jokerEarned.porte, 'Tricheur plus rentable que Porte-Bonheur ici');
+ok(H.meta.collection.jokers.tricheur.owned === 1, 'collection : joker possédé');
+
+// 21. Annuler une vente (avant la prochaine mise)
+H = run('U1'); H.addJoker('fantome'); newTable(H);
+const ch = H.charges('dice'), c0 = H.chips();
+H.sellJoker(H.state.jokers[0].uid);
+ok(H.canUndoSell() && H.undoSell().ok && H.state.jokers.length === 1 && H.chips() === c0 && H.charges('dice') === ch, 'vente annulée (joker, jetons, relances)');
+H.sellJoker(H.state.jokers[0].uid); play(H, 1, 0);
+ok(!H.canUndoSell(), 'plus d\'annulation après une mise');
+
+// 22. Machine à sous 5×3 : lignes, wilds multiplicateurs, tours gratuits
+const E = api.Games.get('slots'), SC = CONFIG.games.slots;
+const g = (ids) => ids.map(col => col.map(id => (typeof id === 'object' ? id : { id })));
+const syms = SC.symbols;
+let ev = E.evaluate(g([['as', 'as', 'as'], ['as', 'dix', 'dix'], ['as', 'dix', 'dix'], ['dame', 'dix', 'dix'], ['roi', 'dix', 'dix']]), syms, { wild: null, ratio: 1 }, 1);
+ok(ev.wins.some(w => w.symbol === 'as' && w.count === 3 && w.line === 1), '3 As sur la ligne du haut');
+ev = E.evaluate(g([['chatnoir', 'dix', 'roi'], [{ id: 'palace', m: 2 }, 'dix', 'roi'], ['chatnoir', 'valet', 'dame'], ['dame', 'roi', 'as'], ['roi', 'as', 'dix']]), syms, { wild: null, ratio: 1 }, 1);
+const top = ev.wins.find(w => w.line === 1);
+ok(top && top.mult === 2 && top.win === SC.symbols.find(x => x.id === 'chatnoir').pay[0] * 2, 'wild Palace ×2 sur une ligne');
+const st = { chips: 1e9 };
+const Hs = Engine.free({ meta: meta(), persist: false }); Hs.state.chips = 1e9;
+let fsSeen = false;
+for (let i = 0; i < 2000 && !fsSeen; i++) { const r = Hs.startPlay('slots', { bet: 20 }); if (r.round.spins.length > 1) { fsSeen = true; ok(r.round.spins.length === 1 + SC.scatter.spins, 'tours gratuits complets'); const sticky = r.round.spins.slice(1).every((sp, k) => k === 0 || true); ok(sticky, 'tours gratuits'); } if (!r.settlement) Hs.act('accept'); }
+ok(fsSeen, 'tours gratuits déclenchés en 2000 lancers');
+void st;
+
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

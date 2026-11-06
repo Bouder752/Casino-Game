@@ -9,8 +9,12 @@ const UI = (() => {
 
   // ---------- Écrans et onglets ----------
   function screen(name) {
-    ['menu', 'choose', 'game', 'shop', 'cosmetics'].forEach(n => ($('screen-' + n).hidden = n !== name));
+    ['menu', 'choose', 'game', 'shop', 'cosmetics', 'collection'].forEach(n => ($('screen-' + n).hidden = n !== name));
     document.body.dataset.screen = name;
+    $('jsheet').hidden = true;
+    // la rangée de jokers reste en bas pendant le choix de table et le jeu
+    $('dock').hidden = !(isRun() && (name === 'game' || name === 'choose'));
+    document.body.classList.toggle('has-dock', !$('dock').hidden);
     closePopover();
     window.scrollTo(0, 0);
   }
@@ -42,11 +46,19 @@ const UI = (() => {
     return box;
   }
   const closeModal = () => ($('modal').hidden = true);
-  function toast(text) {
+  // Toast, avec éventuellement un bouton (ex. « Annuler » après une vente)
+  function toast(text, action) {
     const t = el('div', 'toast', text);
+    if (action) {
+      const b = el('button', 'btn small', action.label);
+      b.onclick = () => { action.fn(); t.remove(); };
+      t.appendChild(b);
+      t.classList.add('with-action');
+    }
     $('toasts').appendChild(t);
-    setTimeout(() => t.classList.add('out'), 2600);
-    setTimeout(() => t.remove(), 3100);
+    const life = action ? 5000 : 2600;
+    setTimeout(() => t.classList.add('out'), life);
+    setTimeout(() => t.remove(), life + 500);
   }
   function popover(anchor, html, buttons) {
     const p = $('popover');
@@ -61,7 +73,7 @@ const UI = (() => {
     if (buttons.length) p.appendChild(row);
     p.hidden = false;
     const r = anchor.getBoundingClientRect();
-    const w = Math.min(280, window.innerWidth - 32);
+    const w = Math.min(320, window.innerWidth - 32);
     p.style.width = w + 'px';
     p.style.left = Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2)) + 'px';
     p.style.top = (r.bottom + window.scrollY + 8) + 'px';
@@ -70,25 +82,54 @@ const UI = (() => {
   document.addEventListener('click', e => { if (!e.target.closest('#popover, .jcard')) closePopover(); });
   const report = r => { if (r && r.error) { Sfx.play('error'); toast(r.error); return false; } return true; };
 
-  // ---------- Cartes d'objets (jokers, consommables…) ----------
+  // ---------- Cartes d'objets (jokers illustrés, consommables…) ----------
+  const RAR_SYM = { commun: '●', rare: '◆', legendaire: '★' };
   const kindCls = d => (d.kind === 'joker' ? 'r-' + d.rarity : d.kind === 'consumable' ? 'r-cons' : d.kind === 'pack' ? 'r-pack' : 'r-upgrade');
-  function itemCard(id, { uid, price, onClick, disabled } = {}) {
+  const KIND_LABEL = { consumable: 'Consommable', pack: 'Pack', upgrade: 'Amélioration' };
+  // Synergies (aperçu au survol d'un joker du shop)
+  const SYN = {
+    porte: ['gain'], rouge: ['roulette'], septieme: ['sept'], molle: ['bj', 'perte'], compteur: ['bj'], consolation: ['perte'],
+    depipe: ['dice', 'relance'], corrompu: ['bj'], martingale: ['perte', 'gain'], zero: ['roulette'], cerise: ['slots'],
+    pickpocket: ['roulette'], miroir: ['copie'], assurance: ['survie'], parrain: ['nombre', 'gain'], tricheur: ['gain'],
+    roue: ['regles'], banquier: ['eco'], fantome: ['relance'], jackpot: ['gain'],
+  };
+  const synergic = (a, b) => a !== b && (a === 'miroir' || b === 'miroir' || a === 'parrain' || b === 'parrain' || (SYN[a] || []).some(t => (SYN[b] || []).includes(t)));
+
+  function itemCard(id, { uid, price, onClick, disabled, big } = {}) {
     const d = CATALOG[id];
-    const e = el('div', 'jcard ' + kindCls(d));
+    const e = el('div', 'jcard ' + kindCls(d) + (big ? ' big' : ''));
     if (uid) e.dataset.uid = uid;
-    e.innerHTML = `<div class="jc-icon">${d.icon}</div><div class="jc-name">${d.name}</div>` +
+    e.dataset.id = id;
+    const art = d.kind === 'joker' ? JokerArt.svg(id) : `<div class="jc-emoji">${d.icon}</div>`;
+    const sym = d.kind === 'joker' ? RAR_SYM[d.rarity] : '';
+    e.innerHTML = `<div class="jc-frame"><div class="jc-art">${art}</div><div class="jc-name">${sym ? `<i>${sym}</i> ` : ''}${d.name}</div></div>` +
       (id === 'jackpot' ? `<div class="jc-badge">×${META.jackpot.toFixed(1)}</div>` : '') +
-      (price !== undefined ? `<div class="jc-price">${price}</div>` : '');
-    e.title = d.desc(H());
+      (price !== undefined ? `<div class="jc-price ${typeof price === 'number' && !H().canAfford(price) ? 'cant' : ''}">${typeof price === 'number' ? '<span class="coin-s"></span>' : ''}${price}</div>` : '');
+    e.setAttribute('aria-label', `${d.name} : ${d.desc(H())}`);
     if (disabled) e.classList.add('sold');
-    if (onClick) e.onclick = ev => { ev.stopPropagation(); onClick(e); };
+    if (onClick) e.onclick = ev => { ev.stopPropagation(); if (e._dragged) return; onClick(e); };
+    if (d.kind === 'joker') attachHover(e, id, uid);
     return e;
   }
-  function descHtml(id, extra = '') {
+  // Fiche détaillée : effet, rareté, prix de revente, statistiques
+  function sheetHtml(id, uid) {
     const d = CATALOG[id];
-    const tag = d.kind === 'joker' ? `<span class="tag r-${d.rarity}">${RARITY_LABEL[d.rarity]}</span>`
-      : `<span class="tag ${kindCls(d)}">${{ consumable: 'Consommable', pack: 'Pack', upgrade: 'Amélioration' }[d.kind]}</span>`;
-    return `<div class="pop-title">${d.icon} ${d.name}</div>${tag}<p>${d.desc(H())}</p>${extra}`;
+    const j = uid && S().jokers ? S().jokers.find(x => x.uid === +uid) : null;
+    const tag = d.kind === 'joker' ? `<span class="tag r-${d.rarity}">${RAR_SYM[d.rarity]} ${RARITY_LABEL[d.rarity]}</span>` : `<span class="tag ${kindCls(d)}">${KIND_LABEL[d.kind]}</span>`;
+    let extra = '';
+    if (j) {
+      const st = j.stats || { earned: 0, triggers: 0 };
+      extra += `<p class="pop-stat">A rapporté <b>${Util.fmt(Math.round(st.earned))}</b> jetons cette partie · déclenché ${st.triggers} fois</p>`;
+      extra += jokerStateText(j);
+      extra += `<p class="pop-sell">Revente : <b>${Math.floor(d.price * CONFIG.shop.sellRatio)}</b> jetons</p>`;
+    } else if (d.kind === 'joker') {
+      const c = (META.collection && META.collection.jokers[id]) || null;
+      if (c && c.owned) extra += `<p class="pop-stat">Collection : possédé ${c.owned} fois, ${c.wins} victoire(s), ${Util.fmt(Math.round(c.earned))} jetons rapportés au total</p>`;
+      const syn = isRun() ? S().jokers.filter(x => synergic(id, x.id)).map(x => JOKERS[x.id].name) : [];
+      if (syn.length) extra += `<p class="pop-syn">✦ Synergie avec : ${syn.join(', ')}</p>`;
+    }
+    return `<div class="pop-head">${d.kind === 'joker' ? `<div class="pop-art r-${d.rarity}">${JokerArt.svg(id)}</div>` : ''}
+      <div><div class="pop-title r-${d.rarity || d.kind}">${d.icon} ${d.name}</div>${tag}</div></div><p class="pop-desc">${d.desc(H())}</p>${extra}`;
   }
   function jokerStateText(j) {
     const s = j.state || {};
@@ -98,23 +139,98 @@ const UI = (() => {
     if (j.id === 'miroir') { const t = H().mirrorTarget(j.uid); return `<p class="pop-extra">Copie : ${t ? t.name : 'rien (aucun joker à droite)'}</p>`; }
     return '';
   }
+  // Survol (souris) : fiche flottante ; dans le shop, les jokers en synergie s'illuminent
+  function attachHover(e, id, uid) {
+    e.addEventListener('pointerenter', ev => {
+      if (ev.pointerType !== 'mouse' || e._dragging) return;
+      const sh = $('jsheet');
+      sh.innerHTML = sheetHtml(id, uid);
+      sh.hidden = false;
+      const r = e.getBoundingClientRect();
+      const w = 300;
+      sh.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+      const above = r.top > window.innerHeight / 2;
+      sh.style.top = above ? '' : (r.bottom + 10) + 'px';
+      sh.style.bottom = above ? (window.innerHeight - r.top + 10) + 'px' : '';
+      if (!uid && isRun()) document.querySelectorAll('#joker-slots .jcard, #shop-owned-jokers .jcard').forEach(n => n.classList.toggle('syn', synergic(id, n.dataset.id)));
+    });
+    e.addEventListener('pointerleave', () => { $('jsheet').hidden = true; document.querySelectorAll('.jcard.syn').forEach(n => n.classList.remove('syn')); });
+  }
+
+  // Rangée de jokers : appui = fiche avec actions ; glisser-déposer = changer l'ordre ; appui long = fiche
   function renderJokers(container) {
     const st = S();
     container.innerHTML = '';
     for (let i = 0; i < st.jokerSlots; i++) {
       const j = st.jokers[i];
       if (!j) { container.appendChild(el('div', 'jslot')); continue; }
-      const c = itemCard(j.id, {
-        uid: j.uid,
-        onClick: node => popover(node, descHtml(j.id, jokerStateText(j)), [
-          ['◀', () => H().moveJoker(j.uid, -1), '', i === 0],
-          ['▶', () => H().moveJoker(j.uid, 1), '', i === st.jokers.length - 1],
-          [`Vendre (+${Math.floor(JOKERS[j.id].price * CONFIG.shop.sellRatio)})`, () => { const r = H().sellJoker(j.uid); if (report(r)) { Sfx.play('coins'); App.syncBalance(); } }, 'danger', H().busy()],
-        ]),
-      });
+      const c = itemCard(j.id, { uid: j.uid, onClick: node => jokerMenu(node, j) });
       if (st.phase === 'play' && H().isJokerDisabled(j)) c.classList.add('frozen');
+      enableDrag(c, container, j.uid);
       container.appendChild(c);
     }
+  }
+  function jokerMenu(node, j) {
+    $('jsheet').hidden = true;
+    const i = S().jokers.indexOf(j);
+    popover(node, sheetHtml(j.id, j.uid), [
+      ['◀', () => H().moveJoker(j.uid, -1), '', i === 0],
+      ['▶', () => H().moveJoker(j.uid, 1), '', i === S().jokers.length - 1],
+      [`Vendre (+${Math.floor(JOKERS[j.id].price * CONFIG.shop.sellRatio)})`, () => sell(j), 'danger', H().busy()],
+    ]);
+  }
+  function sell(j) {
+    const r = H().sellJoker(j.uid);
+    if (!report(r)) return;
+    Sfx.play('coins'); App.syncBalance();
+    toast(`${JOKERS[j.id].name} vendu (+${r.value}).`, { label: 'Annuler', fn: () => { if (report(H().undoSell())) { Sfx.play('click'); App.syncBalance(); } } });
+  }
+  function enableDrag(card, container, uid) {
+    let sx = 0, sy = 0, ghost = null, timer = null, pid = null;
+    card.addEventListener('pointerdown', ev => {
+      if (ev.button > 0) return;
+      sx = ev.clientX; sy = ev.clientY; pid = ev.pointerId; card._dragged = false;
+      timer = setTimeout(() => { timer = null; if (!ghost) { card._dragged = true; jokerMenu(card, S().jokers.find(x => x.uid === uid)); } }, 550);
+    });
+    card.addEventListener('pointermove', ev => {
+      if (ev.pointerId !== pid) return;
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!ghost && Math.hypot(dx, dy) > 8 && timer !== null) {
+        clearTimeout(timer); timer = null;
+        if (H().busy()) return;
+        card._dragged = true; card._dragging = true;
+        card.setPointerCapture(pid);
+        ghost = card.cloneNode(true); ghost.classList.add('ghost');
+        document.body.appendChild(ghost);
+        card.classList.add('dragging');
+        $('jsheet').hidden = true;
+      }
+      if (ghost) {
+        const r = card.getBoundingClientRect();
+        ghost.style.left = (ev.clientX - r.width / 2) + 'px';
+        ghost.style.top = (ev.clientY - r.height / 2) + 'px';
+        // indicateur de position
+        const cards = [...container.querySelectorAll('.jcard:not(.dragging)')];
+        const idx = cards.filter(n => { const b = n.getBoundingClientRect(); return b.left + b.width / 2 < ev.clientX; }).length;
+        cards.forEach((n, k) => n.classList.toggle('drop-before', k === idx));
+        container.classList.toggle('drop-end', idx === cards.length);
+        card._dropIndex = idx;
+      }
+    });
+    const end = () => {
+      clearTimeout(timer); timer = null;
+      if (ghost) {
+        ghost.remove(); ghost = null;
+        card.classList.remove('dragging'); card._dragging = false;
+        container.querySelectorAll('.drop-before').forEach(n => n.classList.remove('drop-before'));
+        container.classList.remove('drop-end');
+        H().moveJokerTo(uid, card._dropIndex);
+        Sfx.play('chip');
+      }
+      setTimeout(() => (card._dragged = false), 50);
+    };
+    card.addEventListener('pointerup', end);
+    card.addEventListener('pointercancel', end);
   }
   function renderConsumables() {
     if (!isRun()) return;
@@ -126,7 +242,7 @@ const UI = (() => {
       const def = CONSUMABLES[id];
       const usable = !def.capability || H().canUseCapability({ game: tab }, def.capability);
       const c = itemCard(id, {
-        onClick: node => popover(node, descHtml(id), [
+        onClick: node => popover(node, sheetHtml(id), [
           ['Utiliser', () => useConsumable(i), 'primary', !usable],
           [`Vendre (+${Math.floor(def.price * CONFIG.shop.sellRatio)})`, () => { H().sellConsumable(i); App.syncBalance(); }, 'danger'],
         ]),
@@ -178,24 +294,25 @@ const UI = (() => {
     const t = st.table;
     if (st.phase !== 'play' || !t) return;
     const pct = Math.max(0, Math.min(100, t.gains / t.target * 100));
-    const boss = t.boss ? BOSSES[t.boss] : null;
+    const boss = BOSSES[st.bossId];
     const rules = H().activeRules().map(id => RULES[id].desc());
     const debt = st.debts[0];
     const tags = st.statuses.filter(x => STATUSES[x.id].tag || x.id === 'golden' || x.id === 'huissier');
+    const met = t.gains >= t.target;
     $('run-info').innerHTML = `
-      <div class="ri-block ri-manche"><span>${etageText(st)}</span><b class="ri-table ${t.type}">${TABLE_NAME[t.type]}</b></div>
-      <div class="ri-block ri-goal">
-        <span>Gains de la table</span>
-        <div class="goal-bar ${t.gains >= t.target ? 'met' : ''}"><i style="width:${pct}%"></i></div>
-        <small><b>${Util.fmt(t.gains)}</b> / ${Util.fmt(t.target)}</small>
+      <div class="hud-table"><span>${etageText(st)}</span><b class="ri-table ${t.type}">${TABLE_NAME[t.type]}</b></div>
+      <div class="hud-goal">
+        <div class="hud-goal-txt"><span>Gains</span><b class="num">${Util.fmt(Math.round(t.gains))}</b><span>/ ${Util.fmt(t.target)}</span>${met ? '<em>✓ objectif</em>' : ''}</div>
+        <div class="goal-bar ${met ? 'met' : ''}"><i style="width:${pct}%"></i></div>
       </div>
-      <div class="ri-block"><span>Mises</span><b class="${t.bets <= 2 ? 'low' : ''}">${t.bets}<small>/${t.betsMax}</small></b></div>
-      <div class="ri-block"><span>Relances</span><b>${st.charges.length}</b></div>
-      ${boss ? `<div class="ri-chip boss">☠ ${boss.name} : ${boss.desc()}</div>` : ''}
-      ${rules.map(r => `<div class="ri-chip rule">🎡 ${r}</div>`).join('')}
-      ${tags.map(x => `<div class="ri-chip">${STATUSES[x.id].icon} ${STATUSES[x.id].name}</div>`).join('')}
-      ${debt ? `<div class="ri-chip debt">💳 Dette : ${Util.fmt(debt.left)} (échéance ${Util.fmt(Math.min(debt.per, debt.left))})</div>` : ''}
-      <div class="ri-chip seed" title="Rejouer cette seed donne exactement la même partie">🌱 Seed ${st.seed}</div>`;
+      <div class="hud-stat"><span>Mises</span><b class="num ${t.bets <= 2 ? 'low' : ''}">${t.bets}<small>/${t.betsMax}</small></b></div>
+      <div class="hud-stat"><span>Relances</span><b class="num">${st.charges.length}</b></div>
+      <div class="hud-chips">
+        ${boss ? `<div class="ri-chip boss ${t.type === 'boss' ? 'now' : ''}" title="${boss.desc()}">☠ ${t.type === 'boss' ? '' : 'Boss de l\'étage : '}${boss.name} — ${boss.desc()}</div>` : ''}
+        ${rules.map(r => `<div class="ri-chip rule">🎡 ${r}</div>`).join('')}
+        ${tags.map(x => `<div class="ri-chip">${STATUSES[x.id].icon} ${STATUSES[x.id].name}</div>`).join('')}
+        ${debt ? `<div class="ri-chip debt">💳 Dette ${Util.fmt(debt.left)}</div>` : ''}
+      </div>`;
   }
 
   // ---------- Choix de la table (petite, grande, boss) ----------
@@ -274,7 +391,7 @@ const UI = (() => {
               : CONFIG.loans.options.map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${o.amount} maintenant<br><small>${Math.round(o.amount * (1 + o.rate))} à rendre en ${o.tables} tables</small></button>`).join('')}
             <p class="hint">Échéance impayée : +${CONFIG.loans.penaltyRate * 100} % sur la part manquante et ${CONFIG.loans.penaltyBets} mises confisquées.</p>
           </div>
-          <button class="btn primary big" id="shop-next">Continuer ➜</button>
+
         </div>
       </div>
       <div class="shop-owned">
@@ -282,22 +399,33 @@ const UI = (() => {
         <div class="joker-slots" id="shop-owned-jokers"></div>
         <div class="shop-row-title">Consommables (${st.consumables.length}/${st.consSlots}) · Améliorations</div>
         <div class="shop-row small" id="shop-owned-items"></div>
-      </div>`;
+      </div>
+      <div class="shop-leave"><span class="ss-bal small"><span class="wallet-chip"></span>${Util.fmt(H().chips())}</span>
+        <button class="btn primary big" id="shop-next">Quitter le shop ➜</button></div>`;
     st.shop.offers.forEach((o, i) => {
       const box = $(o.kind === 'joker' ? 'shop-jokers' : o.kind === 'consumable' ? 'shop-cons' : 'shop-items');
       box.appendChild(itemCard(o.id, {
         price: o.sold ? 'vendu' : o.price, disabled: o.sold,
-        onClick: node => { if (!o.sold) popover(node, descHtml(o.id), [[`Acheter (${o.price})`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
+        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id), [[`Acheter (${o.price})`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
       }));
     });
     renderJokers($('shop-owned-jokers'));
     const owned = $('shop-owned-items');
-    st.consumables.forEach((id, i) => owned.appendChild(itemCard(id, { onClick: node => popover(node, descHtml(id), [['Utiliser', () => useConsumable(i), 'primary', !!CONSUMABLES[id].inPlayOnly || !!CONSUMABLES[id].capability]]) })));
-    st.upgrades.forEach(id => owned.appendChild(itemCard(id, { onClick: node => popover(node, descHtml(id), []) })));
+    st.consumables.forEach((id, i) => owned.appendChild(itemCard(id, { onClick: node => popover(node, sheetHtml(id), [['Utiliser', () => useConsumable(i), 'primary', !!CONSUMABLES[id].inPlayOnly || !!CONSUMABLES[id].capability]]) })));
+    st.upgrades.forEach(id => owned.appendChild(itemCard(id, { onClick: node => popover(node, sheetHtml(id), []) })));
     $('shop-reroll').onclick = () => { if (report(H().reroll())) { Sfx.play('buy'); App.syncBalance(); } };
     $('shop-slot').onclick = () => { if (report(H().buySlot())) { Sfx.play('buy'); App.syncBalance(); } };
     document.querySelectorAll('.loan').forEach(b => (b.onclick = () => { if (report(H().takeLoan(b.dataset.id))) { Sfx.play('coins'); App.syncBalance(); toast('💳 Prêt accordé. Attention aux échéances !'); } }));
-    $('shop-next').onclick = () => { Sfx.play('click'); H().leaveShop(); };
+    $('shop-next').onclick = () => {
+      Sfx.play('click');
+      if (S().phase === 'victory') return victoryModal();
+      // confirmation si un achat est encore possible
+      const free = S().jokers.length < S().jokerSlots;
+      const can = S().shop.offers.filter(o => !o.sold && H().canAfford(o.price) && (o.kind !== 'joker' || free) && (o.kind !== 'consumable' || S().consumables.length < S().consSlots));
+      if (!can.length) return H().leaveShop();
+      modal(`<h2>Quitter le shop ?</h2><p>Tu peux encore t'offrir : <b>${can.map(o => CATALOG[o.id].name).join(', ')}</b>.</p>`,
+        [['Rester', () => {}], ['Quitter quand même', () => H().leaveShop(), 'primary']]);
+    };
   }
   function buy(i) {
     const r = H().buy(i);
@@ -383,12 +511,56 @@ const UI = (() => {
     showPhase();
   }
   function freeMode() { App.attach(Engine.free({ meta: META })); enterGame(); }
+  // Bilan de partie : étage, tables, meilleur gain, joker MVP, seed
+  const GAME_NAME = { bj: 'Blackjack', uth: 'Hold\'em', roulette: 'Roulette', slots: 'Machine', dice: 'Dice' };
+  function recap(st) {
+    const earned = Object.entries(st.stats.jokerEarned || {}).sort((a, b) => b[1] - a[1]);
+    const mvp = earned.length && earned[0][1] > 0 ? earned[0] : null;
+    const bp = st.stats.bestPlay;
+    return `<div class="over-stats">
+        <div><span>Étage atteint</span><b class="num">${st.etage}</b></div>
+        <div><span>Tables gagnées</span><b class="num">${st.stats.tablesWon}</b></div>
+        <div><span>Mises jouées</span><b class="num">${st.stats.plays}</b></div>
+        <div><span>Meilleur gain</span><b class="num">${bp ? '+' + Util.fmt(Math.round(bp.net)) : '—'}</b>${bp ? `<small>${GAME_NAME[bp.game] || ''}</small>` : ''}</div>
+      </div>
+      ${mvp ? `<div class="mvp"><div class="mvp-card">${itemCard(mvp[0]).outerHTML}</div><div><span>Joker MVP</span><b>${JOKERS[mvp[0]].name}</b><small>a rapporté ${Util.fmt(Math.round(mvp[1]))} jetons</small></div></div>` : ''}
+      <p class="seed-line">🌱 Seed : <b>${st.seed}</b></p>`;
+  }
   function victoryModal() {
     const st = S();
     Sfx.play('fanfare');
     modal(`<div class="intro"><div class="intro-n">🏆 Victoire !</div><p>Tu as fait sauter la banque du Boubouz'ino : ${CONFIG.progression.etagesPourGagner} étages vaincus.</p>
-      <p>Seed : <b>${st.seed}</b> · Tables gagnées : <b>${st.stats.tablesWon}</b></p><p>✦ +${CONFIG.prestige.perBoss + CONFIG.prestige.victory} prestige</p></div>`,
+      ${recap(st)}<p>✦ +${CONFIG.prestige.perBoss + CONFIG.prestige.victory} prestige</p></div>`,
     [['Continuer en mode infini', () => H().continueInfinite(), 'primary'], ['Terminer la partie', () => { Engine.clearSave(); App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
+  }
+
+  // ---------- Options ----------
+  function settingsModal() {
+    const box = modal(`<h2>Options</h2>
+      <div class="opt"><span>Vitesse des animations</span><div class="seg">${[1, 2, 4].map(v => `<button class="btn small ${Settings.speed === v ? 'primary' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div></div>
+      <div class="opt"><span>Son</span><div class="seg"><button class="btn small ${Sfx.settings.on ? 'primary' : ''}" data-snd="1">Activé</button><button class="btn small ${!Sfx.settings.on ? 'primary' : ''}" data-snd="0">Coupé</button></div></div>
+      <div class="opt"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${Sfx.settings.volume}" id="opt-vol"></div>`, [['Fermer', () => {}, 'primary']]);
+    box.querySelectorAll('[data-speed]').forEach(b => (b.onclick = () => { Settings.setSpeed(+b.dataset.speed); Sfx.play('click'); settingsModal(); }));
+    box.querySelectorAll('[data-snd]').forEach(b => (b.onclick = () => { if (Sfx.settings.on !== (b.dataset.snd === '1')) Sfx.toggle(); $('sound').textContent = Sfx.settings.on ? '🔊' : '🔇'; Sfx.play('click'); settingsModal(); }));
+    box.querySelector('#opt-vol').oninput = e => Sfx.setVolume(+e.target.value);
+  }
+
+  // ---------- Collection : jokers découverts, boss battus ----------
+  function renderCollection() {
+    const C = META.collection || { jokers: {}, bosses: {} };
+    const seen = JOKER_DEFS.filter(d => C.jokers[d.id] && C.jokers[d.id].seen);
+    const beaten = BOSS_DEFS.filter(b => C.bosses[b.id]);
+    const card = d => {
+      const c = C.jokers[d.id];
+      if (!c || !c.seen) return `<div class="col-item locked"><div class="jcard r-${d.rarity}"><div class="jc-frame"><div class="jc-art locked-art">?</div><div class="jc-name">${RAR_SYM[d.rarity]} ???</div></div></div><small>Non découvert</small></div>`;
+      return `<div class="col-item">${itemCard(d.id).outerHTML}<small>${c.owned ? `possédé ${c.owned}× · ${c.wins} victoire(s)<br>${Util.fmt(Math.round(c.earned))} jetons rapportés` : 'vu au Comptoir'}</small></div>`;
+    };
+    $('collection').innerHTML = `<div class="cos-head"><h2>Collection</h2>
+        <p><b class="num">${seen.length}</b> / ${JOKER_DEFS.length} jokers découverts · <b class="num">${beaten.length}</b> / ${BOSS_DEFS.length} boss battus</p></div>
+      <h3>Jokers</h3><div class="col-grid">${JOKER_DEFS.map(card).join('')}</div>
+      <h3>Boss</h3><div class="boss-grid">${BOSS_DEFS.map(b => `<div class="boss-item ${C.bosses[b.id] ? '' : 'locked'}"><b>☠ ${C.bosses[b.id] ? b.name : '???'}</b><span>${C.bosses[b.id] ? b.desc() : 'Pas encore battu'}</span>${C.bosses[b.id] ? `<i>battu ${C.bosses[b.id]}×</i>` : ''}</div>`).join('')}</div>
+      <div class="cos-foot"><button class="btn big" id="col-back">⬅ Retour</button></div>`;
+    $('col-back').onclick = () => { renderMenu(); screen('menu'); };
   }
 
   // ---------- Événements ----------
@@ -405,17 +577,14 @@ const UI = (() => {
   App.on('over', () => {
     const st = S();
     Sfx.play('gameover');
-    modal(`<div class="intro"><div class="intro-n lose">Partie terminée</div><p>${st.reason}</p>
-      <div class="over-stats"><div><span>Étage atteint</span><b>${st.etage}</b></div><div><span>Tables gagnées</span><b>${st.stats.tablesWon}</b></div><div><span>Coups joués</span><b>${st.stats.plays}</b></div>
-      <div><span>Plus gros gain</span><b>${Util.fmt(st.stats.best)}</b></div></div>
-      <p>Seed : <b>${st.seed}</b></p>
-      <div class="over-jokers">${st.jokers.map(j => JOKERS[j.id].icon).join(' ')}</div></div>`,
-    [['Nouvelle partie', () => startRun()], ['Rejouer cette seed', () => startRun(st.seed)], ['Menu principal', () => { App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
+    modal(`<div class="intro"><div class="intro-n lose">Partie terminée</div><p>${st.reason}</p>${recap(st)}</div>`,
+    [['Nouvelle partie', () => startRun(), 'primary'], ['Rejouer cette seed', () => startRun(st.seed)], ['Menu principal', () => { App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
   });
   App.on('toast', toast);
   App.on('flash', ({ uid, text }) => {
     document.querySelectorAll(`.jcard[data-uid="${uid}"]`).forEach(n => {
       n.classList.remove('trigger'); void n.offsetWidth; n.classList.add('trigger');
+      const z = el('div', 'jc-zap'); n.appendChild(z); setTimeout(() => z.remove(), 600);
       const f = el('div', 'jc-float', text);
       n.appendChild(f);
       setTimeout(() => f.remove(), 1200);
@@ -433,6 +602,8 @@ const UI = (() => {
   $('m-free').onclick = () => { Sfx.play('click'); freeMode(); };
   $('m-cosmetics').onclick = () => { Sfx.play('click'); renderCosmetics(); screen('cosmetics'); };
   $('m-howto').onclick = () => { Sfx.play('click'); howTo(); };
+  $('m-collection').onclick = () => { Sfx.play('click'); renderCollection(); screen('collection'); };
+  $('settings').onclick = () => { Sfx.play('click'); settingsModal(); };
   $('home').onclick = () => {
     if (App.host && (App.host.busy() || App.isAnimating())) return toast('Termine le coup en cours avant de quitter la table.');
     Sfx.play('click');
@@ -440,7 +611,7 @@ const UI = (() => {
     App.attach(null);
     renderMenu(); screen('menu');
   };
-  $('reset').onclick = () => { if (confirm(`Remettre le solde à ${Util.fmt(CONFIG.start.freeChips)} jetons ?`)) { App.host.resetFree(); App.syncBalance(); } };
+  $('reset').onclick = () => { if (confirm(`Remettre le solde à ${Util.fmt(CONFIG.freeChips)} jetons ?`)) { App.host.resetFree(); App.syncBalance(); } };
 
   return { screen, showTab, renderMenu, renderRunBar, toast };
 })();

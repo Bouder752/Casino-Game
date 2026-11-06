@@ -24,10 +24,12 @@ const Engine = (() => {
   const KIND_ORDER = { adjust: 0, add: 1, mult: 2, flat: 3 };
 
   function loadMeta() {
-    return Object.assign({
+    const m = Object.assign({
       prestige: 0, jackpot: 1, unlocked: ['felt-vert', 'back-bordeaux'], felt: 'felt-vert', back: 'back-bordeaux',
-      best: 0, runs: 0, wins: 0,
+      best: 0, runs: 0, wins: 0, collection: null,
     }, Storage.get(META_KEY, {}));
+    if (!m.collection) m.collection = { jokers: {}, bosses: {} };
+    return m;
   }
 
   function newRunState(seed) {
@@ -39,7 +41,7 @@ const Engine = (() => {
       consumables: [], consSlots: CONFIG.shop.consumableSlots,
       upgrades: [], statuses: [], charges: [], debts: [],
       shop: null, summary: null, games: {}, uid: 1,
-      stats: { plays: 0, wins: 0, losses: 0, best: 0, tablesWon: 0, jokersOwned: [] },
+      stats: { plays: 0, wins: 0, losses: 0, best: 0, tablesWon: 0, jokersOwned: [], jokerEarned: {}, bestPlay: null },
     };
   }
   function freeState() {
@@ -65,6 +67,9 @@ const Engine = (() => {
     H.on = f => listeners.push(f);
     H.notify = notify;
     H.saveMeta = () => { if (persist) Storage.set(META_KEY, meta); };
+    // Collection (jokers découverts, boss battus) — conservée entre les parties
+    const coll = () => { if (!meta.collection) meta.collection = { jokers: {}, bosses: {} }; return meta.collection; };
+    const collJoker = id => (coll().jokers[id] = coll().jokers[id] || { seen: 0, owned: 0, wins: 0, earned: 0 });
 
     // ---------------- Modificateurs actifs (ordre déterministe) ----------------
     // améliorations → statuts → patron → jokers de gauche à droite (+ leurs enfants)
@@ -271,9 +276,10 @@ const Engine = (() => {
       const flats = steps.filter(s => s.kind === 'flat').reduce((a, s) => a + s.value, 0);
       const gainF = e.gain > 0 ? round2(e.gain * (1 + add) * mult) : e.gain;
       const net = round2(gainF + flats);
+      attribute(steps, e.gain, add, mult);
       H.give(Math.max(0, round2(e.staked + net + (play.prepaid || 0))));
       if (e.outcome === 'win') state.stats.wins++; else if (e.outcome === 'loss') state.stats.losses++;
-      state.stats.best = Math.max(state.stats.best, net);
+      if (net > state.stats.best) { state.stats.best = net; state.stats.bestPlay = { game: id, net, staked: e.staked }; }
       active = null;
       if (isRun && state.table) state.table.gains = round2(state.table.gains + Math.max(0, net));
       const settlement = {
@@ -286,6 +292,31 @@ const Engine = (() => {
     }
 
     // Fin de table : objectif atteint → gagnée ; sinon faillite ou plus de mises → perdu
+    // Part de chaque joker dans le gain final (pour « a rapporté X jetons » et le joker MVP)
+    function attribute(steps, gain, add, mult) {
+      const credit = (uid, v) => {
+        const j = state.jokers.find(x => x.uid === uid);
+        if (!j || !isRun) return;
+        j.stats = j.stats || { earned: 0, triggers: 0 };
+        j.stats.earned = round2(j.stats.earned + v); j.stats.triggers++;
+        const se = state.stats.jokerEarned || (state.stats.jokerEarned = {});
+        se[j.id] = round2((se[j.id] || 0) + v);
+        collJoker(j.id).earned = round2(collJoker(j.id).earned + v);
+      };
+      const mults = steps.filter(x => x.kind === 'mult');
+      const logSum = mults.reduce((a, x) => a + Math.log(Math.max(1e-6, x.value)), 0);
+      // gain × ((1 + Σ%) × Πmult − 1) = Σ (gain × %ᵢ × Πmult) + gain × (Πmult − 1)
+      const uplift = gain > 0 ? gain * (mult - 1) : 0;
+      steps.forEach(x => {
+        if (!x.src) return;
+        let v = 0;
+        if (x.kind === 'flat' || x.kind === 'adjust') v = x.value;
+        else if (x.kind === 'add') v = gain > 0 ? gain * x.value * mult : 0;
+        else if (x.kind === 'mult') v = logSum ? uplift * Math.log(Math.max(1e-6, x.value)) / logSum : 0;
+        credit(x.src.uid, v);
+      });
+    }
+
     function afterPlay() {
       if (!isRun) { save(); return; }
       if (state.phase !== 'play') return;
@@ -374,11 +405,13 @@ const Engine = (() => {
       state.etageLog[t.type] = 'won';
       let victory = false;
       if (t.type === 'boss') {
+        coll().bosses[t.boss] = (coll().bosses[t.boss] || 0) + 1;
         meta.prestige += CONFIG.prestige.perBoss;
         meta.best = Math.max(meta.best, state.etage);
         if (state.etage === P.etagesPourGagner && !state.infinite) {
           victory = true;
           meta.wins++;
+          state.jokers.forEach(j => collJoker(j.id).wins++);
           meta.prestige += CONFIG.prestige.victory;
         } else { state.etage++; newEtage(); }
       } else state.tableType = NEXT[t.type];
@@ -419,8 +452,9 @@ const Engine = (() => {
     // ---------------- Jokers ----------------
     H.addJoker = id => {
       if (state.jokers.length >= state.jokerSlots) return false;
-      state.jokers.push({ uid: state.uid++, id, state: {} });
+      state.jokers.push({ uid: state.uid++, id, state: {}, stats: { earned: 0, triggers: 0 } });
       if (!state.stats.jokersOwned.includes(id)) state.stats.jokersOwned.push(id);
+      const c = collJoker(id); c.owned++; c.seen = Math.max(c.seen, 1); H.saveMeta();
       notify('change');
       return true;
     };
@@ -435,10 +469,36 @@ const Engine = (() => {
       const j = state.jokers.find(x => x.uid === uid);
       if (!j) return { error: 'Joker introuvable.' };
       const v = Math.floor(JOKERS[j.id].price * CONFIG.shop.sellRatio);
+      const index = state.jokers.indexOf(j);
+      const charges = state.charges.filter(c => c.src === uid);
       H.removeJoker(uid);
       H.give(v);
+      state.lastSale = { joker: JSON.parse(JSON.stringify(j)), index, value: v, charges, plays: state.stats.plays, phase: state.phase };
       save();
       return { ok: true, value: v };
+    };
+    // Annule la dernière vente tant qu'aucune mise n'a été jouée depuis
+    H.canUndoSell = () => {
+      const l = state.lastSale;
+      return !!l && l.plays === state.stats.plays && l.phase === state.phase && !active && state.jokers.length < state.jokerSlots && H.canAfford(l.value);
+    };
+    H.undoSell = () => {
+      if (!H.canUndoSell()) return { error: 'Impossible d\'annuler cette vente.' };
+      const l = state.lastSale;
+      H.stake(l.value);
+      state.jokers.splice(Math.min(l.index, state.jokers.length), 0, l.joker);
+      state.charges.push(...l.charges);
+      state.lastSale = null;
+      save(); notify('change');
+      return { ok: true };
+    };
+    // Déplace un joker à une position donnée (glisser-déposer)
+    H.moveJokerTo = (uid, index) => {
+      const i = state.jokers.findIndex(x => x.uid === uid);
+      if (i < 0) return;
+      const [j] = state.jokers.splice(i, 1);
+      state.jokers.splice(Math.max(0, Math.min(index, state.jokers.length)), 0, j);
+      notify('change'); save();
     };
     H.moveJoker = (uid, dir) => {
       const i = state.jokers.findIndex(x => x.uid === uid), k = i + dir;
@@ -466,7 +526,8 @@ const Engine = (() => {
       for (let i = 0; i < S.packs; i++) offers.push({ kind: 'pack', id: rng.pick(PACK_DEFS).id });
       const ups = UPGRADE_DEFS.filter(u => !state.upgrades.includes(u.id));
       for (let i = 0; i < S.upgrades && ups.length; i++) offers.push({ kind: 'upgrade', id: ups.splice(rng.int(ups.length), 1)[0].id });
-      offers.forEach(o => { o.price = CATALOG[o.id].price; o.sold = false; });
+      offers.forEach(o => { o.price = CATALOG[o.id].price; o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
+      H.saveMeta();
       return { offers, rerollCost };
     }
     H.reroll = () => {

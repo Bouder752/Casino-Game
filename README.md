@@ -12,7 +12,9 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 - La petite et la grande table peuvent être **passées** contre un **tag** (Soldes, Turbo, Investisseur, Collectionneur, Paquet cadeau, Double ou rien). Le boss, lui, ne se passe pas et impose une règle : Croupier Avare, Directeur Pressé, Dame en Noir, Videur, Gardien Endormi, Gourmand.
 - Plus de mises sans l'objectif, ou plus de jetons : perdu. Boss de l'étage 8 vaincu : **victoire**, puis mode infini (objectifs ×1,6 par étage).
 - **Le Comptoir** : 3 jokers + 2 consommables (tirage pondéré par rareté, jamais un joker déjà possédé), packs, améliorations, relance du shop à prix croissant, revente à 50 %, emplacements de joker supplémentaires et **le Prêteur** (prêt remboursé à chaque table gagnée, pénalité et huissier si une échéance est impayée).
-- 5 jeux : **Ultimate Texas Hold'em** (avec probabilités en direct), **Blackjack** (assurance), **Roulette** (avec joueurs IA), **Machine à sous**, **Dice**. Un **mode libre** permet de jouer sans objectif.
+- 5 jeux : **Ultimate Texas Hold'em** (avec probabilités en direct), **Blackjack** (assurance), **Roulette** (avec joueurs IA), **Le Palace des Chats** (machine 5×3, 20 lignes, Wilds ×2/×3 collants pendant 10 tours gratuits déclenchés par 3 Pelotes d'or) et **Dice**. Un **mode libre** permet de jouer sans objectif.
+- **Interface** : objectif, gains, mises, relances et boss de l'étage toujours visibles en haut ; les jokers dans une rangée en bas d'écran (glisser-déposer pour changer l'ordre, fiche au survol ou à l'appui long avec l'effet, le prix de revente et ce que le joker a rapporté) ; aperçu des synergies au Comptoir, prix en rouge quand ils sont trop chers, bouton « Quitter le shop » toujours au même endroit avec confirmation ; « Annuler » après la vente d'un joker ; vitesse d'animation 1×/2×/4× dans les options ; mise en scène des gros coups ; bilan de fin de partie (meilleur gain, joker MVP, seed) ; **collection** des jokers découverts et des boss battus.
+- **Direction artistique** Art déco (Monte-Carlo) : Limelight pour les titres, Cinzel pour les chiffres (à chasse fixe), Cormorant Garamond pour le texte ; vert bouteille, or, crème et bordeaux ; bordures dorées fines et ornements géométriques ; une couleur et un symbole par rareté (● commun gris, ◆ rare bleu, ★ légendaire or). Chaque joker a sa propre illustration.
 - Chaque gain affiche son **détail** : mise → rendu brut → bonus en % → multiplicateurs → bonus fixes, joker par joker.
 - Sons synthétisés (bouton 🔊), cosmétiques (tapis, dos de cartes) débloqués avec le prestige, interface jouable sur téléphone.
 
@@ -53,6 +55,7 @@ js/ui/              interface
   app.js            session, compteur de jetons, détail animé des gains
   views/*.js        une vue par jeu (affichage et animations seulement)
   runui.js          menu, barre de partie, shop, fenêtres
+  jokerArt.js       illustrations des jokers · slotArt.js : symboles de la machine
   cards.js, sound.js, cosmetics.js, util.js, main.js
 tools/              simulate.js, test-engine.js
 ```

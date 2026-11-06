@@ -19,7 +19,8 @@ const App = (() => {
     const target = host ? host.chips() : 0;
     const from = shown, id = ++tweenId;
     if (immediate || Math.abs(target - from) < 0.01) { shown = target; el.textContent = Util.fmt(target); return; }
-    const t0 = performance.now(), dur = Math.min(900, 250 + Math.abs(target - from) * 4);
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    const t0 = performance.now(), dur = Util.dur(Math.min(900, 250 + Math.abs(target - from) * 4));
     el.classList.toggle('up', target > from); el.classList.toggle('down', target < from);
     const step = t => {
       if (id !== tweenId) return;
@@ -61,15 +62,27 @@ const App = (() => {
         await Util.sleep(300);
         line('total ' + (st.net > 0 ? 'win' : st.net < 0 ? 'lose' : 'push'), 'Total', Util.signed(st.net));
         Sfx.play(st.net > 0 ? 'coins' : 'push');
-        setTimeout(() => { box.classList.add('out'); setTimeout(() => { box.hidden = true; box.classList.remove('out'); }, 400); }, 2600);
+        setTimeout(() => { box.classList.add('out'); setTimeout(() => { box.hidden = true; box.classList.remove('out'); }, 400); }, Util.dur(2600) + 600);
       }
       if (st.net !== 0) floatGain(st.net);
+      if (isBig(st)) bigWin();
       syncBalance();
       await Util.sleep(steps.length ? 500 : 150);
     } finally {
       animating--;
       if (!animating) flush();
     }
+  }
+  // Un « gros coup » : au moins 4× la mise, ou la moitié de l'objectif de la table
+  function isBig(st) {
+    const t = host && host.state.table;
+    return st.net > 0 && (st.net >= Math.max(40, st.staked * 4) || (t && st.net >= t.target * 0.5 && st.net >= 30));
+  }
+  function bigWin() {
+    document.body.classList.remove('bigwin'); void document.body.offsetWidth;
+    document.body.classList.add('bigwin');
+    Sfx.play('boom');
+    setTimeout(() => document.body.classList.remove('bigwin'), 900);
   }
   function pop(s) {
     if (!s.src) return;
@@ -102,9 +115,9 @@ const App = (() => {
         case 'sound': Sfx.play(data.name); break;
         case 'table': fire('table'); break;
         case 'choose': defer(() => fire('choose')); break;
-        case 'shop': setTimeout(() => defer(() => fire('shop')), 700); break;
-        case 'victory': setTimeout(() => defer(() => fire('victory')), 700); break;
-        case 'over': setTimeout(() => defer(() => fire('over', data)), 700); break;
+        case 'shop': setTimeout(() => defer(() => fire('shop')), Util.dur(700)); break;
+        case 'victory': setTimeout(() => defer(() => fire('victory')), Util.dur(700)); break;
+        case 'over': setTimeout(() => defer(() => fire('over', data)), Util.dur(700)); break;
       }
     });
     syncBalance(true);

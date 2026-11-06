@@ -10,7 +10,7 @@ App.register((() => {
   let round = null;     // manche affichée (en cours ou terminée)
   let anim = false;
   const valText = cards => { const v = E.value(cards); return v.soft && v.total < 21 ? `${v.total - 10} / ${v.total}` : String(v.total); };
-  const msg = (t, c = '') => { els.msg.textContent = t; els.msg.className = 'msg ' + c; };
+  const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
 
   function handBox() {
     const box = Util.el('div', 'bj-hand');
