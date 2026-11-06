@@ -6,25 +6,33 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 ## Le jeu
 
 - **100 jetons** au départ, **8 étages** à franchir. Chaque étage a 3 tables : **petite table → grande table → table du Boss**.
-- À chaque table, il faut atteindre un **objectif de gains** en **6 mises** maximum (une main, un tirage ou un lancer = 1 mise), sur le jeu de son choix. Seules les mises gagnantes font avancer l'objectif : une perte ne coûte que des jetons.
-- **2 relances** par table pour refaire un tirage raté sans miser à nouveau (plus celles des jokers).
-- Table gagnée : récompense (30 / 45 / 70), +10 par mise non utilisée, intérêts (5 jetons par tranche de 50, 25 max), puis **le Comptoir**.
+- À chaque table, il faut faire monter sa **bankroll** (jetons − dettes) jusqu'à un **palier**, sur le jeu de son choix. **Mises illimitées** : on ne perd qu'à la **faillite**. Paliers de la petite table : 125, 310, 700, 1 550… (grande table ×1,25, boss ×1,5).
+- La **mise max** vaut 25 % du palier visé : elle grandit avec la progression.
+- **3 relances** par table pour refaire un tirage raté sans miser à nouveau (plus celles des jokers).
+- Palier atteint : récompense (15 / 25 / 40), intérêts (5 jetons par tranche de 50, 25 max), puis **le Comptoir**.
 - La petite et la grande table peuvent être **passées** contre un **tag** (Soldes, Turbo, Investisseur, Collectionneur, Paquet cadeau, Double ou rien). Le boss, lui, ne se passe pas et impose une règle : Croupier Avare, Directeur Pressé, Dame en Noir, Videur, Gardien Endormi, Gourmand.
-- Plus de mises sans l'objectif, ou plus de jetons : perdu. Boss de l'étage 8 vaincu : **victoire**, puis mode infini (objectifs ×1,6 par étage).
-- **Le Comptoir** : 3 jokers + 2 consommables (tirage pondéré par rareté, jamais un joker déjà possédé), packs, améliorations, relance du shop à prix croissant, revente à 50 %, emplacements de joker supplémentaires et **le Prêteur** (prêt remboursé à chaque table gagnée, pénalité et huissier si une échéance est impayée).
+- Plus assez de jetons pour miser : perdu. Boss de l'étage 8 vaincu : **victoire**, puis mode infini (paliers ×1,7 par étage).
+- **Le Comptoir** : 3 jokers + 2 consommables (tirage pondéré par rareté, jamais un joker déjà possédé), packs, améliorations, relance du shop à prix croissant, revente à 50 %, emplacements de joker supplémentaires et **le Prêteur** (les jetons prêtés évitent la faillite, mais la dette est déduite de la bankroll : un prêt ne fait pas gagner une table).
 - 5 jeux : **Ultimate Texas Hold'em** (avec probabilités en direct), **Blackjack** (assurance), **Roulette** (avec joueurs IA), **Le Palace des Chats** (machine 5×3, 20 lignes, Wilds ×2/×3 collants pendant 10 tours gratuits déclenchés par 3 Pelotes d'or) et **Dice**. Un **mode libre** permet de jouer sans objectif.
-- **Interface** : objectif, gains, mises, relances et boss de l'étage toujours visibles en haut ; les jokers dans une rangée en bas d'écran (glisser-déposer pour changer l'ordre, fiche au survol ou à l'appui long avec l'effet, le prix de revente et ce que le joker a rapporté) ; aperçu des synergies au Comptoir, prix en rouge quand ils sont trop chers, bouton « Quitter le shop » toujours au même endroit avec confirmation ; « Annuler » après la vente d'un joker ; vitesse d'animation 1×/2×/4× dans les options ; mise en scène des gros coups ; bilan de fin de partie (meilleur gain, joker MVP, seed) ; **collection** des jokers découverts et des boss battus.
+- **Interface** : une seule barre en haut (étage, jauge jetons → palier, mise max, relances, boss ; touchez un badge pour son détail) ; la mise et les boutons d'action sur le rebord de la table ; les règles derrière le bouton « ? » du tapis ; les probabilités du Hold'em repliées dans une pastille ; les jokers dans une rangée en bas d'écran (glisser-déposer pour changer l'ordre, fiche au survol ou à l'appui long avec l'effet, le prix de revente et ce que le joker a rapporté) ; aperçu des synergies au Comptoir, prix en rouge quand ils sont trop chers, bouton « Quitter le shop » toujours au même endroit avec confirmation ; « Annuler » après la vente d'un joker ; vitesse d'animation 1×/2×/4× dans les options ; mise en scène des gros coups ; bilan de fin de partie (meilleur gain, joker MVP, seed) ; **collection** des jokers découverts et des boss battus.
 - **Direction artistique** Art déco (Monte-Carlo) : Limelight pour les titres, Cinzel pour les chiffres (à chasse fixe), Cormorant Garamond pour le texte ; vert bouteille, or, crème et bordeaux ; bordures dorées fines et ornements géométriques ; une couleur et un symbole par rareté (● commun gris, ◆ rare bleu, ★ légendaire or). Chaque joker a sa propre illustration.
 - Chaque gain affiche son **détail** : mise → rendu brut → bonus en % → multiplicateurs → bonus fixes, joker par joker.
 - Sons synthétisés (bouton 🔊), cosmétiques (tapis, dos de cartes) débloqués avec le prestige, interface jouable sur téléphone.
+
+## Refonte « jeu » (après les premiers essais)
+
+- **Moins d'infos à l'écran** : plus de panneaux latéraux ni de bandeau de conseils ; les jeux sont dans une colonne de jetons à gauche (une rangée sur téléphone), la table prend toute la place.
+- **Modèle de partie** : paliers de bankroll de plus en plus hauts, mise max proportionnelle au palier, défaite uniquement à la faillite (voir plus haut).
+- **Habillage** : salle de casino (moquette, lumières floues, vignette), tables inclinées en perspective avec rebord en cuir et rail en bois, jetons en relief (cylindres), boutons « physiques » qui s'enfoncent, jauge de bankroll animée, afficheur à LED pour le Dice, roulette inclinée dans son cylindre, rouleaux ombrés de la machine, menu avec cartes en éventail 3D et jeton qui tourne, fenêtres qui basculent en 3D.
+- **Particules** (`js/ui/fx.js`, canvas) : gerbe de pièces et jetons à chaque gain, pluie de jetons sur les gros coups, confettis à chaque table gagnée et à la victoire. Purement décoratif (hasard de `RNG.fx`), désactivé si le système demande moins d'animations.
 
 ## Après les tests joueurs (5 profils)
 
 Le jeu a été testé par 5 joueurs aux profils différents (ado sur mobile, joueur hardcore de roguelikes, habituée des casinos sur tablette, streamer speedrunner, designer UX daltonienne). Principales évolutions :
 
-- **Équilibrage** : étage 1 plus doux (objectif 35), progression plus raide ensuite, mise max par étage, 3 relances par table (1 par mise), Dice limité à 10 % de chance, prix du shop +15 % par étage. Le Blackjack et le Hold'em comptent ×2 pour l'objectif et la Roulette ×1,5, pour que le Dice ne soit plus la seule stratégie viable. Seules les mises réellement gagnantes font avancer l'objectif. Parrain, Tricheur, Pickpocket et Jackpot Éternel ont été rabotés.
+- **Équilibrage** : 3 relances par table (1 par mise), Dice limité à 10 % de chance, prix du shop +15 % par étage ; Parrain, Tricheur, Pickpocket et Jackpot Éternel rabotés. (Le système d'objectif de gains en 6 mises de cette époque a depuis été remplacé par les paliers de bankroll.)
 - **Corrections** : sauvegarde après chaque tirage (impossible de rejouer un coup en rechargeant la page), carte cachée du croupier qui restait retournée, gains arrondis vers le haut dans la barre, vitesse 4× appliquée aux cartes, pack rouvert à la reprise, mise réajustée quand les jetons baissent.
-- **Interface** : boutons d'action toujours visibles au-dessus de la rangée de jokers (repliable, touche J), barre du haut compacte avec conseil « vise +X par mise » et temps de jeu, tutoriel en 3 étapes, la Machine en premier jeu, roulette verticale sur téléphone (appui long pour retirer une mise), mise tapée directement ou bouton Max, mise de roulette conservée, Hold'em enchaîné.
+- **Interface** : rangée de jokers repliable (touche J), tutoriel en 3 étapes, temps de jeu dans le bilan, la Machine en premier jeu, roulette verticale sur téléphone (appui long pour retirer une mise), mise tapée directement ou bouton Max, mise de roulette conservée, Hold'em enchaîné.
 - **Accessibilité** : options texte agrandi et couleurs bleu/orange pour les daltoniens, symboles et hachures en plus des couleurs, cibles tactiles de 44 px, contrastes relevés, focus visible, fenêtres accessibles (Échap), annonces des résultats aux lecteurs d'écran, animations réduites si le système le demande.
 - **Raccourcis clavier** : Espace/Entrée = action principale, 1 à 5 = jeux, T/S/D/P = tirer, rester, doubler, séparer, C = check, R = relance, A = accepter, J = jokers, Échap = fermer.
 
@@ -36,14 +44,14 @@ Les animations purement décoratives utilisent une instance séparée du même g
 
 ## Équilibrage et simulation
 
-Toutes les valeurs sont dans **`js/core/config.js`** : la progression (`CONFIG.progression` : étages, objectifs, mises et relances par table, récompenses, intérêts, croissance infinie), les boss, les tags, les prix, les raretés, les effets des jokers, les prêts et les tables de paiement.
+Toutes les valeurs sont dans **`js/core/config.js`** : la progression (`CONFIG.progression` : étages, paliers de bankroll, part du palier en mise max, relances, récompenses, intérêts, croissance infinie), les boss, les tags, les prix, les raretés, les effets des jokers, les prêts et les tables de paiement.
 
 Pour mesurer l'effet d'un changement :
 
 - **Navigateur** : ouvrez la console et tapez `Sim.run(1000)`.
 - **Node** : `node tools/simulate.js 1000 [seed] [stratégie]` (`sniper`, `blackjack`, ou un seul jeu : `bj`, `uth`, `dice`, `roulette`, `slots`).
 
-La simulation joue des parties complètes et affiche le taux de victoire, l'étage moyen, les tables gagnées, la répartition des étages et les jokers les plus présents dans les parties gagnées. Stratégie par défaut, « sniper » : comme seules les victoires comptent pour l'objectif, une petite mise au Dice sur un multiplicateur calibré pour finir la table en un coup ; achat de jokers en gardant une réserve.
+La simulation joue des parties complètes et affiche le taux de victoire, l'étage moyen, les tables gagnées, la répartition des étages et les jokers les plus présents dans les parties gagnées. Stratégie par défaut, « sniper » : mise max au Dice avec une chance calibrée pour atteindre le palier en un coup (la bankroll ne monte vers un palier qu'avec une probabilité d'environ bankroll ÷ palier sur un jeu équitable : les jokers font la différence) ; achat de jokers en gardant une réserve. Résultat actuel : environ 41 % de victoires.
 
 Tests du moteur : `node tools/test-engine.js`.
 
@@ -63,8 +71,9 @@ js/core/            moteur, sans DOM (fonctionne aussi sous Node)
   sim.js            simulation
 js/ui/              interface
   app.js            session, compteur de jetons, détail animé des gains
+  fx.js             particules (pièces, jetons, confettis) sur un canvas
   views/*.js        une vue par jeu (affichage et animations seulement)
-  runui.js          menu, barre de partie, shop, fenêtres
+  runui.js          menu, barre du haut, choix de table, shop, fenêtres
   jokerArt.js       illustrations des jokers · slotArt.js : symboles de la machine
   cards.js, sound.js, cosmetics.js, util.js, main.js
 tools/              simulate.js, test-engine.js

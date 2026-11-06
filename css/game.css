@@ -672,3 +672,6 @@ body.has-dock main { padding-bottom: calc(var(--dock-h) + 20px); }
 .dock .joker-slots::before { display: none; }
 body.dock-min .dock-toggle { writing-mode: horizontal-tb; transform: none; top: 4px; bottom: 4px; width: auto; padding: 0 12px !important; }
 body.dock-min .dock-toggle:active:not(:disabled) { transform: translateY(3px); }
+
+/* Machine : rouleaux plus grands quand l'écran le permet */
+@media (min-width: 761px) and (min-height: 740px) { .palace { --sym: 86px; } }

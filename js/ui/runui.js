@@ -389,7 +389,7 @@ const UI = (() => {
       <div class="choose-foot"><span class="ri-chip seed">🌱 Seed ${st.seed}</span></div>`;
     $('choose').querySelectorAll('[data-act]').forEach(b => (b.onclick = () => {
       Sfx.play('click');
-      if (b.dataset.act === 'play') { if (report(H().chooseTable())) startTableUI(); }
+      if (b.dataset.act === 'play') { const r = H().chooseTable(); if (report(r)) { if (r.instant) toast('🎯 Ta bankroll dépasse déjà le palier : table gagnée !'); else startTableUI(); } }
       else { const r = H().skipTable(); if (report(r)) { if (r.text) toast(r.text); Sfx.play('joker'); renderChoose(); App.syncBalance(); } }
     }));
   }
