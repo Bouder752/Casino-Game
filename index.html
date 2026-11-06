@@ -8,15 +8,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Limelight&family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game.css">
 </head>
 <body>
   <div class="lights" aria-hidden="true"></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
   <header class="top">
-    <button class="brand" id="home" title="Menu principal"><span class="brand-suits">♠<i>♥</i></span>Boubouz'ino<span class="brand-suits"><i>♦</i>♣</span></button>
-    <div class="top-mode" id="top-mode"></div>
-    <div class="wallet" title="Jetons">
-      <span class="wallet-chip"></span><span id="balance">0</span>
-      <button id="reset" class="btn small" title="Réinitialiser le solde (mode libre)">↺</button>
+    <button class="brand" id="home" title="Menu principal"><span class="brand-chip" aria-hidden="true"></span><span class="brand-name">Boubouz'ino</span></button>
+    <div class="hud" id="hud">
+      <div class="hud-floor" id="hud-floor"></div>
+      <div class="hud-meter">
+        <div class="wallet" title="Tes jetons">
+          <span class="wallet-chip"></span><span id="balance">0</span>
+          <button id="reset" class="btn small" title="Réinitialiser le solde (mode libre)">↺</button>
+        </div>
+        <div class="hud-bar" id="hud-bar" hidden>
+          <div class="hud-track"><div class="hud-fill" id="hud-fill"></div><div class="hud-shine"></div></div>
+          <div class="hud-goal" id="hud-goal" title="Palier de bankroll à atteindre"></div>
+        </div>
+      </div>
+      <div class="hud-badges" id="hud-badges"></div>
     </div>
     <button class="btn small icon" id="sound" title="Son">🔊</button>
     <button class="btn small icon" id="settings" title="Options">⚙</button>
@@ -26,7 +37,10 @@
   <section class="screen" id="screen-menu">
     <div class="menu">
       <div class="menu-logo">
-        <div class="menu-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="menu-stage" aria-hidden="true">
+          <div class="menu-cards"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="logo-chip"><div class="logo-chip-face"><b>B</b></div></div>
+        </div>
         <h1>Boubouz'ino</h1>
         <p class="tagline">Le casino roguelike — jetons fictifs, vraies sueurs froides</p>
       </div>
@@ -50,252 +64,235 @@
 
   <!-- ÉCRAN DE JEU -->
   <section class="screen" id="screen-game" hidden>
-    <div class="run-bar" id="run-bar" hidden>
-      <div class="run-info" id="run-info"></div>
-    </div>
     <nav class="tabs">
-      <button class="tab" data-tab="uth">Hold'em</button>
-      <button class="tab" data-tab="bj">Blackjack</button>
-      <button class="tab" data-tab="roulette">Roulette</button>
-      <button class="tab" data-tab="slots">Machine</button>
-      <button class="tab" data-tab="dice">Dice</button>
+      <button class="tab" data-tab="uth"><i aria-hidden="true">♠</i><span>Hold'em</span></button>
+      <button class="tab" data-tab="bj"><i aria-hidden="true">♥</i><span>Blackjack</span></button>
+      <button class="tab" data-tab="roulette"><i aria-hidden="true">◎</i><span>Roulette</span></button>
+      <button class="tab" data-tab="slots"><i aria-hidden="true">7</i><span>Machine</span></button>
+      <button class="tab" data-tab="dice"><i aria-hidden="true">⚄</i><span>Dice</span></button>
     </nav>
     <main>
     <!-- ULTIMATE TEXAS HOLD'EM -->
     <section class="game" id="uth" hidden>
-      <div class="layout">
-        <div class="table">
-          <div class="felt">
-            <div class="rack" aria-hidden="true"></div>
-            <div class="shoe" aria-hidden="true"><div class="shoe-card"></div></div>
-            <div class="zone">
-              <div class="zone-title">Croupier <span class="hand-name" id="uth-dealer-name"></span></div>
-              <div class="cards" id="uth-dealer"></div>
-            </div>
-            <svg class="felt-print" viewBox="0 0 640 70" aria-hidden="true">
-              <path id="arc-uth-1" d="M40 12 Q320 74 600 12" fill="none"/>
-              <text class="print-big"><textPath href="#arc-uth-1" startOffset="50%" text-anchor="middle">Ultimate Texas Hold'em</textPath></text>
-            </svg>
-            <div class="zone board-zone">
-              <div class="cards board" id="uth-board"></div>
-            </div>
-            <svg class="felt-print" viewBox="0 0 640 50" aria-hidden="true">
-              <path id="arc-uth-2" d="M10 6 Q320 56 630 6" fill="none"/>
-              <text class="print-small"><textPath href="#arc-uth-2" startOffset="50%" text-anchor="middle">Le croupier se qualifie avec une paire ou mieux</textPath></text>
-            </svg>
-            <div class="zone">
-              <div class="cards" id="uth-player"></div>
-              <div class="zone-title">Vous <span class="hand-name" id="uth-player-name"></span><span class="mini-odds" id="uth-mini-odds"></span></div>
-            </div>
-            <div class="uth-spots">
-              <div class="spot round trips" id="uth-spot-trips"><span class="spot-label">Trips</span><div class="spot-chips"></div></div>
-              <div class="spot round" id="uth-spot-ante"><span class="spot-label">Ante</span><div class="spot-chips"></div></div>
-              <span class="eq">=</span>
-              <div class="spot round" id="uth-spot-blind"><span class="spot-label">Blind</span><div class="spot-chips"></div></div>
-              <div class="spot round play" id="uth-spot-play"><span class="spot-label">Play</span><div class="spot-chips"></div></div>
-            </div>
-            <div class="msg" id="uth-msg" role="status" aria-live="polite"></div>
-            <div class="actions" id="uth-actions"></div>
-            <div class="results" id="uth-results"></div>
+      <div class="table">
+        <div class="felt">
+          <button class="felt-btn rules-btn" data-rules="uth" aria-label="Règles et paiements" title="Règles et paiements">?</button>
+          <details class="odds-float" id="uth-odds-box">
+            <summary><span class="of-ico">%</span><span class="mini-odds" id="uth-mini-odds"></span><span class="of-label">Probas</span></summary>
+            <div class="odds" id="uth-odds"></div>
+          </details>
+          <div class="shoe" aria-hidden="true"><div class="shoe-card"></div></div>
+          <div class="zone dealer-zone">
+            <div class="zone-title">Croupier <span class="hand-name" id="uth-dealer-name"></span></div>
+            <div class="cards" id="uth-dealer"></div>
           </div>
+          <svg class="felt-print" viewBox="0 0 640 70" aria-hidden="true">
+            <path id="arc-uth-1" d="M40 12 Q320 74 600 12" fill="none"/>
+            <text class="print-big"><textPath href="#arc-uth-1" startOffset="50%" text-anchor="middle">Ultimate Texas Hold'em</textPath></text>
+          </svg>
+          <div class="zone board-zone">
+            <div class="cards board" id="uth-board"></div>
+          </div>
+          <div class="zone player-zone">
+            <div class="cards" id="uth-player"></div>
+            <div class="zone-title">Vous <span class="hand-name" id="uth-player-name"></span></div>
+          </div>
+          <div class="uth-spots">
+            <div class="spot round trips" id="uth-spot-trips"><span class="spot-label">Trips</span><div class="spot-chips"></div></div>
+            <div class="spot round" id="uth-spot-ante"><span class="spot-label">Ante</span><div class="spot-chips"></div></div>
+            <span class="eq">=</span>
+            <div class="spot round" id="uth-spot-blind"><span class="spot-label">Blind</span><div class="spot-chips"></div></div>
+            <div class="spot round play" id="uth-spot-play"><span class="spot-label">Play</span><div class="spot-chips"></div></div>
+          </div>
+          <div class="msg" id="uth-msg" role="status" aria-live="polite"></div>
+          <div class="results" id="uth-results"></div>
         </div>
-        <aside class="panel">
-          <div class="odds" id="uth-odds"></div>
-          <div id="uth-ante"></div>
-          <div id="uth-trips"></div>
-          <details class="rules">
-            <summary>Tables de paiement</summary>
-            <table>
-              <tr><th>Main</th><th>Blind</th><th>Trips</th></tr>
-              <tr><td>Quinte flush royale</td><td>500:1</td><td>50:1</td></tr>
-              <tr><td>Quinte flush</td><td>50:1</td><td>40:1</td></tr>
-              <tr><td>Carré</td><td>10:1</td><td>30:1</td></tr>
-              <tr><td>Full</td><td>3:1</td><td>8:1</td></tr>
-              <tr><td>Couleur</td><td>3:2</td><td>6:1</td></tr>
-              <tr><td>Quinte</td><td>1:1</td><td>5:1</td></tr>
-              <tr><td>Brelan</td><td>rendu</td><td>3:1</td></tr>
-            </table>
-          </details>
-          <details class="rules">
-            <summary>Règles</summary>
-            <ul>
-              <li>Misez l'<b>Ante</b> ; une <b>Blind</b> égale est placée automatiquement.</li>
-              <li>Pré-flop : misez <b>Play</b> 3x ou 4x l'Ante, ou checkez.</li>
-              <li>Flop : Play 2x ou check. Turn + river (révélées ensemble) : Play 1x ou se coucher.</li>
-              <li>Le croupier se qualifie avec <b>une paire</b> ou mieux, sinon l'Ante est rendu.</li>
-              <li>Si vous gagnez : Play et Ante paient 1:1, la Blind paie selon la table (rendue en dessous d'une quinte).</li>
-              <li>Le Trips paie selon votre main, quel que soit le croupier.</li>
-            </ul>
-          </details>
-        </aside>
+        <div class="rail">
+          <div class="rail-bets"><div id="uth-ante"></div><div id="uth-trips" class="betctl-mini"></div></div>
+          <div class="actions" id="uth-actions"></div>
+        </div>
+      </div>
+      <div class="rules-src" id="rules-uth" hidden>
+        <h2>Ultimate Texas Hold'em</h2>
+        <ul>
+          <li>Misez l'<b>Ante</b> ; une <b>Blind</b> égale est placée automatiquement.</li>
+          <li>Pré-flop : misez <b>Play</b> 3x ou 4x l'Ante, ou checkez.</li>
+          <li>Flop : Play 2x ou check. Turn + river (révélées ensemble) : Play 1x ou se coucher.</li>
+          <li>Le croupier se qualifie avec <b>une paire</b> ou mieux, sinon l'Ante est rendu.</li>
+          <li>Si vous gagnez : Play et Ante paient 1:1, la Blind paie selon la table (rendue en dessous d'une quinte).</li>
+          <li>Le Trips (optionnel) paie selon votre main, quel que soit le croupier.</li>
+        </ul>
+        <table>
+          <tr><th>Main</th><th>Blind</th><th>Trips</th></tr>
+          <tr><td>Quinte flush royale</td><td>500:1</td><td>50:1</td></tr>
+          <tr><td>Quinte flush</td><td>50:1</td><td>40:1</td></tr>
+          <tr><td>Carré</td><td>10:1</td><td>30:1</td></tr>
+          <tr><td>Full</td><td>3:1</td><td>8:1</td></tr>
+          <tr><td>Couleur</td><td>3:2</td><td>6:1</td></tr>
+          <tr><td>Quinte</td><td>1:1</td><td>5:1</td></tr>
+          <tr><td>Brelan</td><td>rendu</td><td>3:1</td></tr>
+        </table>
       </div>
     </section>
 
     <!-- BLACKJACK -->
     <section class="game" id="bj" hidden>
-      <div class="layout">
-        <div class="table">
-          <div class="felt">
-            <div class="rack" aria-hidden="true"></div>
-            <div class="shoe" aria-hidden="true"><div class="shoe-card"></div></div>
-            <div class="zone">
-              <div class="zone-title">Croupier <span class="hand-name" id="bj-dealer-val"></span></div>
-              <div class="cards" id="bj-dealer"></div>
-            </div>
-            <svg class="felt-print" viewBox="0 0 640 168" aria-hidden="true">
-              <path id="arc-bj-1" d="M30 14 Q320 104 610 14" fill="none"/>
-              <path id="arc-bj-2" d="M70 74 Q320 138 570 74" fill="none"/>
-              <path id="arc-bj-3" d="M150 124 Q320 162 490 124" fill="none"/>
-              <text class="print-big"><textPath href="#arc-bj-1" startOffset="50%" text-anchor="middle">Le Blackjack paie 3 contre 2</textPath></text>
-              <text class="print-small"><textPath href="#arc-bj-2" startOffset="50%" text-anchor="middle">Le croupier tire à 16 et reste à 17</textPath></text>
-              <text class="print-small"><textPath href="#arc-bj-3" startOffset="50%" text-anchor="middle">L'assurance paie 2 contre 1</textPath></text>
-            </svg>
-            <div class="zone">
-              <div class="bj-hands" id="bj-hands"></div>
-            </div>
-            <div class="msg" id="bj-msg" role="status" aria-live="polite"></div>
-            <div class="actions" id="bj-actions"></div>
-          </div>
-        </div>
-        <aside class="panel">
-          <div id="bj-bet"></div>
-          <div class="shoe-info" id="bj-shoe"></div>
+      <div class="table">
+        <div class="felt">
+          <button class="felt-btn rules-btn" data-rules="bj" aria-label="Règles et paiements" title="Règles et paiements">?</button>
+          <div class="shoe" aria-hidden="true"><div class="shoe-card"></div><div class="shoe-info" id="bj-shoe"></div></div>
           <div class="counter" id="bj-counter" hidden></div>
-          <details class="rules" open>
-            <summary>Règles</summary>
-            <ul>
-              <li>Sabot de 6 jeux, mélangé aux ¾.</li>
-              <li>Blackjack payé 3:2, le croupier vérifie s'il a un blackjack.</li>
-              <li>Le croupier tire jusqu'à 17 et reste sur 17 souple.</li>
-              <li>Doubler sur n'importe quelles 2 cartes.</li>
-              <li>Séparer jusqu'à 4 mains ; les As séparés ne reçoivent qu'une carte.</li>
-              <li>Assurance proposée quand le croupier montre un As (moitié de la mise, payée 2:1).</li>
-            </ul>
-          </details>
-        </aside>
+          <div class="zone">
+            <div class="zone-title">Croupier <span class="hand-name" id="bj-dealer-val"></span></div>
+            <div class="cards" id="bj-dealer"></div>
+          </div>
+          <svg class="felt-print" viewBox="0 0 640 110" aria-hidden="true">
+            <path id="arc-bj-1" d="M30 14 Q320 104 610 14" fill="none"/>
+            <path id="arc-bj-2" d="M90 64 Q320 124 550 64" fill="none"/>
+            <text class="print-big"><textPath href="#arc-bj-1" startOffset="50%" text-anchor="middle">Le Blackjack paie 3 contre 2</textPath></text>
+            <text class="print-small"><textPath href="#arc-bj-2" startOffset="50%" text-anchor="middle">Le croupier reste à 17</textPath></text>
+          </svg>
+          <div class="zone">
+            <div class="bj-hands" id="bj-hands"></div>
+          </div>
+          <div class="msg" id="bj-msg" role="status" aria-live="polite"></div>
+        </div>
+        <div class="rail">
+          <div class="rail-bets" id="bj-bet"></div>
+          <div class="actions" id="bj-actions"></div>
+        </div>
+      </div>
+      <div class="rules-src" id="rules-bj" hidden>
+        <h2>Blackjack</h2>
+        <ul>
+          <li>Sabot de 6 jeux, mélangé aux ¾.</li>
+          <li>Blackjack payé 3:2, le croupier vérifie s'il a un blackjack.</li>
+          <li>Le croupier tire jusqu'à 17 et reste sur 17 souple.</li>
+          <li>Doubler sur n'importe quelles 2 cartes.</li>
+          <li>Séparer jusqu'à 4 mains ; les As séparés ne reçoivent qu'une carte.</li>
+          <li>Assurance proposée quand le croupier montre un As (moitié de la mise, payée 2:1).</li>
+        </ul>
       </div>
     </section>
 
     <!-- ROULETTE -->
     <section class="game" id="roulette" hidden>
-      <div class="layout">
-        <div class="table">
-          <div class="felt rl-felt">
-            <div class="rl-top">
-              <div class="rl-wheel-wrap">
-                <svg id="rl-wheel" viewBox="0 0 320 320" aria-hidden="true"></svg>
-                <div class="rl-ball-track" id="rl-ball-track"><i class="rl-ball"></i></div>
-                <div class="rl-pointer"></div>
-              </div>
-              <div class="rl-side">
-                <div class="rl-result" id="rl-result">?</div>
-                <div class="rl-history" id="rl-history"></div>
-                <div class="rl-ai" id="rl-ai"></div>
-              </div>
+      <div class="table">
+        <div class="felt rl-felt">
+          <button class="felt-btn rules-btn" data-rules="roulette" aria-label="Règles et paiements" title="Règles et paiements">?</button>
+          <div class="rl-top">
+            <div class="rl-wheel-wrap">
+              <div class="rl-bowl"></div>
+              <svg id="rl-wheel" viewBox="0 0 320 320" aria-hidden="true"></svg>
+              <div class="rl-ball-track" id="rl-ball-track"><i class="rl-ball"></i></div>
+              <div class="rl-pointer"></div>
             </div>
-            <div class="rl-board-wrap"><div class="rl-board" id="rl-board"></div></div>
-            <div class="rl-total" id="rl-total"></div>
-            <div class="msg" id="rl-msg" role="status" aria-live="polite"></div>
-            <div class="actions" id="rl-actions"></div>
+            <div class="rl-side">
+              <div class="rl-result" id="rl-result">?</div>
+              <div class="rl-history" id="rl-history"></div>
+              <div class="rl-ai" id="rl-ai"></div>
+            </div>
           </div>
+          <div class="rl-board-wrap"><div class="rl-board" id="rl-board"></div></div>
+          <div class="rl-total" id="rl-total"></div>
+          <div class="msg" id="rl-msg" role="status" aria-live="polite"></div>
         </div>
-        <aside class="panel">
-          <div class="betctl">
-            <div class="betctl-head"><span class="betctl-label">Jeton à placer</span></div>
-            <div class="betctl-chips" id="rl-chips"></div>
-            <p class="hint">Touchez une case du tapis pour y poser le jeton. Appui long ou clic droit : retirer la mise.</p>
-          </div>
-          <details class="rules" open>
-            <summary>Paiements</summary>
-            <table>
-              <tr><th>Mise</th><th>Paie</th></tr>
-              <tr><td>Numéro plein</td><td>35:1</td></tr>
-              <tr><td>Douzaine, colonne</td><td>2:1</td></tr>
-              <tr><td>Rouge/Noir, Pair/Impair, 1-18/19-36</td><td>1:1</td></tr>
-            </table>
-            <ul><li>Roulette européenne : un seul zéro. Sur le 0, les mises extérieures perdent.</li></ul>
-          </details>
-        </aside>
+        <div class="rail">
+          <div class="rail-bets"><div class="betctl rl-betctl"><div class="betctl-head"><span class="betctl-label">Jeton</span></div><div class="betctl-chips" id="rl-chips"></div></div></div>
+          <div class="actions" id="rl-actions"></div>
+        </div>
+      </div>
+      <div class="rules-src" id="rules-roulette" hidden>
+        <h2>Roulette européenne</h2>
+        <ul>
+          <li>Choisissez un jeton puis touchez une case du tapis pour y poser votre mise.</li>
+          <li>Appui long ou clic droit sur une case : retirer la mise.</li>
+          <li>Un seul zéro. Sur le 0, les mises extérieures perdent.</li>
+        </ul>
+        <table>
+          <tr><th>Mise</th><th>Paie</th></tr>
+          <tr><td>Numéro plein</td><td>35:1</td></tr>
+          <tr><td>Douzaine, colonne</td><td>2:1</td></tr>
+          <tr><td>Rouge/Noir, Pair/Impair, 1-18/19-36</td><td>1:1</td></tr>
+        </table>
       </div>
     </section>
 
     <!-- MACHINE A SOUS : Le Palace des Chats -->
     <section class="game" id="slots" hidden>
-      <div class="layout">
-        <div class="table">
-          <div class="felt sl-felt">
-            <div class="palace">
-              <div class="palace-roof" aria-hidden="true"></div>
-              <div class="palace-top">
-                <div class="palace-title">Le Palace des Chats</div>
-                <div class="palace-sub">5 rouleaux · 20 lignes · Wilds ×2 / ×3 collants en tours gratuits</div>
-              </div>
-              <div class="fs-banner" id="sl-fs" hidden></div>
-              <div class="sl-window">
-                <div class="sl-grid" id="sl-reels"></div>
-                <svg class="sl-lines" id="sl-lines" aria-hidden="true"></svg>
-                <div class="sl-win" id="sl-win"></div>
-              </div>
-              <div class="sl-lights" id="sl-lights"></div>
+      <div class="table cabinet">
+        <div class="felt sl-felt">
+          <button class="felt-btn rules-btn" data-rules="slots" aria-label="Règles et paiements" title="Règles et paiements">?</button>
+          <div class="palace">
+            <div class="palace-roof" aria-hidden="true"></div>
+            <div class="palace-top">
+              <div class="palace-title">Le Palace des Chats</div>
             </div>
-            <div class="msg" id="sl-msg" role="status" aria-live="polite"></div>
-            <div class="actions" id="sl-actions"></div>
+            <div class="fs-banner" id="sl-fs" hidden></div>
+            <div class="sl-window">
+              <div class="sl-grid" id="sl-reels"></div>
+              <svg class="sl-lines" id="sl-lines" aria-hidden="true"></svg>
+              <div class="sl-win" id="sl-win"></div>
+            </div>
+            <div class="sl-lights" id="sl-lights"></div>
           </div>
+          <div class="msg" id="sl-msg" role="status" aria-live="polite"></div>
         </div>
-        <aside class="panel">
-          <div id="sl-bet"></div>
-          <details class="rules" open>
-            <summary>Table des gains</summary>
-            <div id="sl-paytable"></div>
-          </details>
-        </aside>
+        <div class="rail">
+          <div class="rail-bets" id="sl-bet"></div>
+          <div class="actions" id="sl-actions"></div>
+        </div>
+      </div>
+      <div class="rules-src" id="rules-slots" hidden>
+        <h2>Le Palace des Chats</h2>
+        <ul>
+          <li>5 rouleaux, 3 rangées, 20 lignes. La mise est répartie sur les 20 lignes.</li>
+          <li>Le <b>Palace</b> (wild, rouleaux 2 à 4) remplace tout et multiplie le gain ×2 ou ×3.</li>
+          <li>3 <b>Pelotes d'or</b> : 10 tours gratuits, les wilds restent collés.</li>
+        </ul>
+        <div id="sl-paytable"></div>
       </div>
     </section>
 
     <!-- DICE -->
     <section class="game" id="dice" hidden>
-      <div class="layout">
-        <div class="table">
-          <div class="felt dice-felt">
-            <svg class="felt-print" viewBox="0 0 640 60" aria-hidden="true">
-              <path id="arc-dice" d="M80 50 Q320 -6 560 50" fill="none"/>
-              <text class="print-big"><textPath href="#arc-dice" startOffset="50%" text-anchor="middle">Boubouz'ino · Dice</textPath></text>
-            </svg>
-            <div class="dice-board">
-              <div class="dice-result" id="dice-result">50.00</div>
-            </div>
-            <div class="dice-rule" id="dice-rule"></div>
-            <div class="dice-track" id="dice-track">
-              <div class="dice-marker" id="dice-marker"></div>
-            </div>
-            <input type="range" id="dice-target" min="10" max="95" step="1" value="50" aria-label="Seuil">
-            <div class="dice-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
-            <div class="dice-mode">
-              <button class="btn toggle" id="dice-under">En dessous</button>
-              <button class="btn toggle" id="dice-over">Au-dessus</button>
-            </div>
-            <div class="dice-stats">
-              <div><span>Seuil</span><b id="dice-target-val"></b></div>
-              <div><span>Chance</span><b id="dice-chance"></b></div>
-              <div><span>Multiplicateur</span><b id="dice-mult"></b></div>
-              <div><span>Gain possible</span><b id="dice-profit"></b></div>
-            </div>
-            <div class="msg" id="dice-msg" role="status" aria-live="polite"></div>
-            <div class="actions" id="dice-actions"></div>
-            <div class="dice-history" id="dice-history"></div>
+      <div class="table">
+        <div class="felt dice-felt">
+          <button class="felt-btn rules-btn" data-rules="dice" aria-label="Règles et paiements" title="Règles et paiements">?</button>
+          <div class="dice-board">
+            <div class="dice-result" id="dice-result">50.00</div>
           </div>
+          <div class="dice-rule" id="dice-rule"></div>
+          <div class="dice-track" id="dice-track">
+            <div class="dice-marker" id="dice-marker"></div>
+          </div>
+          <input type="range" id="dice-target" min="10" max="95" step="1" value="50" aria-label="Seuil">
+          <div class="dice-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+          <div class="dice-mode">
+            <button class="btn toggle" id="dice-under">En dessous</button>
+            <button class="btn toggle" id="dice-over">Au-dessus</button>
+          </div>
+          <div class="dice-stats">
+            <div><span>Seuil</span><b id="dice-target-val"></b></div>
+            <div><span>Chance</span><b id="dice-chance"></b></div>
+            <div><span>Multi.</span><b id="dice-mult"></b></div>
+            <div><span>Gain</span><b id="dice-profit"></b></div>
+          </div>
+          <div class="msg" id="dice-msg" role="status" aria-live="polite"></div>
+          <div class="dice-history" id="dice-history"></div>
         </div>
-        <aside class="panel">
-          <div id="dice-bet"></div>
-          <details class="rules" open>
-            <summary>Règles</summary>
-            <ul>
-              <li>Un nombre entre 0.00 et 99.99 est tiré au hasard.</li>
-              <li>Choisissez un seuil et pariez en dessous ou au-dessus.</li>
-              <li>Moins vous avez de chances, plus le multiplicateur est élevé (×99 ÷ chance).</li>
-            </ul>
-          </details>
-        </aside>
+        <div class="rail">
+          <div class="rail-bets" id="dice-bet"></div>
+          <div class="actions" id="dice-actions"></div>
+        </div>
+      </div>
+      <div class="rules-src" id="rules-dice" hidden>
+        <h2>Dice</h2>
+        <ul>
+          <li>Un nombre entre 0.00 et 99.99 est tiré au hasard.</li>
+          <li>Choisissez un seuil et pariez en dessous ou au-dessus.</li>
+          <li>Moins vous avez de chances, plus le multiplicateur est élevé (×99 ÷ chance).</li>
+        </ul>
       </div>
     </section>
     </main>
@@ -354,6 +351,7 @@
   <script src="js/ui/cards.js"></script>
   <script src="js/ui/jokerArt.js"></script>
   <script src="js/ui/slotArt.js"></script>
+  <script src="js/ui/fx.js"></script>
   <script src="js/ui/app.js"></script>
   <script src="js/ui/views/uth.js"></script>
   <script src="js/ui/views/blackjack.js"></script>

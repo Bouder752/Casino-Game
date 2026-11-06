@@ -47,7 +47,7 @@ const BetControls = [];
 
 // Contrôle de mise réutilisable (jetons)
 class BetControl {
-  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500], max = () => Infinity }) {
+  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500], max = () => Infinity, compact = false }) {
     this.value = initial;
     this.maxFn = max;
     this.base = initial;
@@ -83,7 +83,7 @@ class BetControl {
     [['½', () => this.set(Math.floor(this.value / 2)), 'Diviser par 2'],
      ['×2', () => this.set(this.value * 2), 'Doubler'],
      ['Max', () => this.set(this.maxFn()), 'Mise maximale'],
-     ['✕', () => this.set(0), 'Effacer']].forEach(([t, fn, title]) => {
+     ['✕', () => this.set(0), 'Effacer']].filter(([t]) => !compact || t === '✕').forEach(([t, fn, title]) => {
       const b = Util.el('button', 'chip-op', t);
       b.title = title;
       b.setAttribute('aria-label', title);

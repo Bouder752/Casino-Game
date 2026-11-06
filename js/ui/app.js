@@ -18,7 +18,7 @@ const App = (() => {
     const el = $('balance');
     const target = host ? host.chips() : 0;
     const from = shown, id = ++tweenId;
-    if (immediate || Math.abs(target - from) < 0.01) { shown = target; el.textContent = Util.fmt(target); return; }
+    if (immediate || Math.abs(target - from) < 0.01) { shown = target; el.textContent = Util.fmt(target); fire('balance', target); return; }
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     const t0 = performance.now(), dur = Util.dur(Math.min(900, 250 + Math.abs(target - from) * 4));
     el.classList.toggle('up', target > from); el.classList.toggle('down', target < from);
@@ -27,6 +27,7 @@ const App = (() => {
       const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
       shown = from + (target - from) * e;
       el.textContent = Util.fmt(Math.round(shown * 100) / 100);
+      fire('balance', shown);
       if (k < 1) requestAnimationFrame(step);
       else { shown = target; el.textContent = Util.fmt(target); el.classList.remove('up', 'down'); }
     };
@@ -65,6 +66,11 @@ const App = (() => {
         setTimeout(() => { box.classList.add('out'); setTimeout(() => { box.hidden = true; box.classList.remove('out'); }, 400); }, Util.dur(2600) + 600);
       }
       if (st.net !== 0) floatGain(st.net);
+      if (st.net > 0) {
+        const felt = document.querySelector('.game:not([hidden]) .felt');
+        const [x, y] = FX.from(felt);
+        FX.burst(x, y, Math.round(8 + Math.min(40, st.net / Math.max(1, st.staked) * 8)), st.net >= st.staked * 2 ? 'coin' : 'chip');
+      }
       if (isBig(st)) bigWin();
       syncBalance();
       await Util.sleep(steps.length ? 500 : 150);
@@ -81,6 +87,7 @@ const App = (() => {
   function bigWin() {
     document.body.classList.remove('bigwin'); void document.body.offsetWidth;
     document.body.classList.add('bigwin');
+    FX.rain();
     Sfx.play('boom');
     setTimeout(() => document.body.classList.remove('bigwin'), 900);
   }

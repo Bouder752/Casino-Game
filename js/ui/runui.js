@@ -24,6 +24,7 @@ const UI = (() => {
     document.querySelectorAll('.game').forEach(g => (g.hidden = g.id !== id));
     Storage.set('casino.tab', id);
     renderConsumables();
+    if (App.host) paintHud();
   }
   document.querySelectorAll('.tab').forEach(t => (t.onclick = () => { Sfx.play('click'); showTab(t.dataset.tab); }));
   const refreshGames = () => App.views().forEach(v => v.refresh && v.refresh());
@@ -300,41 +301,66 @@ const UI = (() => {
   const F = () => CONFIG.progression.etagesPourGagner;
   const etageText = st => `Étage ${st.etage}${st.etage <= F() ? ' / ' + F() : ' · infini'}`;
 
-  // ---------- Barre de partie ----------
+  // ---------- Barre du haut : étage, bankroll → palier, mise max, badges ----------
   function renderRunBar() {
     const run = isRun();
-    $('run-bar').hidden = !run;
     $('reset').hidden = run || !App.host;
-    document.querySelector('.wallet').hidden = !App.host;
-    $('top-mode').textContent = !App.host ? '' : run ? etageText(S()) + (S().table ? ' — ' + TABLE_NAME[S().table.type] : '') : 'Mode libre';
-    if (!run) return;
-    const st = S();
-    renderJokers($('joker-slots'));
-    renderConsumables();
-    const t = st.table;
-    if (st.phase !== 'play' || !t) return;
-    const pct = Math.max(0, Math.min(100, t.gains / t.target * 100));
+    $('hud').hidden = !App.host;
+    if (run) { renderJokers($('joker-slots')); renderConsumables(); }
+    paintHud();
+  }
+  // Valeur affichée pendant que le compteur défile (pour que la barre suive les jetons)
+  let shownChips = null;
+  App.on('balance', v => { shownChips = v; paintMeter(); });
+  function paintMeter() {
+    if (!isRun()) return;
+    const st = S(), t = st.table;
+    const bar = $('hud-bar');
+    bar.hidden = !(st.phase === 'play' && t);
+    if (bar.hidden) return;
+    const debt = st.debts.reduce((a, d) => a + d.left, 0);
+    const chips = shownChips == null ? H().chips() : shownChips;
+    const bank = chips - debt;
+    const pct = Math.max(0, Math.min(100, bank / t.target * 100));
+    $('hud-fill').style.width = pct + '%';
+    bar.classList.toggle('danger', bank < t.target * 0.25);
+    bar.classList.toggle('near', pct >= 80);
+    $('hud-goal').innerHTML = `<span>Palier</span><b class="num">${Util.fmt(t.target)}</b>`;
+    bar.title = `Bankroll ${Util.fmt(Math.floor(bank * 100) / 100)} / ${Util.fmt(t.target)}${debt ? ` (jetons − dette de ${Util.fmt(debt)})` : ''}`;
+  }
+  const badge = (cls, html, info) => `<button class="hbadge ${cls}" data-info="${info.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">${html}</button>`;
+  function paintHud() {
+    const run = isRun();
+    if (!App.host) return;
+    if (!run) {
+      $('hud-floor').innerHTML = '<b>Mode libre</b>';
+      $('hud-bar').hidden = true;
+      $('hud-badges').innerHTML = '';
+      return;
+    }
+    const st = S(), t = st.table;
+    const type = t ? t.type : st.tableType;
+    $('hud-floor').className = 'hud-floor ' + (type || '');
+    $('hud-floor').innerHTML = `<small>Étage</small><b class="num">${st.etage}${st.etage <= F() ? `<i>/${F()}</i>` : ''}</b><span>${TABLE_NAME[type] || ''}</span>`;
+    paintMeter();
+    const out = [];
+    if (st.phase === 'play' && t) {
+      out.push(badge('maxbet', `<small>Mise max</small><b class="num">${Util.fmt(H().maxBet(tab))}</b>`,
+        `<b>Mise maximale</b> : ${Math.round(CONFIG.progression.miseMaxRatio * 100)} % du palier visé. Elle augmente avec les paliers.`));
+      out.push(badge('rr', `<b class="num">↻ ${st.charges.length}</b>`, '<b>Relances</b> : refaire un tirage raté sans miser à nouveau.'));
+    }
     const boss = BOSSES[st.bossId];
-    const rules = H().activeRules().map(id => RULES[id].desc());
+    if (boss) out.push(badge('boss' + (type === 'boss' ? ' now' : ''), type === 'boss' ? `☠ <span>${boss.name}</span>` : '☠', `<b>☠ ${boss.name}</b>${type === 'boss' ? '' : ' (3ᵉ table de l\'étage)'}<br>${boss.desc()}`));
+    if (H().activeRules) H().activeRules().forEach(id => out.push(badge('rule', '🎡', `<b>Règle active</b><br>${RULES[id].desc()}`)));
+    st.statuses.filter(x => STATUSES[x.id].tag || x.id === 'golden' || x.id === 'huissier')
+      .forEach(x => out.push(badge('tag', STATUSES[x.id].icon, `<b>${STATUSES[x.id].icon} ${STATUSES[x.id].name}</b><br>${STATUSES[x.id].desc()}`)));
     const debt = st.debts[0];
-    const tags = st.statuses.filter(x => STATUSES[x.id].tag || x.id === 'golden' || x.id === 'huissier');
-    const met = t.gains >= t.target;
-    $('run-info').innerHTML = `
-      <div class="hud-table"><span>${etageText(st)}</span><b class="ri-table ${t.type}">${TABLE_NAME[t.type]}</b></div>
-      <div class="hud-goal">
-        <div class="hud-goal-txt"><span>Gains</span><b class="num">${Util.fmt(Math.floor(t.gains * 100) / 100)}</b><span>/ ${Util.fmt(t.target)}</span>${met ? '<em>✓ objectif</em>' : ''}</div>
-        <div class="goal-bar ${met ? 'met' : ''}"><i style="width:${pct}%"></i></div>
-      </div>
-      <div class="hud-stat hud-time" title="Temps de jeu"><span>Temps</span><b class="num" id="hud-timer">${fmtTime(st.elapsed || 0)}</b></div>
-      <div class="hud-stat"><span>Mises</span><b class="num ${t.bets <= 2 ? 'low' : ''}">${t.bets}<small>/${t.betsMax}</small></b></div>
-      <div class="hud-stat" title="Relance : refaire un tirage raté sans miser à nouveau"><span>Relances</span><b class="num">${st.charges.length}</b></div>
-      ${!met && t.bets > 0 ? `<div class="hud-hint" title="Gain moyen à viser par mise pour atteindre l'objectif">💡 vise <b>+${Util.fmt(Math.ceil((t.target - t.gains) / t.bets))}</b> par mise</div>` : '<div></div>'}
-      <div class="hud-chips">
-        ${boss ? `<div class="ri-chip boss ${t.type === 'boss' ? 'now' : ''}" title="${boss.desc()}">☠ ${t.type === 'boss' ? '' : 'Boss de l\'étage (à la 3ᵉ table) : '}${boss.name} — ${boss.desc()}</div>` : ''}
-        ${rules.map(r => `<div class="ri-chip rule">🎡 ${r}</div>`).join('')}
-        ${tags.map(x => `<div class="ri-chip">${STATUSES[x.id].icon} ${STATUSES[x.id].name}</div>`).join('')}
-        ${debt ? `<div class="ri-chip debt">💳 Dette ${Util.fmt(debt.left)}</div>` : ''}
-      </div>`;
+    if (debt) out.push(badge('debt', `💳 <b class="num">${Util.fmt(debt.left)}</b>`, `<b>Dette</b> : ${Util.fmt(debt.left)} à rembourser (${Util.fmt(Math.min(debt.per, debt.left))} prélevés à chaque table gagnée). La dette est déduite de ta bankroll.`));
+    $('hud-badges').innerHTML = out.join('');
+    bindBadges();
+  }
+  function bindBadges() {
+    $('hud-badges').querySelectorAll('.hbadge').forEach(b => (b.onclick = () => { Sfx.play('click'); popover(b, `<p>${b.dataset.info}</p>`, []); }));
   }
 
   // ---------- Choix de la table (petite, grande, boss) ----------
@@ -350,15 +376,15 @@ const UI = (() => {
       return `<div class="tcard ${type} ${info.status}">
         <div class="tc-head"><span>${TABLE_NAME[type]}</span><i>${badge}</i></div>
         <div class="tc-chip">${type === 'boss' ? '☠' : type === 'grande' ? '♦' : '♣'}</div>
-        <div class="tc-goal"><small>Objectif de gains</small><b>${Util.fmt(info.target)}</b></div>
-        <div class="tc-meta">${boss && boss.id === 'presse' ? CONFIG.bosses.presse.bets : P.misesParTable} mises · ${boss && boss.id === 'sobre' ? 0 : P.relancesParTable} relances · récompense <b>${info.reward}</b></div>
+        <div class="tc-goal"><small>Bankroll à atteindre</small><b>${Util.fmt(info.target)}</b></div>
+        <div class="tc-meta">mise max <b>${Util.fmt(info.maxBet)}</b> · récompense <b>+${info.reward}</b></div>
         ${boss ? `<div class="tc-boss"><b>${boss.name}</b><br>${boss.desc()}</div>` : ''}
         ${tag ? `<div class="tc-tag"><span>Passer pour :</span> ${tag.icon} <b>${tag.name}</b><br><small>${tag.desc()}</small></div>` : ''}
         ${current ? `<div class="tc-actions"><button class="btn primary" data-act="play">Jouer</button>${type !== 'boss' ? '<button class="btn" data-act="skip">Passer</button>' : ''}</div>` : ''}
       </div>`;
     };
     $('choose').innerHTML = `<div class="choose-head"><h2>${etageText(st)}</h2>
-        <p>Atteins l'objectif de gains de chaque table en ${P.misesParTable} mises. Seules les mises gagnantes comptent.</p></div>
+        <p>Fais monter ta bankroll jusqu'au palier. Mises illimitées : tu ne perds qu'à la faillite.</p></div>
       <div class="tables">${['petite', 'grande', 'boss'].map(card).join('')}</div>
       <div class="choose-foot"><span class="ri-chip seed">🌱 Seed ${st.seed}</span></div>`;
     $('choose').querySelectorAll('[data-act]').forEach(b => (b.onclick = () => {
@@ -374,7 +400,7 @@ const UI = (() => {
     if (t.boss) {
       const b = BOSSES[t.boss];
       modal(`<div class="intro"><div class="intro-n">☠ ${b.name}</div><div class="intro-boss">${b.desc()}</div>
-        <div class="intro-goal">Gagne <b>${Util.fmt(t.target)}</b> jetons en <b>${t.bets}</b> mises</div></div>`, [['Affronter le boss', () => {}, 'primary big']], 'intro-box');
+        <div class="intro-goal">Atteins une bankroll de <b>${Util.fmt(t.target)}</b></div></div>`, [['Affronter le boss', () => {}, 'primary big']], 'intro-box');
     }
   }
 
@@ -403,7 +429,7 @@ const UI = (() => {
           <div class="ss-bal"><span class="wallet-chip"></span>${Util.fmt(H().chips())}</div>
           <div class="ss-next">
             <div>Prochaine table : <b>${TABLE_NAME[st.tableType]}</b> — ${etageText(st)}</div>
-            <div>Objectif de gains : <b>${Util.fmt(nextInfo.target)}</b> en ${CONFIG.progression.misesParTable} mises</div>
+            <div>Bankroll à atteindre : <b>${Util.fmt(nextInfo.target)}</b> · mise max ${Util.fmt(nextInfo.maxBet)}</div>
             ${nextInfo.boss ? `<div class="boss-warn">☠ ${BOSSES[nextInfo.boss].name} : ${BOSSES[nextInfo.boss].desc()}</div>` : ''}
           </div>
           <button class="btn" id="shop-reroll">🔄 Relancer le shop (${st.shop.rerollCost})</button>
@@ -412,7 +438,7 @@ const UI = (() => {
             <div class="shop-row-title">💳 Le Prêteur</div>
             ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque table gagnée.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
               : CONFIG.loans.options.map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${o.amount} maintenant<br><small>${Math.round(o.amount * (1 + o.rate))} à rendre en ${o.tables} tables</small></button>`).join('')}
-            <p class="hint">Échéance impayée : +${CONFIG.loans.penaltyRate * 100} % sur la part manquante et ${CONFIG.loans.penaltyBets} mises confisquées.</p>
+            <p class="hint">Les jetons prêtés t'évitent la faillite, mais la dette est déduite de ta bankroll : elle ne fait pas avancer le palier.</p>
           </div>
 
         </div>
@@ -508,11 +534,12 @@ const UI = (() => {
     modal(`<h2>Comment jouer</h2>
       <ul class="howto">
         <li>Tu démarres avec <b>${P.jetonsDepart} jetons</b>. Il y a <b>${P.etagesPourGagner} étages</b>, chacun avec 3 tables : <b>petite</b>, <b>grande</b> et <b>table du Boss</b>.</li>
-        <li>À chaque table, atteins l'<b>objectif de gains</b> en <b>${P.misesParTable} mises</b> maximum (une main, un tirage ou un lancer = 1 mise), sur le jeu de ton choix. Seules les mises gagnantes font avancer l'objectif : les pertes ne coûtent que des jetons.</li>
+        <li>À chaque table, fais monter ta <b>bankroll</b> (tes jetons, moins tes dettes) jusqu'au <b>palier</b> affiché en haut, sur le jeu de ton choix. Mises illimitées.</li>
+        <li>La <b>mise max</b> vaut ${Math.round(P.miseMaxRatio * 100)} % du palier : plus les paliers montent, plus tu peux miser gros.</li>
         <li>Tu as <b>${P.relancesParTable} relances</b> par table pour refaire un tirage raté sans miser à nouveau.</li>
-        <li>Table gagnée : récompense, +${P.bonusParMiseRestante} par mise restante et ${P.interetsParTranche.gain} jetons d'intérêts par tranche de ${P.interetsParTranche.tranche} (${P.interetsParTranche.max} max), puis le <b>Comptoir</b>.</li>
+        <li>Palier atteint : récompense et ${P.interetsParTranche.gain} jetons d'intérêts par tranche de ${P.interetsParTranche.tranche} (${P.interetsParTranche.max} max), puis le <b>Comptoir</b>.</li>
         <li>Tu peux <b>passer</b> la petite ou la grande table pour gagner un <b>tag</b> (bonus), mais pas le Boss, qui impose une règle spéciale.</li>
-        <li>Plus de mises sans l'objectif, ou plus de jetons : perdu. Bats le boss de l'étage ${P.etagesPourGagner} pour gagner, puis continue en mode infini.</li>
+        <li>Tu ne perds qu'à la <b>faillite</b>. Bats le boss de l'étage ${P.etagesPourGagner} pour gagner, puis continue en mode infini.</li>
         <li>Les jokers s'appliquent de <b>gauche à droite</b>. Chaque gain affiche son détail. Chaque partie a une <b>seed</b> : même seed et mêmes choix = même partie.</li>
       </ul>`, [['Compris !', () => {}, 'primary']]);
   }
@@ -532,8 +559,8 @@ const UI = (() => {
   function tutorial(step = 0) {
     const P = CONFIG.progression;
     const steps = [
-      `<div class="tuto"><div class="tuto-n">1 / 3</div><h2>Le but</h2><p>À chaque table, gagne <b>${Util.fmt(H().objective(1, 'petite'))} jetons</b> (puis plus) en <b>${P.misesParTable} mises</b>.<br>Seules tes mises <b>gagnantes</b> comptent. La barre en haut montre où tu en es.</p></div>`,
-      `<div class="tuto"><div class="tuto-n">2 / 3</div><h2>Ta mise</h2><p>Choisis ta mise avec les <b>jetons</b> (ou touche le montant pour le taper), puis appuie sur le gros bouton doré.<br>💡 Le bandeau du haut te dit combien viser par mise. Le <b>Blackjack</b> et le <b>Hold'em</b> comptent <b>double</b> pour l'objectif.</p></div>`,
+      `<div class="tuto"><div class="tuto-n">1 / 3</div><h2>Le but</h2><p>Fais grimper ta bankroll de <b>${P.jetonsDepart}</b> à <b>${Util.fmt(H().objective(1, 'petite'))} jetons</b>, puis à des paliers toujours plus hauts.<br>Mises illimitées : tu ne perds qu'à la <b>faillite</b>. La jauge en haut montre où tu en es.</p></div>`,
+      `<div class="tuto"><div class="tuto-n">2 / 3</div><h2>Ta mise</h2><p>Choisis ta mise avec les <b>jetons</b> sur le rebord de la table, puis appuie sur le gros bouton doré.<br>La <b>mise max</b> grandit avec les paliers. Le bouton <b>?</b> sur le tapis donne les règles du jeu.</p></div>`,
       `<div class="tuto"><div class="tuto-n">3 / 3</div><h2>Les jokers</h2><p>Entre les tables, achète des <b>jokers</b> au Comptoir : ils boostent tes gains. Ils apparaissent en bas de l'écran ; touche-les pour voir ce qu'ils font.<br>Raté un tirage ? Une <b>relance</b> te donne une 2ᵉ chance.</p></div>`,
     ];
     modal(steps[step], step < steps.length - 1
@@ -615,8 +642,8 @@ const UI = (() => {
   });
   App.on('table', () => renderRunBar());
   App.on('choose', () => { closeModal(); renderRunBar(); renderChoose(); screen('choose'); });
-  App.on('shop', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); Sfx.play('win'); });
-  App.on('victory', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); victoryModal(); });
+  App.on('shop', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); Sfx.play('win'); FX.confetti(); });
+  App.on('victory', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); victoryModal(); FX.confetti(220); FX.rain(90); });
   App.on('over', () => {
     const st = S();
     Sfx.play('gameover');
@@ -663,19 +690,11 @@ const UI = (() => {
   $('dock-toggle').onclick = () => { Settings.set('dockMin', !Settings.dockMin); paintDock(); Sfx.play('click'); };
   paintDock();
 
-  // ---------- Poids de chaque jeu pour l'objectif, affiché sur les onglets ----------
-  function paintTabs() {
-    const W = CONFIG.progression.poidsObjectif || {};
-    document.querySelectorAll('.tab').forEach(t => {
-      let b = t.querySelector('.tab-w');
-      const w = W[t.dataset.tab] || 1;
-      if (!isRun() || w === 1) { if (b) b.remove(); return; }
-      if (!b) { b = el('span', 'tab-w'); t.appendChild(b); }
-      b.textContent = `×${String(w).replace('.', ',')}`;
-      b.title = `Les gains de ce jeu comptent ×${String(w).replace('.', ',')} pour l'objectif`;
-    });
-  }
-  App.on('session', paintTabs);
+  // ---------- Règles de chaque jeu (bouton « ? » sur le tapis) ----------
+  document.querySelectorAll('.rules-btn').forEach(b => (b.onclick = () => {
+    Sfx.play('click');
+    modal(`<div class="rules-modal">${$('rules-' + b.dataset.rules).innerHTML}</div>`, [['OK', () => {}, 'primary']], 'wide');
+  }));
 
   // ---------- Minuteur de partie (bilan et speedrun) ----------
   setInterval(() => {

@@ -353,6 +353,9 @@ const Engine = (() => {
       type, target: H.objective(state.etage, type), reward: P.recompenseTable[type],
       boss: type === 'boss' ? state.bossId : null, tag: state.tagOffers[type] || null,
       status: state.etageLog[type] || (state.tableType === type ? 'current' : 'upcoming'),
+      // mise max de base (sans jokers ni tags), réduite par le Directeur Pressé
+      maxBet: Math.max(5, Math.round(H.objective(state.etage, type) * CONFIG.progression.miseMaxRatio
+        * (type === 'boss' && state.bossId === 'presse' ? CONFIG.bosses.presse.maxBet : 1))),
     });
     function newEtage() {
       state.bossId = rng.pick(BOSS_DEFS).id;

@@ -8,8 +8,8 @@ App.register((() => {
     spots: { ante: $('uth-spot-ante'), blind: $('uth-spot-blind'), play: $('uth-spot-play'), trips: $('uth-spot-trips') },
     odds: $('uth-odds'), mini: $('uth-mini-odds'),
   };
-  const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10, max: () => (App.host ? Math.min(App.host.maxBet('uth'), Math.floor(App.host.chips() / 2)) : Infinity) });
-  const trips = new BetControl($('uth-trips'), { label: 'Trips (optionnel)', initial: 0, max: betLimit('uth') });
+  const ante = new BetControl($('uth-ante'), { label: 'Ante', initial: 10, max: () => (App.host ? Math.min(App.host.maxBet('uth'), Math.floor(App.host.chips() / 2)) : Infinity) });
+  const trips = new BetControl($('uth-trips'), { label: 'Trips', initial: 0, chips: [1, 5, 25], compact: true, max: betLimit('uth') });
   let r = null, anim = false;
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
 
@@ -53,7 +53,7 @@ App.register((() => {
     els.odds.querySelector('.odds-empty').hidden = true;
     els.odds.querySelector('.odds-body').hidden = false;
     els.odds.querySelector('.odds-stage').textContent = label + (o.done ? '' : ' …');
-    els.mini.textContent = `${pct(o.win)} de gagner`;
+    els.mini.textContent = pct(o.win);
     const w = els.odds.querySelector('.wtl');
     w.querySelector('.w').style.width = o.win * 100 + '%';
     w.querySelector('.t').style.width = o.tie * 100 + '%';

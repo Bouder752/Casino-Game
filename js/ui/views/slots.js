@@ -5,7 +5,7 @@ App.register((() => {
   const E = Games.get('slots');
   const C = CONFIG.games.slots;
   const els = { grid: $('sl-reels'), lines: $('sl-lines'), actions: $('sl-actions'), msg: $('sl-msg'), pay: $('sl-paytable'), win: $('sl-win'), fs: $('sl-fs'), lights: $('sl-lights') };
-  const bet = new BetControl($('sl-bet'), { label: 'Mise par lancer (20 lignes)', initial: 20, max: betLimit('slots') });
+  const bet = new BetControl($('sl-bet'), { label: 'Mise', initial: 20, max: betLimit('slots') });
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
   const symbols = () => (App.host ? E.symbols(App.host) : C.symbols);
   const pool = () => [...symbols(), C.wild, C.scatter];
