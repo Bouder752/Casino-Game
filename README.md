@@ -18,6 +18,16 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 - Chaque gain affiche son **détail** : mise → rendu brut → bonus en % → multiplicateurs → bonus fixes, joker par joker.
 - Sons synthétisés (bouton 🔊), cosmétiques (tapis, dos de cartes) débloqués avec le prestige, interface jouable sur téléphone.
 
+## Après les tests joueurs (5 profils)
+
+Le jeu a été testé par 5 joueurs aux profils différents (ado sur mobile, joueur hardcore de roguelikes, habituée des casinos sur tablette, streamer speedrunner, designer UX daltonienne). Principales évolutions :
+
+- **Équilibrage** : étage 1 plus doux (objectif 35), progression plus raide ensuite, mise max par étage, 3 relances par table (1 par mise), Dice limité à 10 % de chance, prix du shop +15 % par étage. Le Blackjack et le Hold'em comptent ×2 pour l'objectif et la Roulette ×1,5, pour que le Dice ne soit plus la seule stratégie viable. Seules les mises réellement gagnantes font avancer l'objectif. Parrain, Tricheur, Pickpocket et Jackpot Éternel ont été rabotés.
+- **Corrections** : sauvegarde après chaque tirage (impossible de rejouer un coup en rechargeant la page), carte cachée du croupier qui restait retournée, gains arrondis vers le haut dans la barre, vitesse 4× appliquée aux cartes, pack rouvert à la reprise, mise réajustée quand les jetons baissent.
+- **Interface** : boutons d'action toujours visibles au-dessus de la rangée de jokers (repliable, touche J), barre du haut compacte avec conseil « vise +X par mise » et temps de jeu, tutoriel en 3 étapes, la Machine en premier jeu, roulette verticale sur téléphone (appui long pour retirer une mise), mise tapée directement ou bouton Max, mise de roulette conservée, Hold'em enchaîné.
+- **Accessibilité** : options texte agrandi et couleurs bleu/orange pour les daltoniens, symboles et hachures en plus des couleurs, cibles tactiles de 44 px, contrastes relevés, focus visible, fenêtres accessibles (Échap), annonces des résultats aux lecteurs d'écran, animations réduites si le système le demande.
+- **Raccourcis clavier** : Espace/Entrée = action principale, 1 à 5 = jeux, T/S/D/P = tirer, rester, doubler, séparer, C = check, R = relance, A = accepter, J = jokers, Échap = fermer.
+
 ## Seed et rejouabilité
 
 Tout le hasard de la partie (cartes, roulette, machine, dé, shop, patrons, événements) vient d'**un seul générateur seedé** (mulberry32, `js/core/rng.js`), dont l'état est stocké dans la partie.

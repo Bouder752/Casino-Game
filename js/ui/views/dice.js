@@ -65,6 +65,7 @@ App.register((() => {
   function end() { busy = false; bet.setEnabled(true); els.slider.disabled = false; idle(); }
   function roll() {
     return App.animate(async () => {
+      msg('');
       const res = App.host.startPlay('dice', { bet: bet.value, target: target(), mode });
       if (res.error) { Sfx.play('error'); return msg(res.error, 'warn'); }
       App.syncBalance();

@@ -8,7 +8,7 @@ App.register((() => {
     spots: { ante: $('uth-spot-ante'), blind: $('uth-spot-blind'), play: $('uth-spot-play'), trips: $('uth-spot-trips') },
     odds: $('uth-odds'), mini: $('uth-mini-odds'),
   };
-  const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10, max: () => Math.min(App.host ? App.host.maxBet('uth') : 0, App.host ? Math.floor(App.host.chips() / 2) : 0) });
+  const ante = new BetControl($('uth-ante'), { label: 'Ante (= Blind)', initial: 10, max: () => (App.host ? Math.min(App.host.maxBet('uth'), Math.floor(App.host.chips() / 2)) : Infinity) });
   const trips = new BetControl($('uth-trips'), { label: 'Trips (optionnel)', initial: 0, max: betLimit('uth') });
   let r = null, anim = false;
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
@@ -159,7 +159,9 @@ App.register((() => {
     els.results.appendChild(tot);
     Sfx.play(st.net > 0 ? (st.net >= st.staked ? 'bigwin' : 'win') : st.net < 0 ? 'lose' : 'push');
     await App.showSettlement(st);
-    setActions(els.actions, [['Nouvelle main', async () => { r = null; render(); els.results.innerHTML = ''; msg(''); resetOdds(); idle(); }, { cls: 'primary' }]]);
+    // Enchaîner directement : « Distribuer » relance une main (la table est nettoyée au passage)
+    ante.setEnabled(true); trips.setEnabled(true);
+    setActions(els.actions, [['Distribuer', async () => { els.results.innerHTML = ''; r = null; render(); return deal(); }, { cls: 'primary' }]]);
   }
 
   App.on('change', () => {

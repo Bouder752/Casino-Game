@@ -108,7 +108,7 @@ const App = (() => {
     h.on((type, data) => {
       if (h !== host) return; // ancienne session
       switch (type) {
-        case 'chips': if (!animating && !h.busy()) syncBalance(); break;
+        case 'chips': if (!animating && !h.busy()) syncBalance(); BetControls.forEach(b => b.update()); break;
         case 'change': fire('change'); break;
         case 'flash': fire('flash', data); break;
         case 'toast': fire('toast', data.text); break;

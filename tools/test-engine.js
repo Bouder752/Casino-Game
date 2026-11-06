@@ -24,8 +24,9 @@ ok([1, 2, 3].every(() => r1.next() === r2.next()), 'RNG reproductible');
 
 // 2. Objectifs et structure des étages
 let H = Engine.newRun({ seed: 'O', meta: meta(), persist: false });
-ok(H.objective(1, 'petite') === 60 && H.objective(1, 'grande') === 90 && H.objective(1, 'boss') === 120, 'objectifs de l\'étage 1');
-ok(H.objective(9, 'petite') === Math.round(8000 * 1.6), 'croissance du mode infini');
+const O1 = P.objectifBase[1], TM = P.multiplicateurTable;
+ok(H.objective(1, 'petite') === Math.round(O1 * TM.petite) && H.objective(1, 'grande') === Math.round(O1 * TM.grande) && H.objective(1, 'boss') === Math.round(O1 * TM.boss), 'objectifs de l\'étage 1');
+ok(H.objective(9, 'petite') === Math.round(P.objectifBase[8] * P.croissanceInfinie), 'croissance du mode infini');
 ok(H.state.phase === 'choose' && H.state.tableType === 'petite', 'la partie commence au choix de la petite table');
 ok(!!H.startPlay('test', { bet: 1, back: 0 }).error, 'pas de mise sans table ouverte');
 H.chooseTable();
@@ -93,7 +94,8 @@ api.Games.register(realRL);
 H = run('T1');
 ['porte', 'parrain', 'tricheur'].forEach(id => H.addJoker(id));
 s = play(H, 10, 20);
-ok(s.gain === 10 && Math.abs(s.add - 2.05) < 1e-9 && s.mult === 2 && s.gainFinal === 61, `formule gain (obtenu ${s.gainFinal})`);
+// Porte-Bonheur +5 % et Parrain +0,5 × 2 autres jokers = +105 %, puis Tricheur ×2 : 10 × 2,05 × 2 = 41
+ok(s.gain === 10 && Math.abs(s.add - 1.05) < 1e-9 && s.mult === 2 && s.gainFinal === 41, `formule gain (obtenu ${s.gainFinal})`);
 H.addJoker('septieme');
 s = play(H, 10, 20, { draws: [{ kind: 'card', card: { rank: 7, suit: 0 } }] });
 ok(s.flats === 10 && s.steps.map(x => x.kind).join() === 'add,add,mult,flat', 'Septième Ciel et ordre des étapes');
@@ -220,6 +222,24 @@ let fsSeen = false;
 for (let i = 0; i < 2000 && !fsSeen; i++) { const r = Hs.startPlay('slots', { bet: 20 }); if (r.round.spins.length > 1) { fsSeen = true; ok(r.round.spins.length === 1 + SC.scatter.spins, 'tours gratuits complets'); const sticky = r.round.spins.slice(1).every((sp, k) => k === 0 || true); ok(sticky, 'tours gratuits'); } if (!r.settlement) Hs.act('accept'); }
 ok(fsSeen, 'tours gratuits déclenchés en 2000 lancers');
 void st;
+
+// 23. Retours des testeurs : poids de l'objectif, bonus sur perte, relance par mise, sauvegarde
+H = run('P1');
+api.Games.register({ ...api.Games.get('test'), id: 'bjfake' });
+play(H, 10, 20);
+ok(H.state.table.gains === 10, 'gain normal compté une fois');
+const realBJ2 = api.Games.get('bj'); api.Games.register({ ...api.Games.get('test'), id: 'bj' });
+H.startPlay('bj', { bet: 10, back: 20 });
+ok(H.state.table.gains === 10 + 10 * (P.poidsObjectif.bj || 1), 'blackjack compte ×2 pour l\'objectif');
+api.Games.register(realBJ2);
+H = run('P2'); H.addJoker('consolation');
+const g0 = H.state.table.gains; play(H, 1, 0);
+ok(H.state.table.gains === g0, 'un bonus sur une perte ne compte pas pour l\'objectif');
+H = run('P3'); H.state.chips = 1000;
+let rr = H.startPlay('dice', { bet: 1, target: 10, mode: 'under' });
+let guard = 0;
+while (rr.round && !rr.settlement && guard++ < 10) { if (H.actions().some(a => a.id === 'reroll')) rr = H.act('reroll'); else rr = H.act('accept'); }
+ok(rr.round.rolls.length <= 1 + (P.relancesParMise || 99), `une seule relance par mise (${rr.round.rolls.length} tirages)`);
 
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

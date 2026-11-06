@@ -9,7 +9,8 @@ App.register((() => {
   const bet = new BetControl($('bj-bet'), { label: 'Mise', initial: 10, max: betLimit('bj') });
   let round = null;     // manche affichée (en cours ou terminée)
   let anim = false;
-  const valText = cards => { const v = E.value(cards); return v.soft && v.total < 21 ? `${v.total - 10} / ${v.total}` : String(v.total); };
+  // « 9 / 19 » pendant la décision, mais une seule valeur une fois la main jouée
+  const valText = (cards, final = false) => { const v = E.value(cards); return !final && v.soft && v.total < 21 ? `${v.total - 10} / ${v.total}` : String(v.total); };
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
 
   function handBox() {
@@ -41,7 +42,7 @@ App.register((() => {
     const hidden = r.hideHole && !r.bribed;
     renderCards(els.dealer, dealer, i => i === 1 && (hidden || opts.hideHole));
     const shownDealer = hidden || opts.hideHole ? dealer.slice(0, 1) : dealer;
-    els.dealerVal.textContent = !dealer.length ? '' : (!hidden && !opts.hideHole && E.isBJ(r.dealer) && dealer.length === 2) ? 'Blackjack' : valText(shownDealer) + (r.hideHole && r.bribed ? ' 👁' : '');
+    els.dealerVal.textContent = !dealer.length ? '' : (!hidden && !opts.hideHole && E.isBJ(r.dealer) && dealer.length === 2) ? 'Blackjack' : valText(shownDealer, !r.hideHole) + (r.hideHole && r.bribed ? ' 👁' : '');
     while (els.hands.children.length > r.hands.length) els.hands.lastChild.remove();
     r.hands.forEach((h, i) => {
       let box = els.hands.children[i];
@@ -49,7 +50,7 @@ App.register((() => {
       box.classList.toggle('active', !r.done && r.stage === 'player' && i === r.active && r.hands.length > 1);
       const cards = h.cards.slice(0, opts.hands ? opts.hands[i] : h.cards.length);
       renderCards(box.querySelector('.cards'), cards);
-      box.querySelector('.val').textContent = h.isBJ ? 'Blackjack' : cards.length ? valText(cards) : '';
+      box.querySelector('.val').textContent = h.isBJ ? 'Blackjack' : cards.length ? valText(cards, h.done || r.done) : '';
       box.querySelector('.hbet').textContent = [h.doubled ? 'doublée' : '', i === 0 && r.insurance ? `assurance ${Util.fmt(r.insurance)}` : ''].filter(Boolean).join(' · ');
       if (!h.settled) setSpot(box.querySelector('.spot'), h.bet);
       const res = box.querySelector('.hand-result');

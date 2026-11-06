@@ -55,7 +55,7 @@ const Sim = (() => {
   const RANK = { legendaire: 3, rare: 2, commun: 1 };
   function shop(H) {
     const st = H.state;
-    const reserve = Math.max(40, H.objective(st.etage, st.tableType) * 0.6);
+    const reserve = Math.max(60, H.objective(st.etage, st.tableType) * 1.2);
     const offers = st.shop.offers.map((o, i) => ({ ...o, i }));
     offers.filter(o => o.kind === 'joker').sort((a, b) => RANK[JOKERS[b.id].rarity] - RANK[JOKERS[a.id].rarity] || a.price - b.price)
       .forEach(o => { if (H.chips() - o.price >= reserve && st.jokers.length < st.jokerSlots) H.buy(o.i); });
@@ -76,7 +76,7 @@ const Sim = (() => {
     const t = H.state.table;
     const need = t.target - t.gains;
     const share = t.bets <= 2 ? 0.6 : 0.4;
-    return Math.max(1, Math.min(Math.floor(H.chips() * share), Math.ceil(need / Math.min(2, t.bets))));
+    return Math.max(1, Math.min(H.maxBet('bj'), Math.floor(H.chips() * share), Math.ceil(need / Math.min(2, t.bets))));
   }
 
   function playRun(seed, opts = {}) {
@@ -97,15 +97,15 @@ const Sim = (() => {
       if (opts.strategy !== 'blackjack' && (!opts.game || opts.game === 'mixed')) {
         // « Sniper » : seules les victoires comptent pour l'objectif, donc une petite
         // mise sur un multiplicateur élevé, calibré pour finir la table en un coup
-        const f = t.bets <= 2 ? 0.35 : 0.15;
-        const b = Math.max(1, Math.floor(H.chips() * f));
-        const chance = Math.max(2, Math.min(90, Math.floor(99 * b / (need + b))));
+        const f = t.bets <= 2 ? 0.4 : 0.25;
+        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips() * f)));
+        const chance = Math.max(CONFIG.games.dice.minTarget, Math.min(90, Math.floor(99 * b / (need + b))));
         playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
       } else if (opts.game && opts.game !== 'mixed') playOne(H, opts.game, bet);
       else if (t.bets <= 1 && need > bet) {
         // dernière mise : un Dice risqué calibré pour atteindre l'objectif
-        const b = Math.max(1, Math.floor(H.chips()));
-        const chance = Math.max(2, Math.min(95, Math.floor(99 * b / (need + b))));
+        const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));
+        const chance = Math.max(CONFIG.games.dice.minTarget, Math.min(95, Math.floor(99 * b / (need + b))));
         playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
       } else playOne(H, 'bj', bet);
     }

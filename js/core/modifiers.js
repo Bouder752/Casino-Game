@@ -61,8 +61,8 @@ const JOKER_DEFS = [
     } },
   { id: 'cerise', name: 'Triple Cerise', icon: '🍒', desc: () => `Les cerises remplacent n'importe quel symbole dans les machines à sous (ligne complétée payée ${pct(J.cerise.wildRatio)}).`,
     'slots.wild'(e, me) { e.wild = 'cerise'; e.ratio = J.cerise.wildRatio; e.sources.push(me); } },
-  { id: 'pickpocket', name: 'Le Pickpocket', icon: '🕵️', desc: () => `Quand un joueur IA gagne à la roulette, tu récupères ${pct(J.pickpocket.pct)} de son gain.`,
-    onSettle(e, me) { if (e.info && e.info.aiWin > 0) e.flat(me, e.info.aiWin * J.pickpocket.pct, 'gains des voisins'); } },
+  { id: 'pickpocket', name: 'Le Pickpocket', icon: '🕵️', desc: () => `Quand un joueur IA gagne à la roulette, tu récupères ${pct(J.pickpocket.pct)} de son gain (au plus ta mise).`,
+    onSettle(e, me) { if (e.info && e.info.aiWin > 0) e.flat(me, Math.min(e.staked, e.info.aiWin * J.pickpocket.pct), 'gains des voisins'); } },
   { id: 'miroir', name: 'Le Miroir', icon: '🪞', desc: () => 'Copie l\'effet du joker placé à sa droite.', copyRight: true },
   { id: 'assurance', name: 'L\'Assurance-Vie', icon: '🛟', desc: () => `Si tu tombes à 0 jeton, tu repars avec ${J.assurance.amount} jetons. Usage unique.`,
     onBankrupt(e, me) {
@@ -104,9 +104,9 @@ const JOKER_DEFS = [
     } },
   { id: 'fantome', name: 'Le Fantôme du Casino', icon: '👻', desc: () => 'Une relance de plus par table : annule un tirage et refais-le (carte au blackjack, dé, roulette, machine).',
     onRoundStart(e, me) { me.host.addCharge(me, 'any', J.fantome.charges); } },
-  { id: 'jackpot', name: 'Jackpot Éternel', icon: '💎', desc: h => `Chaque victoire ajoute +${J.jackpot.step} à son multiplicateur de gains. Il ne se réinitialise jamais, même entre les parties.${h ? ` Actuellement ×${h.meta.jackpot.toFixed(1)}.` : ''}`,
+  { id: 'jackpot', name: 'Jackpot Éternel', icon: '💎', desc: h => `Chaque table gagnée ajoute +${J.jackpot.step} à son multiplicateur de gains (×${J.jackpot.max} max). Il ne se réinitialise jamais, même entre les parties.${h ? ` Actuellement ×${h.meta.jackpot.toFixed(1)}.` : ''}`,
     onSettle(e, me) { if (e.outcome === 'win' && me.host.meta.jackpot !== 1) e.mult(me, me.host.meta.jackpot); },
-    onWin(e, me) { me.host.meta.jackpot = Math.round((me.host.meta.jackpot + J.jackpot.step) * 10) / 10; me.host.saveMeta(); } },
+    onRoundEnd(e, me) { me.host.meta.jackpot = Math.min(J.jackpot.max, Math.round((me.host.meta.jackpot + J.jackpot.step) * 10) / 10); me.host.saveMeta(); me.flash(`×${me.host.meta.jackpot.toFixed(1)}`); } },
 ];
 JOKER_DEFS.forEach(d => Object.assign(d, { kind: 'joker', rarity: J[d.id].rarity, price: J[d.id].price }));
 const JOKERS = Object.fromEntries(JOKER_DEFS.map(d => [d.id, d]));
@@ -165,7 +165,7 @@ const UPGRADES = Object.fromEntries(UPGRADE_DEFS.map(d => [d.id, d]));
 // Les tags s'obtiennent en passant une petite ou une grande table.
 const T = CONFIG.tags;
 const STATUS_DEFS = [
-  { id: 'golden', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise compte double.',
+  { id: 'golden', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise : si elle gagne, son gain est doublé.',
     onSettle(e, me) { if (e.outcome === 'win') e.mult(me, CONFIG.consumables.dore.mult, 'Jeton Doré'); me.remove(); } },
   { id: 'huissier', name: 'Huissier', icon: '⚖️', desc: () => `Échéance de prêt impayée : ${CONFIG.loans.penaltyBets} mises de moins à la prochaine table.`,
     onRoundStart(e, me) { e.table.bets -= CONFIG.loans.penaltyBets; me.remove(); } },
@@ -195,7 +195,7 @@ const TAG_DEFS = STATUS_DEFS.filter(d => d.tag);
 const CONSUMABLE_DEFS = [
   { id: 'bonus', name: 'Carte Bonus', icon: '🎴', desc: () => 'Ajoute une carte de ton choix dans ta main (pendant une main de Blackjack ou de Hold\'em).',
     capability: 'bonusCard', use: (H, ctx, card) => H.useCapability(ctx, 'bonusCard', card) },
-  { id: 'dore', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise compte double : son gain est doublé.', inPlayOnly: true,
+  { id: 'dore', name: 'Jeton Doré', icon: '🪙', desc: () => 'Ta prochaine mise : si elle gagne, son gain est doublé (perdue sinon).', inPlayOnly: true,
     use: H => { H.addStatus('golden'); return { ok: true, text: '🪙 Ta prochaine mise compte double !' }; } },
   { id: 'boisson', name: 'Boisson du Bar', icon: '🍸', desc: () => '+1 relance à cette table (dé, roulette, machine ou carte au blackjack).', inPlayOnly: true,
     use: H => { H.addCharge({ uid: 'boisson', name: 'Boisson du Bar', icon: '🍸' }, 'any', 1); return { ok: true, text: '🍸 +1 relance pour cette table.' }; } },

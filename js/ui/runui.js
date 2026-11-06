@@ -29,23 +29,38 @@ const UI = (() => {
   const refreshGames = () => App.views().forEach(v => v.refresh && v.refresh());
 
   // ---------- Fenêtres, bulles, toasts ----------
-  function modal(html, buttons = [], cls = '') {
+  // Fenêtre modale accessible : rôle dialog, focus sur le bouton principal, Échap = bouton « esc »
+  let escAction = null, lastFocus = null;
+  function modal(html, buttons = [], cls = '', { esc } = {}) {
     const box = $('modal-box');
     box.className = 'modal-box ' + cls;
     box.innerHTML = html;
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    escAction = null;
     if (buttons.length) {
       const row = el('div', 'modal-actions');
-      buttons.forEach(([label, fn, c = '']) => {
+      buttons.forEach(([label, fn, c = ''], i) => {
         const b = el('button', 'btn ' + c, label);
-        b.onclick = () => { Sfx.play('click'); if (fn() !== false) closeModal(); };
+        const run = () => { Sfx.play('click'); if (fn() !== false) closeModal(); };
+        b.onclick = run;
+        // par défaut, Échap déclenche le seul bouton, ou celui désigné
+        if (esc === i || (esc === undefined && buttons.length === 1)) escAction = run;
         row.appendChild(b);
       });
       box.appendChild(row);
     }
+    lastFocus = document.activeElement;
     $('modal').hidden = false;
+    const first = box.querySelector('.modal-actions .btn.primary') || box.querySelector('button, input');
+    if (first) setTimeout(() => first.focus(), 30);
     return box;
   }
-  const closeModal = () => ($('modal').hidden = true);
+  const closeModal = () => {
+    $('modal').hidden = true;
+    escAction = null;
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+  };
   // Toast, avec éventuellement un bouton (ex. « Annuler » après une vente)
   function toast(text, action) {
     const t = el('div', 'toast', text);
@@ -61,6 +76,7 @@ const UI = (() => {
     setTimeout(() => t.remove(), life + 500);
   }
   function popover(anchor, html, buttons) {
+    $('jsheet').hidden = true;
     const p = $('popover');
     p.innerHTML = html;
     const row = el('div', 'pop-actions');
@@ -165,6 +181,9 @@ const UI = (() => {
       const j = st.jokers[i];
       if (!j) { container.appendChild(el('div', 'jslot')); continue; }
       const c = itemCard(j.id, { uid: j.uid, onClick: node => jokerMenu(node, j) });
+      c.tabIndex = 0;
+      c.setAttribute('role', 'button');
+      c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jokerMenu(c, j); } };
       if (st.phase === 'play' && H().isJokerDisabled(j)) c.classList.add('frozen');
       enableDrag(c, container, j.uid);
       container.appendChild(c);
@@ -277,6 +296,7 @@ const UI = (() => {
   }
 
   const TABLE_NAME = { petite: 'Petite table', grande: 'Grande table', boss: 'Table du Boss' };
+  const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const F = () => CONFIG.progression.etagesPourGagner;
   const etageText = st => `Étage ${st.etage}${st.etage <= F() ? ' / ' + F() : ' · infini'}`;
 
@@ -302,13 +322,15 @@ const UI = (() => {
     $('run-info').innerHTML = `
       <div class="hud-table"><span>${etageText(st)}</span><b class="ri-table ${t.type}">${TABLE_NAME[t.type]}</b></div>
       <div class="hud-goal">
-        <div class="hud-goal-txt"><span>Gains</span><b class="num">${Util.fmt(Math.round(t.gains))}</b><span>/ ${Util.fmt(t.target)}</span>${met ? '<em>✓ objectif</em>' : ''}</div>
+        <div class="hud-goal-txt"><span>Gains</span><b class="num">${Util.fmt(Math.floor(t.gains * 100) / 100)}</b><span>/ ${Util.fmt(t.target)}</span>${met ? '<em>✓ objectif</em>' : ''}</div>
         <div class="goal-bar ${met ? 'met' : ''}"><i style="width:${pct}%"></i></div>
       </div>
+      <div class="hud-stat hud-time" title="Temps de jeu"><span>Temps</span><b class="num" id="hud-timer">${fmtTime(st.elapsed || 0)}</b></div>
       <div class="hud-stat"><span>Mises</span><b class="num ${t.bets <= 2 ? 'low' : ''}">${t.bets}<small>/${t.betsMax}</small></b></div>
-      <div class="hud-stat"><span>Relances</span><b class="num">${st.charges.length}</b></div>
+      <div class="hud-stat" title="Relance : refaire un tirage raté sans miser à nouveau"><span>Relances</span><b class="num">${st.charges.length}</b></div>
+      ${!met && t.bets > 0 ? `<div class="hud-hint" title="Gain moyen à viser par mise pour atteindre l'objectif">💡 vise <b>+${Util.fmt(Math.ceil((t.target - t.gains) / t.bets))}</b> par mise</div>` : '<div></div>'}
       <div class="hud-chips">
-        ${boss ? `<div class="ri-chip boss ${t.type === 'boss' ? 'now' : ''}" title="${boss.desc()}">☠ ${t.type === 'boss' ? '' : 'Boss de l\'étage : '}${boss.name} — ${boss.desc()}</div>` : ''}
+        ${boss ? `<div class="ri-chip boss ${t.type === 'boss' ? 'now' : ''}" title="${boss.desc()}">☠ ${t.type === 'boss' ? '' : 'Boss de l\'étage (à la 3ᵉ table) : '}${boss.name} — ${boss.desc()}</div>` : ''}
         ${rules.map(r => `<div class="ri-chip rule">🎡 ${r}</div>`).join('')}
         ${tags.map(x => `<div class="ri-chip">${STATUSES[x.id].icon} ${STATUSES[x.id].name}</div>`).join('')}
         ${debt ? `<div class="ri-chip debt">💳 Dette ${Util.fmt(debt.left)}</div>` : ''}
@@ -329,7 +351,7 @@ const UI = (() => {
         <div class="tc-head"><span>${TABLE_NAME[type]}</span><i>${badge}</i></div>
         <div class="tc-chip">${type === 'boss' ? '☠' : type === 'grande' ? '♦' : '♣'}</div>
         <div class="tc-goal"><small>Objectif de gains</small><b>${Util.fmt(info.target)}</b></div>
-        <div class="tc-meta">${P.misesParTable} mises · ${P.relancesParTable} relances · récompense <b>${info.reward}</b></div>
+        <div class="tc-meta">${boss && boss.id === 'presse' ? CONFIG.bosses.presse.bets : P.misesParTable} mises · ${boss && boss.id === 'sobre' ? 0 : P.relancesParTable} relances · récompense <b>${info.reward}</b></div>
         ${boss ? `<div class="tc-boss"><b>${boss.name}</b><br>${boss.desc()}</div>` : ''}
         ${tag ? `<div class="tc-tag"><span>Passer pour :</span> ${tag.icon} <b>${tag.name}</b><br><small>${tag.desc()}</small></div>` : ''}
         ${current ? `<div class="tc-actions"><button class="btn primary" data-act="play">Jouer</button>${type !== 'boss' ? '<button class="btn" data-act="skip">Passer</button>' : ''}</div>` : ''}
@@ -366,6 +388,7 @@ const UI = (() => {
       <div class="shop-head">
         <h2>Le Comptoir</h2>
         ${sum ? `<div class="shop-summary">
+          ${sum.type === 'boss' ? `<div class="boss-down">☠ Boss vaincu !</div>` : ''}
           <div class="ss-title">${sum.victory ? '🏆 Boss final vaincu !' : `${TABLE_NAME[sum.type]} de l'étage ${sum.etage} gagnée`}</div>
           ${sum.lines.map(l => `<div class="ss-line ${l.bad || l.value < 0 ? 'bad' : ''}"><span>${l.label}</span>${l.value ? `<b>${Util.signed(l.value)}</b>` : ''}</div>`).join('')}
         </div>` : ''}
@@ -421,10 +444,10 @@ const UI = (() => {
       if (S().phase === 'victory') return victoryModal();
       // confirmation si un achat est encore possible
       const free = S().jokers.length < S().jokerSlots;
-      const can = S().shop.offers.filter(o => !o.sold && H().canAfford(o.price) && (o.kind !== 'joker' || free) && (o.kind !== 'consumable' || S().consumables.length < S().consSlots));
-      if (!can.length) return H().leaveShop();
-      modal(`<h2>Quitter le shop ?</h2><p>Tu peux encore t'offrir : <b>${can.map(o => CATALOG[o.id].name).join(', ')}</b>.</p>`,
-        [['Rester', () => {}], ['Quitter quand même', () => H().leaveShop(), 'primary']]);
+      const can = S().shop.offers.filter(o => !o.sold && o.kind === 'joker' && free && H().canAfford(o.price));
+      if (!can.length || !Settings.confirmShop) return H().leaveShop();
+      modal(`<h2>Quitter le shop ?</h2><p>Tu peux encore t'offrir : <b>${can.map(o => CATALOG[o.id].name).join(', ')}</b>.</p><p class="hint">Cette confirmation se désactive dans les options (⚙).</p>`,
+        [['Rester', () => {}], ['Quitter quand même', () => H().leaveShop(), 'primary']], '', { esc: 0 });
     };
   }
   function buy(i) {
@@ -499,11 +522,24 @@ const UI = (() => {
   function showPhase() {
     const ph = S().phase;
     renderRunBar();
+    if (S().pendingPack && S().pendingPack.length) setTimeout(() => openPack(S().pendingPack), 300);
     if (ph === 'choose') { renderChoose(); screen('choose'); }
     else if (ph === 'shop' || ph === 'victory') { renderShop(); screen('shop'); if (ph === 'victory') victoryModal(); }
     else enterGame();
   }
-  function startRun(seed) { App.attach(Engine.newRun({ seed, meta: META })); showPhase(); }
+  function startRun(seed) { App.attach(Engine.newRun({ seed, meta: META })); showPhase(); if (!Settings.tutorialDone) tutorial(); }
+  // Tutoriel de première partie : 3 bulles, pas un mur de texte
+  function tutorial(step = 0) {
+    const P = CONFIG.progression;
+    const steps = [
+      `<div class="tuto"><div class="tuto-n">1 / 3</div><h2>Le but</h2><p>À chaque table, gagne <b>${Util.fmt(H().objective(1, 'petite'))} jetons</b> (puis plus) en <b>${P.misesParTable} mises</b>.<br>Seules tes mises <b>gagnantes</b> comptent. La barre en haut montre où tu en es.</p></div>`,
+      `<div class="tuto"><div class="tuto-n">2 / 3</div><h2>Ta mise</h2><p>Choisis ta mise avec les <b>jetons</b> (ou touche le montant pour le taper), puis appuie sur le gros bouton doré.<br>💡 Le bandeau du haut te dit combien viser par mise. Le <b>Blackjack</b> et le <b>Hold'em</b> comptent <b>double</b> pour l'objectif.</p></div>`,
+      `<div class="tuto"><div class="tuto-n">3 / 3</div><h2>Les jokers</h2><p>Entre les tables, achète des <b>jokers</b> au Comptoir : ils boostent tes gains. Ils apparaissent en bas de l'écran ; touche-les pour voir ce qu'ils font.<br>Raté un tirage ? Une <b>relance</b> te donne une 2ᵉ chance.</p></div>`,
+    ];
+    modal(steps[step], step < steps.length - 1
+      ? [['Passer', () => Settings.set('tutorialDone', true)], ['Suivant ➜', () => { setTimeout(() => tutorial(step + 1), 0); }, 'primary']]
+      : [['C\'est parti !', () => Settings.set('tutorialDone', true), 'primary']], 'tuto-box', { esc: 0 });
+  }
   function resume() {
     const h = Engine.load({ meta: META });
     if (!h) { toast('Aucune partie à reprendre.'); return renderMenu(); }
@@ -521,6 +557,7 @@ const UI = (() => {
         <div><span>Étage atteint</span><b class="num">${st.etage}</b></div>
         <div><span>Tables gagnées</span><b class="num">${st.stats.tablesWon}</b></div>
         <div><span>Mises jouées</span><b class="num">${st.stats.plays}</b></div>
+        <div><span>Temps</span><b class="num">${fmtTime(st.elapsed || 0)}</b></div>
         <div><span>Meilleur gain</span><b class="num">${bp ? '+' + Util.fmt(Math.round(bp.net)) : '—'}</b>${bp ? `<small>${GAME_NAME[bp.game] || ''}</small>` : ''}</div>
       </div>
       ${mvp ? `<div class="mvp"><div class="mvp-card">${itemCard(mvp[0]).outerHTML}</div><div><span>Joker MVP</span><b>${JOKERS[mvp[0]].name}</b><small>a rapporté ${Util.fmt(Math.round(mvp[1]))} jetons</small></div></div>` : ''}
@@ -535,11 +572,17 @@ const UI = (() => {
   }
 
   // ---------- Options ----------
+  const toggle = key => `<button class="btn small ${Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="1">Oui</button><button class="btn small ${!Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="0">Non</button>`;
   function settingsModal() {
     const box = modal(`<h2>Options</h2>
       <div class="opt"><span>Vitesse des animations</span><div class="seg">${[1, 2, 4].map(v => `<button class="btn small ${Settings.speed === v ? 'primary' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div></div>
       <div class="opt"><span>Son</span><div class="seg"><button class="btn small ${Sfx.settings.on ? 'primary' : ''}" data-snd="1">Activé</button><button class="btn small ${!Sfx.settings.on ? 'primary' : ''}" data-snd="0">Coupé</button></div></div>
-      <div class="opt"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${Sfx.settings.volume}" id="opt-vol"></div>`, [['Fermer', () => {}, 'primary']]);
+      <div class="opt"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${Sfx.settings.volume}" id="opt-vol" aria-label="Volume"></div>
+      <div class="opt"><span>Texte agrandi</span><div class="seg">${toggle('bigText')}</div></div>
+      <div class="opt"><span>Couleurs pour daltoniens (bleu / orange)</span><div class="seg">${toggle('colorblind')}</div></div>
+      <div class="opt"><span>Confirmer avant de quitter le shop</span><div class="seg">${toggle('confirmShop')}</div></div>
+      <p class="hint">Raccourcis : Espace ou Entrée = action principale · 1 à 5 = changer de jeu · T tirer · S rester · D doubler · P séparer · C check · R relance · A accepter · J replier les jokers · Échap = fermer.</p>`, [['Fermer', () => {}, 'primary']]);
+    box.querySelectorAll('[data-opt]').forEach(b => (b.onclick = () => { Settings.set(b.dataset.opt, b.dataset.val === '1'); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-speed]').forEach(b => (b.onclick = () => { Settings.setSpeed(+b.dataset.speed); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-snd]').forEach(b => (b.onclick = () => { if (Sfx.settings.on !== (b.dataset.snd === '1')) Sfx.toggle(); $('sound').textContent = Sfx.settings.on ? '🔊' : '🔇'; Sfx.play('click'); settingsModal(); }));
     box.querySelector('#opt-vol').oninput = e => Sfx.setVolume(+e.target.value);
@@ -592,12 +635,14 @@ const UI = (() => {
   });
 
   // ---------- Boutons du menu ----------
-  $('m-new').onclick = () => {
+  const newGame = () => {
     Sfx.play('click');
-    if (Engine.hasSave() && !confirm('Une partie est en cours. La remplacer par une nouvelle ?')) return;
-    Engine.clearSave();
-    startRun($('m-seed').value.trim() || undefined);
+    const go = () => { Engine.clearSave(); startRun($('m-seed').value.trim() || undefined); };
+    if (Engine.hasSave()) return modal('<h2>Nouvelle partie ?</h2><p>La partie en cours sera abandonnée.</p>', [['Garder ma partie', () => {}], ['Nouvelle partie', go, 'primary']], '', { esc: 0 });
+    go();
   };
+  $('m-new').onclick = newGame;
+  $('m-seed').onkeydown = e => { if (e.key === 'Enter') newGame(); };
   $('m-continue').onclick = () => { Sfx.play('click'); resume(); };
   $('m-free').onclick = () => { Sfx.play('click'); freeMode(); };
   $('m-cosmetics').onclick = () => { Sfx.play('click'); renderCosmetics(); screen('cosmetics'); };
@@ -612,6 +657,65 @@ const UI = (() => {
     renderMenu(); screen('menu');
   };
   $('reset').onclick = () => { if (confirm(`Remettre le solde à ${Util.fmt(CONFIG.freeChips)} jetons ?`)) { App.host.resetFree(); App.syncBalance(); } };
+
+  // ---------- Rangée de jokers repliable ----------
+  const paintDock = () => { $('dock-toggle').textContent = Settings.dockMin ? '▴ Jokers' : '▾ Jokers'; $('dock-toggle').setAttribute('aria-expanded', String(!Settings.dockMin)); };
+  $('dock-toggle').onclick = () => { Settings.set('dockMin', !Settings.dockMin); paintDock(); Sfx.play('click'); };
+  paintDock();
+
+  // ---------- Poids de chaque jeu pour l'objectif, affiché sur les onglets ----------
+  function paintTabs() {
+    const W = CONFIG.progression.poidsObjectif || {};
+    document.querySelectorAll('.tab').forEach(t => {
+      let b = t.querySelector('.tab-w');
+      const w = W[t.dataset.tab] || 1;
+      if (!isRun() || w === 1) { if (b) b.remove(); return; }
+      if (!b) { b = el('span', 'tab-w'); t.appendChild(b); }
+      b.textContent = `×${String(w).replace('.', ',')}`;
+      b.title = `Les gains de ce jeu comptent ×${String(w).replace('.', ',')} pour l'objectif`;
+    });
+  }
+  App.on('session', paintTabs);
+
+  // ---------- Minuteur de partie (bilan et speedrun) ----------
+  setInterval(() => {
+    if (!isRun() || document.hidden || !['game', 'choose', 'shop'].includes(document.body.dataset.screen)) return;
+    S().elapsed = (S().elapsed || 0) + 1;
+    const t = $('hud-timer');
+    if (t) t.textContent = fmtTime(S().elapsed);
+  }, 1000);
+
+  // ---------- Raccourcis clavier ----------
+  const KEYMAP = { t: 'hit', h: 'hit', s: 'stand', d: 'double', p: 'split', c: 'check', r: 'reroll', a: 'accept', f: 'fold' };
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('input, textarea, select')) return;
+    const k = e.key.toLowerCase();
+    if (e.key === 'Escape') {
+      if (!$('popover').hidden) return closePopover();
+      if (!$('modal').hidden && escAction) { e.preventDefault(); return escAction(); }
+      return;
+    }
+    if (!$('modal').hidden) return; // une fenêtre ouverte garde la main (Entrée = bouton focalisé)
+    const scr = document.body.dataset.screen;
+    if (k === 'j' && isRun()) { $('dock-toggle').click(); return; }
+    if (scr === 'choose' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const b = document.querySelector('#choose [data-act=play]'); if (b) b.click(); return; }
+    if (scr === 'shop' && e.key === 'Enter') { e.preventDefault(); $('shop-next').click(); return; }
+    if (scr !== 'game') return;
+    if (/^[1-5]$/.test(e.key)) { const t = document.querySelectorAll('.tab')[+e.key - 1]; if (t) t.click(); return; }
+    const bar = document.querySelector('.game:not([hidden]) .actions');
+    if (!bar) return;
+    const btns = [...bar.querySelectorAll('button:not([disabled])')];
+    if ((e.key === ' ' || e.key === 'Enter') && !(e.target.tagName === 'BUTTON' && e.target !== document.body)) {
+      e.preventDefault();
+      const b = bar.querySelector('button.primary:not([disabled])') || btns[0];
+      if (b) b.click();
+      return;
+    }
+    // lettres : actions du moteur (Tirer, Rester, Doubler…) d'après leur libellé
+    const want = { hit: /^tirer/i, stand: /^rester/i, double: /^doubler/i, split: /^séparer/i, check: /^check/i, reroll: /relancer|refaire/i, accept: /^accepter/i, fold: /coucher/i }[KEYMAP[k]];
+    if (want) { const b = btns.find(x => want.test(x.textContent.trim().replace(/^[^\wÀ-ÿ]+/, ''))); if (b) { e.preventDefault(); b.click(); } }
+  });
 
   return { screen, showTab, renderMenu, renderRunBar, toast };
 })();

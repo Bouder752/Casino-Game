@@ -86,7 +86,8 @@ const Engine = (() => {
       return {
         host: H, def, kind, inst, state: inst.state,
         uid: src ? src.uid : inst.uid,
-        name: def.name, icon: def.icon || (src ? src.icon : kind === 'boss' ? '☠' : '✨'),
+        name: kind === 'joker' && inst.id === 'miroir' && def.id !== 'miroir' ? `Miroir → ${def.name}` : def.name,
+        icon: kind === 'joker' && inst.id === 'miroir' && def.id !== 'miroir' ? '🪞' : def.icon || (src ? src.icon : kind === 'boss' ? '☠' : '✨'),
         flash: text => notify('flash', { uid: src ? src.uid : inst.uid, text }),
         remove: () => {
           if (kind === 'joker') H.removeJoker(inst.uid);
@@ -167,8 +168,12 @@ const Engine = (() => {
       for (let i = 0; i < n; i++) state.charges.push({ src: src.uid, name: src.name, icon: src.icon, games });
       notify('change');
     };
-    H.charges = game => (isRun ? state.charges.filter(c => c.games === 'any' || c.games === game).length : 0);
+    const perBetLeft = () => (active && CONFIG.progression.relancesParMise ? CONFIG.progression.relancesParMise - (active.play.rerolls || 0) : Infinity);
+    H.charges = game => (isRun ? Math.min(perBetLeft(), state.charges.filter(c => c.games === 'any' || c.games === game).length) : 0);
+    H.chargesTotal = () => (isRun ? state.charges.length : 0);
     H.useCharge = game => {
+      if (perBetLeft() <= 0) return false;
+      if (active) active.play.rerolls = (active.play.rerolls || 0) + 1;
       let i = state.charges.findIndex(c => c.games === game);
       if (i < 0) i = state.charges.findIndex(c => c.games === 'any');
       if (i < 0) return false;
@@ -220,6 +225,7 @@ const Engine = (() => {
       state.stats.plays++;
       active = { id, round: res.round, play };
       H.emit('onBetPlaced', { game: id, round: res.round, play });
+      save();
       notify('change');
       return res.round.done ? { round: res.round, settlement: finish() } : { round: res.round };
     };
@@ -230,6 +236,7 @@ const Engine = (() => {
       const allowed = H.actions().find(a => a.id === actionId && !a.disabled);
       if (!allowed) return { error: 'Action impossible.' };
       Games.get(id).act(H, gameState(id), round, actionId, arg);
+      save();
       notify('change');
       return round.done ? { round, settlement: finish() } : { round };
     };
@@ -281,7 +288,10 @@ const Engine = (() => {
       if (e.outcome === 'win') state.stats.wins++; else if (e.outcome === 'loss') state.stats.losses++;
       if (net > state.stats.best) { state.stats.best = net; state.stats.bestPlay = { game: id, net, staked: e.staked }; }
       active = null;
-      if (isRun && state.table) state.table.gains = round2(state.table.gains + Math.max(0, net));
+      // Seules les mises gagnantes font avancer l'objectif (un bonus sur une perte ne compte pas)
+      // Les jeux de table (adresse) comptent davantage : CONFIG.progression.poidsObjectif
+      const weight = (CONFIG.progression.poidsObjectif || {})[id] || 1;
+      if (isRun && state.table && e.outcome === 'win') state.table.gains = round2(state.table.gains + Math.max(0, net) * weight);
       const settlement = {
         game: id, staked: e.staked, baseBack: e.baseBack, back: e.back, gain: e.gain, outcome: e.outcome,
         steps, add, mult: round2(mult), gainFinal: gainF, flats: round2(flats), net, info: e.info,
@@ -398,7 +408,7 @@ const Engine = (() => {
       H.give(reward); lines.push({ label: { petite: 'Petite table gagnée', grande: 'Grande table gagnée', boss: 'Boss vaincu' }[t.type], value: reward });
       if (t.bets > 0) { const b = t.bets * P.bonusParMiseRestante; H.give(b); lines.push({ label: `Mises restantes (${t.bets} × ${P.bonusParMiseRestante})`, value: b }); }
       if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${I.gain} par ${I.tranche} jetons, ${I.max} max)`, value: interest }); }
-      const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); } };
+      const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); attribute([{ kind: 'flat', value: v, src: { uid: me.uid } }], 0, 0, 1); } };
       H.emit('onRoundEnd', e);
       processDebts(lines);
       state.stats.tablesWon++;
@@ -526,7 +536,8 @@ const Engine = (() => {
       for (let i = 0; i < S.packs; i++) offers.push({ kind: 'pack', id: rng.pick(PACK_DEFS).id });
       const ups = UPGRADE_DEFS.filter(u => !state.upgrades.includes(u.id));
       for (let i = 0; i < S.upgrades && ups.length; i++) offers.push({ kind: 'upgrade', id: ups.splice(rng.int(ups.length), 1)[0].id });
-      offers.forEach(o => { o.price = CATALOG[o.id].price; o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
+      const inflation = 1 + CONFIG.shop.priceGrowth * (state.etage - 1);
+      offers.forEach(o => { o.price = Math.round(CATALOG[o.id].price * inflation); o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
       H.saveMeta();
       return { offers, rerollCost };
     }
@@ -639,8 +650,9 @@ const Engine = (() => {
     }
 
     // ---------------- Sauvegarde ----------------
+    // Sauvegarde : aussi pendant un coup (la mise engagée est alors perdue si on recharge la page)
     function save() {
-      if (!persist || active) return;
+      if (!persist) return;
       if (isRun && state.phase !== 'over') Storage.set(SAVE_KEY, state);
       if (!isRun) Storage.set(FREE_KEY, { chips: state.chips, rng: state.rng, seed: state.seed });
     }

@@ -32,8 +32,13 @@ App.register((() => {
     const c = Util.el('button', 'rl-cell ' + cls);
     c.dataset.key = key; c.innerHTML = `<span>${text}</span>`;
     c.style.cssText = style;
-    c.onclick = () => place(key);
+    c.onclick = () => { if (c._long) { c._long = false; return; } place(key); };
     c.oncontextmenu = ev => { ev.preventDefault(); remove(key); };
+    // appui long (tactile) : retirer la mise de la case
+    let lt = null;
+    c.addEventListener('pointerdown', () => { lt = setTimeout(() => { c._long = true; remove(key); Sfx.play('chip'); }, 550); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => c.addEventListener(t, () => clearTimeout(lt)));
+    c.setAttribute('aria-label', key[0] === 'n' ? `Numéro ${key.slice(1)}` : E.OUTSIDE[key].label);
     return c;
   }
   (function drawBoard() {
@@ -45,8 +50,27 @@ App.register((() => {
     }
     ['c3', 'c2', 'c1'].forEach((k, row) => g.appendChild(cell(k, '2:1', 'out', `grid-row:${row + 1};grid-column:14`)));
     ['d1', 'd2', 'd3'].forEach((k, i) => g.appendChild(cell(k, E.OUTSIDE[k].label, 'out', `grid-row:4;grid-column:${2 + i * 4}/span 4`)));
-    ['low', 'even', 'red', 'black', 'odd', 'high'].forEach((k, i) => g.appendChild(cell(k, k === 'red' || k === 'black' ? '◆' : E.OUTSIDE[k].label, 'out ' + (k === 'red' || k === 'black' ? 'diamond-' + k : ''), `grid-row:5;grid-column:${2 + i * 2}/span 2`)));
+    ['low', 'even', 'red', 'black', 'odd', 'high'].forEach((k, i) => g.appendChild(cell(k, k === 'red' ? '♦ Rouge' : k === 'black' ? '♠ Noir' : E.OUTSIDE[k].label, 'out ' + (k === 'red' || k === 'black' ? 'diamond-' + k : ''), `grid-row:5;grid-column:${2 + i * 2}/span 2`)));
+    layout();
   })();
+  // Placement des cases : horizontal (écran large) ou vertical (téléphone)
+  function layout() {
+    const vertical = window.matchMedia('(max-width: 560px)').matches;
+    els.board.classList.toggle('vertical', vertical);
+    els.board.querySelectorAll('.rl-cell').forEach(c => {
+      const k = c.dataset.key;
+      if (!vertical) { c.style.gridRow = c.dataset.hr || c.style.gridRow; c.style.gridColumn = c.dataset.hc || c.style.gridColumn; return; }
+      if (!c.dataset.hr) { c.dataset.hr = c.style.gridRow; c.dataset.hc = c.style.gridColumn; }
+      let row, col;
+      if (k === 'n0') { row = '1'; col = '2 / span 3'; }
+      else if (k[0] === 'n') { const n = +k.slice(1); row = String(1 + Math.ceil(n / 3)); col = String(1 + ((n - 1) % 3) + 1); }
+      else if (k[0] === 'c') { row = '14'; col = String(1 + +k[1]); }
+      else if (k[0] === 'd') { const d = +k[1]; row = `${2 + (d - 1) * 4} / span 4`; col = '1'; }
+      else { const i = ['low', 'even', 'red', 'black', 'odd', 'high'].indexOf(k); row = `${2 + i * 2} / span 2`; col = '5'; }
+      c.style.gridRow = row; c.style.gridColumn = col;
+    });
+  }
+  window.addEventListener('resize', layout);
   [1, 5, 25, 100].forEach(v => {
     const b = Util.el('button', `chip chip-${v}`, v);
     b.onclick = () => { chip = v; Sfx.play('chip'); els.chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('sel', x === b)); };
@@ -135,9 +159,9 @@ App.register((() => {
     const st = res.settlement;
     if (st.net > 0) { msg(`${label(r.n)} — gagné ! +${Util.fmt(st.net)} jetons`, 'win'); Sfx.play(st.net >= st.staked * 3 ? 'bigwin' : 'win'); }
     else if (st.net < 0) { msg(`${label(r.n)} — perdu, −${Util.fmt(-st.net)} jetons`, 'lose'); Sfx.play('lose'); }
-    else { msg(`${label(r.n)} — mises rendues`, 'push'); Sfx.play('push'); }
+    else { msg(`${label(r.n)} — gains et pertes s'annulent (net 0)`, 'push'); Sfx.play('push'); }
     await App.showSettlement(st);
-    bets = {}; renderBets(); idle();
+    renderBets(); idle(); // la mise reste en place pour le tour suivant ; « Effacer » pour la retirer
   }
   function spin() {
     return play(async () => {
@@ -145,6 +169,7 @@ App.register((() => {
       if (res.error) { Sfx.play('error'); msg(res.error, 'warn'); return idle(); }
       App.syncBalance();
       lastBets = { ...bets };
+      msg('');
       setActions(els.actions, []);
       showAi(res.round.ai, false);
       await afterSpin(res);

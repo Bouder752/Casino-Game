@@ -161,7 +161,7 @@ function renderCards(container, cards, isHidden = () => false, highlight = null)
   while (keep < kids.length && keep < cards.length && kids[keep]._key === cards[keep].rank + '-' + cards[keep].suit) keep++;
   kids.slice(keep).forEach(k => k.remove());
   cards.forEach((c, i) => {
-    const hidden = isHidden(i);
+    const hidden = !!isHidden(i); // toujours un booléen (sinon classList.toggle inverse la carte)
     let e = container.children[i];
     if (!e) {
       e = cardEl(c);

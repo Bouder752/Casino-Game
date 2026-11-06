@@ -1,11 +1,26 @@
 // Réglages d'interface (vitesse d'animation 1x / 2x / 4x)
+// Réglages d'interface : vitesse, texte agrandi, couleurs pour daltoniens, confirmation du shop, rangée de jokers repliée
 const Settings = (() => {
-  const st = Object.assign({ speed: 1 }, Storage.get('boubouzino.settings', {}));
-  const apply = () => document.documentElement.style.setProperty('--spd', String(1 / st.speed));
+  const st = Object.assign({ speed: 1, bigText: false, colorblind: false, confirmShop: true, dockMin: false, tutorialDone: false }, Storage.get('boubouzino.settings', {}));
+  const apply = () => {
+    const r = document.documentElement;
+    r.style.setProperty('--spd', String(1 / st.speed));
+    r.classList.toggle('big-text', !!st.bigText);
+    r.classList.toggle('cb', !!st.colorblind);
+    if (document.body) document.body.classList.toggle('dock-min', !!st.dockMin);
+  };
   apply();
+  const save = () => { Storage.set('boubouzino.settings', st); apply(); };
   return {
     get speed() { return st.speed; },
-    setSpeed(v) { st.speed = v; Storage.set('boubouzino.settings', st); apply(); },
+    get bigText() { return st.bigText; },
+    get colorblind() { return st.colorblind; },
+    get confirmShop() { return st.confirmShop; },
+    get dockMin() { return st.dockMin; },
+    get tutorialDone() { return st.tutorialDone; },
+    setSpeed(v) { st.speed = v; save(); },
+    set(key, v) { st[key] = v; save(); },
+    apply,
   };
 })();
 
@@ -44,19 +59,34 @@ class BetControl {
       <div class="betctl-chips"></div>`;
     container.querySelector('.betctl-label').textContent = label;
     this.amountEl = container.querySelector('.betctl-amount');
+    // la mise se tape aussi directement (clic sur le montant)
+    this.amountEl.tabIndex = 0;
+    this.amountEl.title = 'Taper une mise';
+    this.amountEl.setAttribute('role', 'button');
+    const ask = () => {
+      if (!this.enabled) return;
+      const v = prompt('Mise :', this.value);
+      if (v !== null && !isNaN(parseFloat(v.replace(',', '.')))) this.set(parseFloat(v.replace(',', '.')));
+    };
+    this.amountEl.onclick = ask;
+    this.amountEl.onkeydown = e => { if (e.key === 'Enter') ask(); };
     this.maxEl = container.querySelector('.betctl-max');
     const chipsEl = container.querySelector('.betctl-chips');
     chips.forEach(v => {
       const b = Util.el('button', `chip chip-${v}`, v);
       b.title = `+${v}`;
+      b.dataset.v = v;
+      b.setAttribute('aria-label', `Ajouter ${v} à la mise`);
       b.onclick = () => { Sfx.play('chip'); this.set(this.value + v); };
       chipsEl.appendChild(b);
     });
     [['½', () => this.set(Math.floor(this.value / 2)), 'Diviser par 2'],
      ['×2', () => this.set(this.value * 2), 'Doubler'],
+     ['Max', () => this.set(this.maxFn()), 'Mise maximale'],
      ['✕', () => this.set(0), 'Effacer']].forEach(([t, fn, title]) => {
       const b = Util.el('button', 'chip-op', t);
       b.title = title;
+      b.setAttribute('aria-label', title);
       b.onclick = fn;
       chipsEl.appendChild(b);
     });
@@ -73,8 +103,12 @@ class BetControl {
   }
   update() {
     const m = this.maxFn();
+    // la mise ne peut pas dépasser ce qu'on a : on la ramène au maximum possible
+    if (this.value > m && Number.isFinite(m) && this.enabled) this.value = Math.max(0, m);
     this.amountEl.textContent = Util.fmt(this.value);
     this.maxEl.textContent = Number.isFinite(m) ? `max ${Util.fmt(m)}` : '';
+    // un jeton plus gros que la mise possible est grisé
+    this.buttons.forEach(b => { if (b.dataset.v) b.disabled = !this.enabled || +b.dataset.v > m; });
   }
   // Ré-applique la limite (changement de manche / de mode)
   refresh() {
@@ -86,6 +120,7 @@ class BetControl {
   setEnabled(e) {
     this.enabled = e;
     this.buttons.forEach(b => (b.disabled = !e));
+    this.update();
   }
 }
 
@@ -162,7 +197,8 @@ function engineActions(container, actions, onAct) {
     { cls: a.primary ? 'primary' : a.danger ? 'danger' : a.ghost ? 'ghost' : '', disabled: a.disabled }]));
 }
 // Limite de mise : plafond de la manche et jetons disponibles
-const betLimit = (game, ratio = 1) => () => (App.host ? Math.max(0, Math.min(App.host.maxBet(game), Math.floor(App.host.chips() * ratio * 100) / 100)) : 0);
+// (sans partie en cours : pas de limite, pour ne pas ramener la mise par défaut à 0)
+const betLimit = (game, ratio = 1) => () => (App.host ? Math.max(0, Math.min(App.host.maxBet(game), Math.floor(App.host.chips() * ratio * 100) / 100)) : Infinity);
 
 // Symboles des messages (lisibles sans les couleurs)
 const MSG_ICON = { win: '✓ ', lose: '✗ ', push: '= ', warn: '⚠ ' };

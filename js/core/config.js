@@ -9,10 +9,12 @@ const CONFIG = {
     etagesPourGagner: 8,
     jetonsDepart: 100,
     misesParTable: 6,          // nombre de mises autorisées par table
-    relancesParTable: 2,       // « défausses » : refaire un tirage sans miser
+    relancesParTable: 3,       // « défausses » : refaire un tirage sans miser (2 → 3 après les tests joueurs)
+    relancesParMise: 1,        // relances utilisables sur une même mise (null = sans limite)
 
     // Objectif de gains de la petite table, par étage (index = étage)
-    objectifBase: [0, 60, 150, 350, 800, 1600, 3000, 5000, 8000],
+    // Après les tests joueurs : étage 1 plus doux (60 → 35), montée plus raide ensuite
+    objectifBase: [0, 35, 100, 280, 700, 1600, 3400, 6500, 12000],
     multiplicateurTable: { petite: 1, grande: 1.5, boss: 2 },
     croissanceInfinie: 1.6,    // après l'étage 8, objectif ×1,6 par étage
 
@@ -22,7 +24,10 @@ const CONFIG = {
 
     // La petite ou la grande table (pas le boss) peut être passée contre un tag bonus
     passerTableRecompense: 'tag',
-    limiteMise: null,          // null = pas de mise max ; sinon tableau par étage
+    // Mise max par étage (contre l'effet boule de neige) ; null = pas de limite
+    limiteMise: [0, 50, 100, 200, 400, 875, 1750, 3250, 6250],
+    // Poids des gains pour l'objectif : les jeux d'adresse comptent plus que les jeux de pur hasard
+    poidsObjectif: { bj: 2, uth: 2, roulette: 1.5, slots: 1, dice: 1 },
   },
   freeChips: 1000,
   prestige: { perBoss: 1, victory: 5 },
@@ -43,6 +48,7 @@ const CONFIG = {
     // Poids de rareté selon l'étage (n)
     rarityWeights: n => ({ commun: 70 - 3 * n, rare: 25 + 2 * n, legendaire: 5 + n }),
     reroll: { base: 5, step: 5 },
+    priceGrowth: 0.15,         // les prix montent de 15 % par étage
     sellRatio: 0.5,
     jokerSlots: { base: 4, prices: [100, 200, 400] },
     consumableSlots: 2,
@@ -73,12 +79,12 @@ const CONFIG = {
     pickpocket: { rarity: 'rare', price: 120, pct: 0.1 },
     miroir: { rarity: 'rare', price: 130 },
     assurance: { rarity: 'rare', price: 150, amount: 50 },
-    parrain: { rarity: 'legendaire', price: 220, perJoker: 1 },
-    tricheur: { rarity: 'legendaire', price: 250, mult: 2, catchChance: 0.1 },
+    parrain: { rarity: 'legendaire', price: 220, perJoker: 0.5 },
+    tricheur: { rarity: 'legendaire', price: 250, mult: 2, catchChance: 0.25 },
     roue: { rarity: 'legendaire', price: 280 },
     banquier: { rarity: 'legendaire', price: 300, rate: 0.1, cap: 50 },
     fantome: { rarity: 'legendaire', price: 350, charges: 1 },
-    jackpot: { rarity: 'legendaire', price: 400, step: 0.1 },
+    jackpot: { rarity: 'legendaire', price: 400, step: 0.1, max: 3 },
   },
 
   consumables: {
@@ -124,7 +130,7 @@ const CONFIG = {
       blindPay: { 9: 500, 8: 50, 7: 10, 6: 3, 5: 1.5, 4: 1 },
       tripsPay: { 9: 50, 8: 40, 7: 30, 6: 8, 5: 6, 4: 5, 3: 3 },
     },
-    dice: { edge: 99, minTarget: 2, maxTarget: 98 },
+    dice: { edge: 99, minTarget: 10, maxTarget: 95 },   // 10 % de chance minimum (×9,9 max)
     roulette: { straight: 36, even: 2, dozen: 3, ai: { count: 3, min: 5, max: 50, step: 5 } },
     // Machine « Le Palace des Chats » : 5 rouleaux × 3 rangées, 20 lignes.
     // pay = multiples de la mise par ligne (mise / 20) pour 3, 4 et 5 symboles alignés.
