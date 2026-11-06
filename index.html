@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Casino Jetons</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">♠ Casino <span>Jetons</span></div>
+    <nav class="tabs">
+      <button class="tab" data-tab="uth">Ultimate Hold'em</button>
+      <button class="tab" data-tab="bj">Blackjack</button>
+      <button class="tab" data-tab="dice">Dice</button>
+    </nav>
+    <div class="wallet">
+      <span class="coin">●</span><span id="balance">0</span>
+      <button id="reset" class="btn small" title="Réinitialiser le solde">↺</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ULTIMATE TEXAS HOLD'EM -->
+    <section class="game" id="uth" hidden>
+      <div class="layout">
+        <div class="felt">
+          <div class="zone">
+            <div class="zone-title">Croupier <span class="hand-name" id="uth-dealer-name"></span></div>
+            <div class="cards" id="uth-dealer"></div>
+          </div>
+          <div class="zone">
+            <div class="zone-title">Tableau</div>
+            <div class="cards" id="uth-board"></div>
+          </div>
+          <div class="zone">
+            <div class="zone-title">Vous <span class="hand-name" id="uth-player-name"></span></div>
+            <div class="cards" id="uth-player"></div>
+          </div>
+          <div class="spots">
+            <div class="spot" id="uth-spot-trips"><span>Trips</span><b class="amt">—</b></div>
+            <div class="spot" id="uth-spot-ante"><span>Ante</span><b class="amt">—</b></div>
+            <div class="spot" id="uth-spot-blind"><span>Blind</span><b class="amt">—</b></div>
+            <div class="spot" id="uth-spot-play"><span>Play</span><b class="amt">—</b></div>
+          </div>
+          <div class="msg" id="uth-msg"></div>
+          <div class="actions" id="uth-actions"></div>
+          <div class="results" id="uth-results"></div>
+        </div>
+        <aside class="panel">
+          <div id="uth-ante"></div>
+          <div id="uth-trips"></div>
+          <details class="rules" open>
+            <summary>Tables de paiement</summary>
+            <table>
+              <tr><th>Main</th><th>Blind</th><th>Trips</th></tr>
+              <tr><td>Quinte flush royale</td><td>500:1</td><td>50:1</td></tr>
+              <tr><td>Quinte flush</td><td>50:1</td><td>40:1</td></tr>
+              <tr><td>Carré</td><td>10:1</td><td>30:1</td></tr>
+              <tr><td>Full</td><td>3:1</td><td>8:1</td></tr>
+              <tr><td>Couleur</td><td>3:2</td><td>6:1</td></tr>
+              <tr><td>Quinte</td><td>1:1</td><td>5:1</td></tr>
+              <tr><td>Brelan</td><td>rendu</td><td>3:1</td></tr>
+            </table>
+          </details>
+          <details class="rules">
+            <summary>Règles</summary>
+            <ul>
+              <li>Misez l'<b>Ante</b> ; une <b>Blind</b> égale est placée automatiquement.</li>
+              <li>Pré-flop : misez <b>Play</b> 3x ou 4x l'Ante, ou checkez.</li>
+              <li>Flop : Play 2x ou check. River : Play 1x ou se coucher.</li>
+              <li>Le croupier se qualifie avec <b>une paire</b> ou mieux, sinon l'Ante est rendu.</li>
+              <li>Si vous gagnez : Play et Ante paient 1:1, la Blind paie selon la table (rendue en dessous d'une quinte).</li>
+              <li>Le Trips paie selon votre main, quel que soit le croupier.</li>
+            </ul>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <!-- BLACKJACK -->
+    <section class="game" id="bj" hidden>
+      <div class="layout">
+        <div class="felt">
+          <div class="zone">
+            <div class="zone-title">Croupier <span class="hand-name" id="bj-dealer-val"></span></div>
+            <div class="cards" id="bj-dealer"></div>
+          </div>
+          <div class="felt-text">Le blackjack paie 3 contre 2 · Le croupier reste sur 17</div>
+          <div class="zone">
+            <div class="zone-title">Vous</div>
+            <div class="bj-hands" id="bj-hands"></div>
+          </div>
+          <div class="msg" id="bj-msg"></div>
+          <div class="actions" id="bj-actions"></div>
+        </div>
+        <aside class="panel">
+          <div id="bj-bet"></div>
+          <div class="shoe-info" id="bj-shoe"></div>
+          <details class="rules" open>
+            <summary>Règles</summary>
+            <ul>
+              <li>Sabot de 6 jeux, mélangé aux ¾.</li>
+              <li>Blackjack payé 3:2, le croupier vérifie s'il a un blackjack.</li>
+              <li>Le croupier tire jusqu'à 17 et reste sur 17 souple.</li>
+              <li>Doubler sur n'importe quelles 2 cartes.</li>
+              <li>Séparer jusqu'à 4 mains ; les As séparés ne reçoivent qu'une carte.</li>
+            </ul>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <!-- DICE -->
+    <section class="game" id="dice" hidden>
+      <div class="layout">
+        <div class="felt dice-felt">
+          <div class="dice-result" id="dice-result">50.00</div>
+          <div class="dice-rule" id="dice-rule"></div>
+          <div class="dice-track" id="dice-track">
+            <div class="dice-marker" id="dice-marker"></div>
+          </div>
+          <input type="range" id="dice-target" min="2" max="98" step="1" value="50" aria-label="Seuil">
+          <div class="dice-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+          <div class="dice-mode">
+            <button class="btn toggle" id="dice-under">En dessous</button>
+            <button class="btn toggle" id="dice-over">Au-dessus</button>
+          </div>
+          <div class="dice-stats">
+            <div><span>Seuil</span><b id="dice-target-val"></b></div>
+            <div><span>Chance</span><b id="dice-chance"></b></div>
+            <div><span>Multiplicateur</span><b id="dice-mult"></b></div>
+            <div><span>Gain possible</span><b id="dice-profit"></b></div>
+          </div>
+          <div class="msg" id="dice-msg"></div>
+          <div class="actions" id="dice-actions"></div>
+          <div class="dice-history" id="dice-history"></div>
+        </div>
+        <aside class="panel">
+          <div id="dice-bet"></div>
+          <details class="rules" open>
+            <summary>Règles</summary>
+            <ul>
+              <li>Un nombre entre 0.00 et 99.99 est tiré au hasard.</li>
+              <li>Choisissez un seuil et pariez en dessous ou au-dessus.</li>
+              <li>Moins vous avez de chances, plus le multiplicateur est élevé (×99 ÷ chance).</li>
+            </ul>
+          </details>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer>Jeu gratuit avec des jetons fictifs — aucun argent réel. Jouer comporte des risques : si le jeu devient un problème, appelez le 09 74 75 13 13 (Joueurs Info Service).</footer>
+
+  <script src="js/util.js"></script>
+  <script src="js/wallet.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/handEval.js"></script>
+  <script src="js/uth.js"></script>
+  <script src="js/blackjack.js"></script>
+  <script src="js/dice.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
