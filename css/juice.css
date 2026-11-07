@@ -1,0 +1,222 @@
+/* =====================================================================
+   Couche « jeu de cartes » (inspirée des jeux de cartes et roguelikes
+   modernes, sans reprendre leurs visuels) : police ronde et épaisse, fond
+   tourbillonnant, panneaux en ardoise avec gros contours, boutons pleins
+   colorés, jokers qui flottent, s'inclinent sous la souris et rebondissent.
+   Chargée en dernier : elle surcharge style.css et game.css.
+   ===================================================================== */
+:root {
+  --f-title: 'Lilita One', 'Arial Black', sans-serif;
+  --f-num: 'Lilita One', 'Arial Black', sans-serif;
+  --f-text: 'Nunito', 'Trebuchet MS', sans-serif;
+  --serif: var(--f-num);
+  --ink: #0e0a12;
+  --slate: #2b3940; --slate-2: #1d282e; --slate-3: #141c20; --slate-hi: #3c4f57;
+  --c-red: #f0444f; --c-red-d: #a51f2a;
+  --c-blue: #1f8fff; --c-blue-d: #0f56a8;
+  --c-orange: #ff9d1f; --c-orange-d: #b4620a;
+  --c-green: #2fbf71; --c-green-d: #187a45;
+  --c-purple: #9a5cff; --c-purple-d: #5b2fb0;
+  --c-gold: #ffd23f; --c-gold-d: #b8860b;
+  --muted: #c9d3d8;
+}
+body { font-family: var(--f-text); font-weight: 700; letter-spacing: .1px; }
+b, strong { font-weight: 900; }
+
+/* ---------- Fond : tourbillon de couleurs qui tourne lentement ---------- */
+body { background: #120a12; }
+.lights {
+  position: fixed; inset: -60vmax; z-index: 0; pointer-events: none; opacity: .95; filter: blur(70px) saturate(1.25);
+  background:
+    conic-gradient(from 0deg at 50% 50%, #3d0f22, #0f3a33, #26124a, #3d0f22, #11364a, #3a1a0c, #3d0f22);
+  animation: swirl 60s linear infinite; will-change: transform;
+}
+@keyframes swirl { to { transform: rotate(360deg); } }
+.lights::after { display: none; }
+/* Grain et lignes fines par-dessus, plus un assombrissement des bords */
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(0, 0, 0, .6)),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .14) 0 1px, transparent 1px 3px);
+}
+
+/* ---------- Titres et nombres ---------- */
+h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, .choose-head h2, .cos-head h2, .tc-head span, .win-title {
+  font-family: var(--f-title) !important; font-weight: 400; letter-spacing: .5px;
+}
+.modal-box h2, .shop-head h2, .choose-head h2, .cos-head h2 {
+  color: #fff !important; -webkit-text-fill-color: #fff; background: none !important;
+  text-shadow: 0 3px 0 var(--ink), 0 0 18px rgba(255, 255, 255, .15) !important; filter: none !important;
+}
+.num, #balance, .betctl-amount, .hbadge b, .hud-goal b, .hud-floor b, .tc-goal b, .stack-amt, .jc-price, .rl-result, .dice-stats b, .over-stats b, .res-net, .wl b, .win-bank b {
+  font-family: var(--f-num) !important; font-weight: 400 !important; letter-spacing: .5px;
+}
+.zone-title, .betctl-label, .hbadge small, .hud-goal span, .hud-floor small, .win-kicker, .shop-row-title, .tc-goal small, .dice-stats span, .odds-head, .spot-label {
+  font-family: var(--f-title) !important; font-weight: 400 !important; letter-spacing: 1px !important;
+}
+
+/* ---------- Boutons : pleins, colorés, ombre dure ---------- */
+.btn {
+  font-family: var(--f-title) !important; font-weight: 400 !important; letter-spacing: .6px !important; font-size: 16px;
+  text-transform: uppercase; color: #fff !important; text-shadow: 0 2px 0 rgba(0, 0, 0, .45) !important;
+  background: var(--c-blue) !important; border: 3px solid var(--ink) !important; border-radius: 12px !important;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .22), inset 0 3px 0 rgba(255, 255, 255, .25), 0 5px 0 var(--ink) !important;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-2px) rotate(-.5deg); }
+.btn:active:not(:disabled) { transform: translateY(4px) !important; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .22), 0 1px 0 var(--ink) !important; }
+.btn.primary { background: var(--c-orange) !important; }
+.btn.danger { background: var(--c-red) !important; }
+.btn.ghost { background: var(--c-purple) !important; }
+.btn.toggle { background: var(--slate-hi) !important; }
+.btn.toggle.active { background: var(--c-gold) !important; color: #3a2400 !important; text-shadow: none !important; }
+.btn.icon { background: var(--slate-hi) !important; font-size: 18px; }
+.btn.small { font-size: 13px; }
+.btn:disabled { filter: grayscale(.8) brightness(.65); opacity: .7; }
+.btn.big { font-size: 19px; }
+/* Bouton principal qui « respire » pour attirer l'œil */
+.rail .actions .btn.primary:not(:disabled), .win-go:not(:disabled), #m-new { animation: breathe 2.2s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.04); } }
+
+/* ---------- Panneaux en ardoise ---------- */
+.modal-box, .popover, .jsheet, .shop-offers, .shop-side, .shop-owned, .shop-summary, .ss-next, .loans, .cos-item, .odds-float .odds, .toast, .tcard {
+  background: linear-gradient(180deg, var(--slate-hi) 0, var(--slate) 14px, var(--slate-2) 100%) !important;
+  border: 3px solid var(--ink) !important; border-radius: 18px !important;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .06), 0 6px 0 var(--ink), 0 18px 34px rgba(0, 0, 0, .55) !important;
+  color: #fff;
+}
+.ss-next, .loans, .shop-summary { background: var(--slate-3) !important; box-shadow: inset 0 3px 8px rgba(0, 0, 0, .5) !important; border-width: 2px !important; }
+.modal-box { animation: modalPop .35s cubic-bezier(.2, 1.5, .4, 1) both; }
+@keyframes modalPop { from { transform: scale(.7) rotate(-2deg); opacity: 0; } }
+.win-box { background: linear-gradient(180deg, var(--slate-hi) 0, var(--slate) 16px, var(--slate-2)) !important; box-shadow: inset 0 0 0 3px rgba(255, 210, 63, .5), 0 8px 0 var(--ink), 0 0 90px rgba(255, 190, 60, .35) !important; }
+.win-ov.boss .win-box { background: linear-gradient(180deg, #7a2a3a 0, #5a1424 16px, #3a0a16) !important; }
+.win-title { color: var(--c-gold) !important; }
+.wl { background: var(--slate-3); border: 2px solid var(--ink); }
+.tag, .tag.jt { font-family: var(--f-title); font-weight: 400; letter-spacing: .5px; border-radius: 8px; border: 2px solid var(--ink); padding: 1px 8px; display: inline-block; margin: 3px 4px 0 0; font-size: 12px; }
+.tag.jt { background: var(--slate-hi); color: #fff; }
+.pop-desc { font-size: 16px; line-height: 1.35; }
+
+/* ---------- Barre du haut : plaques colorées ---------- */
+.top { background: linear-gradient(180deg, #2f3e45, #1d282e) !important; border-bottom: 3px solid var(--ink) !important; box-shadow: 0 6px 0 rgba(0, 0, 0, .35), 0 10px 26px rgba(0, 0, 0, .5) !important; }
+.brand-name { color: #fff !important; text-shadow: 0 3px 0 var(--ink), 0 0 16px rgba(255, 210, 63, .35) !important; }
+.hud-floor { background: var(--c-green) !important; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 4px 0 var(--ink) !important; border: 3px solid var(--ink) !important; }
+.hud-floor.grande { background: var(--c-blue) !important; }
+.hud-floor.boss { background: var(--c-red) !important; }
+.hud-floor span { color: #fff !important; font-family: var(--f-title); }
+.wallet { background: var(--slate-3) !important; border: 3px solid var(--ink) !important; box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 3px 0 var(--ink) !important; }
+.hud-track { border: 3px solid var(--ink) !important; border-left: 0 !important; background: var(--slate-3) !important; }
+.hud-goal { background: var(--c-gold) !important; border: 3px solid var(--ink) !important; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .15), 0 4px 0 var(--ink) !important; }
+.hbadge { background: var(--slate-hi) !important; border: 3px solid var(--ink) !important; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .2), 0 3px 0 var(--ink) !important; }
+.hbadge.maxbet { background: var(--c-blue) !important; }
+.hbadge.boss { background: #5a2430 !important; } .hbadge.boss.now { background: var(--c-red) !important; }
+.hbadge.debt { background: var(--c-orange-d) !important; }
+
+/* ---------- Onglets des jeux ---------- */
+.tab { background: var(--slate) !important; border: 3px solid var(--ink) !important; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .25), 0 4px 0 var(--ink) !important; color: #fff !important; font-family: var(--f-title) !important; font-weight: 400 !important; }
+.tab.active { background: var(--c-orange) !important; color: #fff !important; text-shadow: 0 2px 0 rgba(0, 0, 0, .4) !important; }
+
+/* ---------- Jokers : cartes à collectionner ---------- */
+.jcard {
+  --rx: 0deg; --ry: 0deg; --rc: #c9d3d8;
+  border: 3px solid var(--ink) !important; border-radius: 12px !important; overflow: visible;
+  background: var(--rc) !important; padding: 3px;
+  box-shadow: 0 5px 0 var(--ink), 0 10px 16px rgba(0, 0, 0, .45) !important;
+  transform: perspective(500px) rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform .12s ease-out, box-shadow .12s;
+  animation: cardFloat 3.4s ease-in-out infinite; animation-delay: var(--d, 0s);
+}
+.jcard.r-commun { --rc: #b9c4cb; } .jcard.r-rare { --rc: #3d8bff; } .jcard.r-legendaire { --rc: #ffc93f; }
+.jcard.r-cons { --rc: #2fbf71; } .jcard.r-pack { --rc: #9a5cff; } .jcard.r-upgrade { --rc: #ff7a45; }
+@keyframes cardFloat { 0%, 100% { translate: 0 0; rotate: -1deg; } 50% { translate: 0 -4px; rotate: 1deg; } }
+.jcard:hover { animation-play-state: paused; z-index: 5; box-shadow: 0 9px 0 var(--ink), 0 18px 24px rgba(0, 0, 0, .55) !important; translate: 0 -8px; scale: 1.06; }
+.jc-frame { border-radius: 8px; overflow: hidden; border: 2px solid var(--ink); background: #1a1418; height: 100%; display: flex; flex-direction: column; }
+.jc-art { flex: 1; min-height: 0; }
+.jc-name { font-family: var(--f-title) !important; font-weight: 400 !important; color: #fff !important; background: var(--ink) !important; letter-spacing: .3px; line-height: 1.05; border-top: 0 !important; text-shadow: none !important; }
+.jc-name i { color: var(--rc); }
+/* Reflet qui balaie la carte au survol */
+.jc-frame::after { content: ''; position: absolute; inset: 3px; border-radius: 8px; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .45) 45%, transparent 60%); background-size: 250% 100%; background-position: 120% 0; transition: background-position .5s; }
+.jcard:hover .jc-frame::after { background-position: -40% 0; }
+/* Légendaires : reflet holographique permanent */
+.jcard.r-legendaire .jc-frame::before {
+  content: ''; position: absolute; inset: 3px; border-radius: 8px; pointer-events: none; z-index: 1; mix-blend-mode: color-dodge; opacity: .35;
+  background: linear-gradient(125deg, #ff5f6d, #ffc371, #47e891, #3db8ff, #b46bff, #ff5f6d); background-size: 300% 300%; animation: holo 5s linear infinite;
+}
+@keyframes holo { to { background-position: 300% 300%; } }
+.jcard.grows::after { content: '▲'; position: absolute; top: -9px; right: -7px; width: 20px; height: 20px; display: grid; place-items: center; font-size: 10px; color: #fff; background: var(--c-green); border: 2px solid var(--ink); border-radius: 50%; z-index: 3; }
+/* Déclenchement : rebond, petite rotation, nombre qui saute */
+.jcard.trigger { animation: jTrig .45s cubic-bezier(.3, 1.8, .5, 1) !important; }
+@keyframes jTrig { 0% { scale: 1; } 30% { scale: 1.22; rotate: -6deg; } 60% { scale: .96; rotate: 4deg; } 100% { scale: 1; rotate: 0deg; } }
+.jc-float {
+  font-family: var(--f-num) !important; font-weight: 400 !important; font-size: 20px !important; color: #fff !important;
+  background: var(--c-red) !important; border: 3px solid var(--ink) !important; border-radius: 10px !important; padding: 0 8px !important;
+  box-shadow: 0 3px 0 var(--ink) !important; text-shadow: 0 2px 0 rgba(0, 0, 0, .4) !important; white-space: nowrap;
+}
+.jc-price { background: var(--c-gold) !important; color: #3a2400 !important; border: 3px solid var(--ink) !important; border-radius: 10px !important; font-size: 18px !important; box-shadow: 0 3px 0 var(--ink) !important; }
+.jc-price.cant { background: #6b3a3f !important; color: #ffb3b3 !important; }
+.jslot { border-radius: 12px !important; border: 3px dashed rgba(255, 255, 255, .14) !important; background: rgba(0, 0, 0, .22) !important; }
+
+/* Rangée de jokers : plateau en ardoise */
+.dock { background: linear-gradient(180deg, #2f3e45, #1d282e) !important; border-top: 3px solid var(--ink) !important; box-shadow: 0 -6px 0 rgba(0, 0, 0, .3), 0 -12px 30px rgba(0, 0, 0, .5) !important; }
+.dock-toggle { background: var(--c-orange) !important; }
+
+/* ---------- Panneau de score : GAIN × MULTI ---------- */
+.ledger.sb {
+  position: fixed; left: 50%; top: 88px; right: auto; bottom: auto; transform: translateX(-50%); z-index: 60;
+  width: min(380px, calc(100vw - 24px)); padding: 10px 12px 12px; border-radius: 18px !important; border: 3px solid var(--ink) !important;
+  background: linear-gradient(180deg, var(--slate-hi) 0, var(--slate) 12px, var(--slate-2)) !important; color: #fff;
+  box-shadow: 0 6px 0 var(--ink), 0 20px 40px rgba(0, 0, 0, .6) !important; text-align: center; font-family: var(--f-title);
+  animation: sbIn .3s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+@keyframes sbIn { from { transform: translateX(-50%) translateY(-30px) scale(.8); opacity: 0; } }
+.ledger.sb.out { animation: sbOut .35s ease-in forwards; }
+@keyframes sbOut { to { transform: translateX(-50%) translateY(-20px) scale(.9); opacity: 0; } }
+.sb-src { min-height: 22px; font-size: 15px; color: #e6eef2; letter-spacing: .3px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-row { display: flex; align-items: stretch; justify-content: center; gap: 8px; }
+.sb-chips, .sb-mult { flex: 1; border-radius: 12px; border: 3px solid var(--ink); padding: 2px 8px 6px; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 3px 0 var(--ink); }
+.sb-chips { background: var(--c-blue); } .sb-mult { background: var(--c-red); }
+.sb-chips small, .sb-mult small { display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: .85; }
+.sb-chips b, .sb-mult b { display: inline-block; font-weight: 400; font-size: 34px; line-height: 1; text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.sb-x { align-self: center; font-size: 30px; color: #fff; text-shadow: 0 3px 0 var(--ink); }
+.sb-flat { min-height: 0; font-size: 18px; color: #7dffb0; text-shadow: 0 2px 0 var(--ink); }
+.sb-flat:empty { display: none; }
+.sb-total { font-size: 0; transition: font-size .2s; }
+.sb-total.show { font-size: 46px; line-height: 1.05; margin-top: 4px; animation: totalPop .45s cubic-bezier(.2, 1.8, .4, 1); text-shadow: 0 4px 0 var(--ink); }
+.sb-total.win { color: var(--c-gold); } .sb-total.lose { color: #ff8a8a; } .sb-total.push { color: #fff; }
+@keyframes totalPop { from { transform: scale(.3) rotate(-10deg); } }
+.bump { animation: bumpN .28s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes bumpN { 40% { transform: scale(1.45) rotate(-5deg); } }
+/* Multiplicateur élevé : le panneau « chauffe » */
+.ledger.sb.hot .sb-mult { animation: burn .5s ease-in-out infinite alternate; }
+@keyframes burn { from { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 3px 0 var(--ink), 0 0 10px #ff6a00; } to { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 3px 0 var(--ink), 0 0 30px 6px #ffb000; } }
+
+/* ---------- Menu ---------- */
+.menu-logo h1 { color: #fff !important; -webkit-text-fill-color: #fff !important; text-shadow: 0 5px 0 var(--ink), 0 9px 0 rgba(0, 0, 0, .3), 0 0 40px rgba(255, 190, 60, .4) !important; animation: logoWobble 4s ease-in-out infinite !important; }
+@keyframes logoWobble { 0%, 100% { transform: rotate(-2deg) scale(1); } 50% { transform: rotate(2deg) scale(1.04); } }
+.tagline { color: #e6eef2 !important; font-style: normal !important; }
+#m-new { background: var(--c-orange) !important; }
+#m-continue { background: var(--c-green) !important; }
+#m-free { background: var(--c-blue) !important; }
+#m-collection, #m-cosmetics, #m-howto { background: var(--slate-hi) !important; }
+.seed-input { background: var(--slate-3) !important; color: #fff !important; font-family: var(--f-text) !important; }
+.menu-stats { color: #c9d3d8 !important; }
+
+/* ---------- Choix de table ---------- */
+.tcard.current { box-shadow: inset 0 0 0 3px rgba(255, 210, 63, .7), 0 8px 0 var(--ink), 0 0 40px rgba(255, 190, 60, .3) !important; }
+.tcard.boss { background: linear-gradient(180deg, #7a2a3a 0, #5a1424 16px, #3a0a16) !important; }
+.tc-goal b { color: var(--c-gold) !important; text-shadow: 0 3px 0 var(--ink) !important; }
+
+/* ---------- Divers ---------- */
+.msg:not(:empty) { font-family: var(--f-title) !important; font-weight: 400 !important; letter-spacing: .5px; }
+.toast { font-family: var(--f-title); font-weight: 400; letter-spacing: .3px; }
+.hand-name { font-family: var(--f-title) !important; font-weight: 400 !important; border: 2px solid var(--ink); }
+.shop-head h2 { font-size: 46px !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lights, .jcard, .menu-logo h1, .rail .actions .btn.primary, #m-new, .win-go { animation: none !important; }
+}
+@media (max-width: 760px) {
+  .ledger.sb { top: 104px; }
+  .sb-chips b, .sb-mult b { font-size: 28px; }
+  .btn { font-size: 14px; }
+  .lights { filter: blur(50px) saturate(1.2); }
+}

@@ -54,6 +54,8 @@ const Sfx = (() => {
     reelstop: () => { noise(0.08, { vol: 0.3, freq: 600 }); tone(140, 0.1, { vol: 0.2 }); },
     coins: () => { for (let i = 0; i < 6; i++) tone(2000 + RNG.fx.next() * 1600, 0.08, { type: 'triangle', vol: 0.07, at: i * 0.05 }); },
     buy: () => { tone(1318, 0.09, { type: 'square', vol: 0.06 }); tone(1760, 0.25, { type: 'square', vol: 0.06, at: 0.08 }); SOUNDS.coins(); },
+    // Déclenchement d'un joker dans le panneau de score : la note monte à chaque étape
+    step: (k = 0) => { const f = 523 * Math.pow(2, Math.min(k, 14) / 12); tone(f, 0.09, { type: 'square', vol: 0.07 }); tone(f * 1.5, 0.12, { type: 'triangle', vol: 0.08, at: 0.03 }); },
     joker: () => { tone(880, 0.12, { type: 'triangle', vol: 0.12, slide: 1.5 }); tone(1320, 0.15, { type: 'sine', vol: 0.1, at: 0.06 }); },
     error: () => tone(160, 0.2, { type: 'square', vol: 0.06 }),
     boom: () => { tone(70, 0.6, { type: 'sine', vol: 0.5, slide: 0.5 }); tone(110, 0.45, { type: 'triangle', vol: 0.2, slide: 0.6 }); noise(0.35, { vol: 0.25, freq: 180, q: 0.6 }); setTimeout(() => SOUNDS.coins(), 150); },
@@ -63,9 +65,9 @@ const Sfx = (() => {
   };
   return {
     settings,
-    play(name) {
+    play(name, arg) {
       if (!settings.on || !SOUNDS[name]) return;
-      try { SOUNDS[name](); } catch (e) { /* audio indisponible */ }
+      try { SOUNDS[name](arg); } catch (e) { /* audio indisponible */ }
     },
     toggle() { settings.on = !settings.on; save(); return settings.on; },
     setVolume(v) { settings.volume = v; save(); if (master) master.gain.value = v; },

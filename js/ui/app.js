@@ -37,33 +37,55 @@ const App = (() => {
   // ---------- Détail du gain, étape par étape ----------
   const fmtStep = s => s.kind === 'mult' ? `×${Util.fmt(Math.round(s.value * 100) / 100)}`
     : s.kind === 'add' ? `+${Math.round(s.value * 100)} %` : Util.signed(s.value);
+  // Panneau de score (façon jeu de cartes) : GAIN brut × MULTI qui grimpe joker après joker
   async function showSettlement(st) {
     animating++;
     try {
       const steps = st.steps || [];
       if (steps.length) {
         const box = $('ledger');
-        box.innerHTML = '';
+        box.className = 'ledger sb';
+        box.innerHTML = `
+          <div class="sb-src" id="sb-src">Mise ${Util.fmt(st.staked)}</div>
+          <div class="sb-row">
+            <div class="sb-chips"><small>Gain</small><b id="sb-g">${Util.signed(Util.round2(st.baseBack - st.staked))}</b></div>
+            <div class="sb-x">×</div>
+            <div class="sb-mult"><small>Multi</small><b id="sb-m">1</b></div>
+          </div>
+          <div class="sb-flat" id="sb-f"></div>
+          <div class="sb-total" id="sb-t"></div>`;
         box.hidden = false;
-        const line = (cls, label, value) => {
-          const r = Util.el('div', 'lg-line ' + cls);
-          r.innerHTML = `<span>${label}</span><b>${value}</b>`;
-          box.appendChild(r);
-          return r;
-        };
-        line('base', `Mise ${Util.fmt(st.staked)} · rendu ${Util.fmt(st.baseBack)}`, '');
-        for (const s of steps.filter(x => x.kind === 'adjust')) { await Util.sleep(260); pop(s); line('adjust', `${s.src.icon} ${s.src.name}${s.label ? ` <i>${s.label}</i>` : ''}`, fmtStep(s)); }
-        await Util.sleep(200);
-        line('gain', 'Gain brut', Util.signed(st.gain));
-        for (const s of steps.filter(x => x.kind !== 'adjust')) {
-          await Util.sleep(320);
-          pop(s);
-          line(s.kind, `${s.src ? s.src.icon + ' ' + s.src.name : ''}${s.label ? ` <i>${s.label}</i>` : ''}`, fmtStep(s));
+        const G = $('sb-g'), M = $('sb-m'), F = $('sb-f'), T = $('sb-t'), SRC = $('sb-src');
+        const bump = n => { n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump'); };
+        const label = s => `${s.src ? s.src.icon + ' ' + s.src.name : ''}${s.label ? ` · ${s.label}` : ''}`;
+        let gain = Util.round2(st.baseBack - st.staked), addSum = 0, mul = 1, flats = 0, k = 0;
+        const multVal = () => Math.round((1 + addSum) * mul * 100) / 100;
+        await Util.sleep(220);
+        for (const s of steps.filter(x => x.kind === 'adjust')) {
+          gain = Util.round2(gain + s.value); pop(s); Sfx.play('step', k++);
+          SRC.textContent = label(s); G.textContent = Util.signed(gain); bump(G);
+          await Util.sleep(300);
         }
-        await Util.sleep(300);
-        line('total ' + (st.net > 0 ? 'win' : st.net < 0 ? 'lose' : 'push'), 'Total', Util.signed(st.net));
+        for (const s of steps.filter(x => x.kind === 'add' || x.kind === 'mult')) {
+          if (st.gain <= 0) break; // multiplicateurs sans effet sur une perte
+          if (s.kind === 'add') addSum += s.value; else mul *= s.value;
+          pop(s); Sfx.play('step', k++);
+          SRC.textContent = `${label(s)} ${fmtStep(s)}`;
+          M.textContent = Util.fmt(multVal()); bump(M);
+          box.classList.toggle('hot', multVal() >= 3);
+          await Util.sleep(340);
+        }
+        for (const s of steps.filter(x => x.kind === 'flat')) {
+          flats = Util.round2(flats + s.value); pop(s); Sfx.play('step', k++);
+          SRC.textContent = label(s); F.textContent = `${Util.signed(flats)} jetons`; bump(F);
+          await Util.sleep(280);
+        }
+        await Util.sleep(200);
+        SRC.textContent = st.net > 0 ? 'Gagné !' : st.net < 0 ? 'Perdu' : 'Rendu';
+        T.textContent = Util.signed(st.net);
+        T.className = 'sb-total show ' + (st.net > 0 ? 'win' : st.net < 0 ? 'lose' : 'push');
         Sfx.play(st.net > 0 ? 'coins' : 'push');
-        setTimeout(() => { box.classList.add('out'); setTimeout(() => { box.hidden = true; box.classList.remove('out'); }, 400); }, Util.dur(2600) + 600);
+        setTimeout(() => { box.classList.add('out'); setTimeout(() => { box.hidden = true; box.classList.remove('out', 'hot'); }, 400); }, Util.dur(1800) + 500);
       }
       if (st.net !== 0) floatGain(st.net);
       if (st.net > 0) {
