@@ -9,20 +9,20 @@ const CONFIG = {
   // bankroll (jetons − dettes) atteint le palier. Pas de limite de mises :
   // on ne perd que par faillite. La mise max suit le palier.
   // Palier de la table n (0 = petite table de l'étage 1) : jetonsDepart × Π (croissanceDepart + croissanceParTable × k)
-  // → 130, 200, 310 | 490, 810, 1 400 | … des millions au boss final. Il faut un build pour suivre.
+  // → 120, 150, 200 | 270, 390, 590 | … des centaines de millions au boss final. Il faut un build pour suivre.
   progression: {
     etagesPourGagner: 8,
     jetonsDepart: 100,
-    croissanceDepart: 1.3,     // la 1re table demande ×1,3
-    croissanceParTable: 0.05, // puis chaque table un peu plus (×2,45 au boss final)
+    croissanceDepart: 1.2,     // la 1re table demande ×1,2
+    croissanceParTable: 0.065, // puis chaque table un peu plus (×2,7 au boss final)
     miseMaxRatio: 0.25,        // mise max = 25 % du palier visé à l'étage 1…
     miseMaxDecroissance: 0.85, // …puis ×0,85 par étage (≈ 8 % du palier à l'étage 8) : il faut des multiplicateurs
     miseMin: 1,
     miseMinRatio: 0.03,        // mise minimale = 3 % du palier (en dessous, c'est la faillite)
-    croissanceMin: 1.25,       // une table demande toujours au moins +25 % de ta bankroll de départ
-    relancesParTable: 3,       // refaire un tirage raté sans miser à nouveau
+    croissanceMin: 1.1,        // une table demande toujours au moins +10 % de ta bankroll de départ
+    relancesParTable: 3,       // refaire un tirage raté (en payant une part de la mise)
     relancesParMise: 1,        // relances utilisables sur une même mise
-    coutRelance: 0.15,         // une relance coûte 15 % de la mise en cours
+    coutRelance: 0.25,         // une relance coûte 25 % de la mise en cours
     jokerDeDepart: 3,          // choix entre 3 jokers communs en début de partie
 
     // Récompense de table : une part du palier atteint
@@ -53,9 +53,9 @@ const CONFIG = {
     // Poids de rareté selon la manche (n = numéro de la manche)
     // Poids de rareté selon l'étage (n)
     rarityWeights: n => ({ commun: 70 - 3 * n, rare: 25 + 2 * n, legendaire: 5 + n }),
-    reroll: { base: 6, step: 4 },     // prix pour un palier de 150 (tous les prix suivent le palier)
+    reroll: { base: 4, step: 3 },     // prix pour un palier de 150 (tous les prix suivent le palier)
     sellRatio: 0.5,
-    jokerSlots: { base: 5, prices: [90, 160, 260] },
+    jokerSlots: { base: 5, prices: [50, 90, 150] },
     consumableSlots: 2,
   },
 
@@ -69,56 +69,68 @@ const CONFIG = {
     penaltyMaxBet: 0.7,    // et l'huissier réduit la mise max de 30 % à la table suivante
   },
 
-  // Prix pour un palier de 150 : ils suivent le palier visé (≈ 12-18 % du palier pour un commun)
+  // Prix pour un palier de 150 : ils suivent le palier prévu de la prochaine table.
+  // Commun ≈ 8-11 % du palier, rare ≈ 15-20 %, légendaire ≈ 25-32 % : tout est achetable, rien n'est gratuit.
   jokers: {
     // Communs
-    porte: { rarity: 'commun', price: 20, pct: 0.2 },
-    rouge: { rarity: 'commun', price: 20, bonus: 0.5 },
-    septieme: { rarity: 'commun', price: 22, stake: 0.15 },
-    molle: { rarity: 'commun', price: 24, refund: 0.25 },
-    compteur: { rarity: 'commun', price: 24, pct: 0.35 },
-    consolation: { rarity: 'commun', price: 18, stake: 0.1 },
-    depipe: { rarity: 'commun', price: 22, pct: 0.4, charges: 1 },
-    serie: { rarity: 'commun', price: 26, pct: 0.12 },
+    porte: { rarity: 'commun', price: 14, pct: 0.2 },
+    rouge: { rarity: 'commun', price: 12, bonus: 0.5 },
+    septieme: { rarity: 'commun', price: 14, stake: 0.15 },
+    molle: { rarity: 'commun', price: 14, refund: 0.25 },
+    compteur: { rarity: 'commun', price: 14, pct: 0.35 },
+    consolation: { rarity: 'commun', price: 12, stake: 0.1 },
+    depipe: { rarity: 'commun', price: 13, pct: 0.4, charges: 1 },
+    serie: { rarity: 'commun', price: 16, pct: 0.12 },
     // Rares
-    corrompu: { rarity: 'rare', price: 45, cards: 1 },
-    martingale: { rarity: 'rare', price: 38, pct: 0.5 },
-    zero: { rarity: 'rare', price: 40, straightMult: 2 },
-    cerise: { rarity: 'rare', price: 40, wildRatio: 0.6 },
-    pickpocket: { rarity: 'rare', price: 36, pct: 0.3 },
-    miroir: { rarity: 'rare', price: 48 },
-    assurance: { rarity: 'rare', price: 34, palier: 0.6 },
-    doubleur: { rarity: 'rare', price: 40, mult: 2.5 },
-    cristal: { rarity: 'rare', price: 42, pct: 0.5, mult: 2 },
-    grosbras: { rarity: 'rare', price: 42, pct: 0.1 },
+    corrompu: { rarity: 'rare', price: 28, cards: 1 },
+    martingale: { rarity: 'rare', price: 24, pct: 0.4, cap: 5, minStake: 0.25 },
+    zero: { rarity: 'rare', price: 24, straightMult: 2 },
+    cerise: { rarity: 'rare', price: 24, wildRatio: 0.6 },
+    pickpocket: { rarity: 'rare', price: 22, pct: 0.3 },
+    miroir: { rarity: 'rare', price: 30 },
+    assurance: { rarity: 'rare', price: 22, palier: 0.6 },
+    doubleur: { rarity: 'rare', price: 24, mult: 2.5 },
+    cristal: { rarity: 'rare', price: 26, pct: 0.5, mult: 2 },
+    grosbras: { rarity: 'rare', price: 26, pct: 0.1 },
     // Légendaires
-    parrain: { rarity: 'legendaire', price: 95, perJoker: 0.3 },
-    tricheur: { rarity: 'legendaire', price: 85, mult: 2.5, catchChance: 0.25 },
-    roue: { rarity: 'legendaire', price: 80 },
-    banquier: { rarity: 'legendaire', price: 90, rate: 0.1 },
-    fantome: { rarity: 'legendaire', price: 80, charges: 2 },
-    jackpot: { rarity: 'legendaire', price: 100, step: 0.1, max: 3 },
-    midas: { rarity: 'legendaire', price: 100, step: 0.25 },
+    parrain: { rarity: 'legendaire', price: 46, perJoker: 0.3 },
+    tricheur: { rarity: 'legendaire', price: 42, mult: 2.5, catchChance: 0.25 },
+    roue: { rarity: 'legendaire', price: 38 },
+    banquier: { rarity: 'legendaire', price: 42, rate: 0.1 },
+    fantome: { rarity: 'legendaire', price: 38, charges: 2 },
+    jackpot: { rarity: 'legendaire', price: 46, step: 0.2, max: 4 },
+    midas: { rarity: 'legendaire', price: 46, step: 0.25 },
+    // Nouvelles stratégies
+    touriste: { rarity: 'commun', price: 13, pct: 0.4 },
+    habitue: { rarity: 'commun', price: 14, pct: 0.08 },
+    marchand: { rarity: 'commun', price: 12 },
+    collect7: { rarity: 'rare', price: 28, step: 0.05 },
+    tapis: { rarity: 'rare', price: 26, step: 0.3, fast: 3, slow: 6 },
+    faussaire: { rarity: 'rare', price: 22 },
+    carnet: { rarity: 'rare', price: 22, pct: 0.3 },
+    ivre: { rarity: 'rare', price: 28, standOn: 19 },
+    fusion: { rarity: 'legendaire', price: 48 },
+    russe: { rarity: 'legendaire', price: 40, mult: 3 },
   },
 
   consumables: {
-    bonus: { price: 12 },
-    dore: { price: 14, mult: 2 },
-    boisson: { price: 14 },
-    potdevin: { price: 20 },
-    ticket: { price: 8, table: [            // gains pour un palier de 150 (suivent le palier)
+    bonus: { price: 9 },
+    dore: { price: 10, mult: 2 },
+    boisson: { price: 10 },
+    potdevin: { price: 12 },
+    ticket: { price: 6, table: [            // gains pour un palier de 150 (suivent le palier)
       { w: 35, min: 0, max: 0 }, { w: 30, min: 4, max: 10 }, { w: 22, min: 12, max: 25 },
       { w: 11, min: 30, max: 50 }, { w: 2, min: 75, max: 75 },
     ] },
   },
   upgrades: {
-    vip: { price: 70, maxBet: 1.25 },
-    truque: { price: 60, ranks: [2, 3] },
-    doree: { price: 80 },
+    vip: { price: 40, maxBet: 1.25 },
+    truque: { price: 32, ranks: [2, 3] },
+    doree: { price: 40 },
   },
   packs: {
-    petit: { price: 22, choices: 3 },
-    mystere: { price: 60, legendaryChance: 0.25 },
+    petit: { price: 14, choices: 3 },
+    mystere: { price: 32, legendaryChance: 0.25 },
   },
   // Boss : règles spéciales de la 3e table de chaque étage
   bosses: {
@@ -145,7 +157,7 @@ const CONFIG = {
       blindPay: { 9: 500, 8: 50, 7: 10, 6: 3, 5: 1.5, 4: 1 },
       tripsPay: { 9: 50, 8: 40, 7: 30, 6: 8, 5: 6, 4: 5, 3: 3 },
     },
-    dice: { edge: 99, minTarget: 10, maxTarget: 95 },   // 10 % de chance minimum (×9,9 max)
+    dice: { edge: 99, minTarget: 10, maxTarget: 90, minRerollChance: 25 },   // 10 % de chance minimum (×9,9 max)
     roulette: { straight: 36, even: 2, dozen: 3, ai: { count: 3, min: 5, max: 50, step: 5 } },
     // Machine « Les Chats des Toits » : 5 rouleaux × 3 rangées, 20 lignes.
     // pay = multiples de la mise par ligne (mise / 20) pour 3, 4 et 5 symboles alignés.

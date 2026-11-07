@@ -70,7 +70,7 @@ const BlackjackEngine = (() => {
     if (alive) {
       const drawn = [];
       const tmp = r.dealer.slice();
-      while (value(tmp).total < C.standOn) { const c = draw(H, gs, r); tmp.push(c); drawn.push(c); }
+      while (value(tmp).total < ((r.rules && r.rules.standOn) || C.standOn)) { const c = draw(H, gs, r); tmp.push(c); drawn.push(c); }
       const q = H.query('bj.dealerSkip', { skip: 0, sources: [] });
       const skip = Math.min(drawn.length, q.skip);
       for (let i = 0; i < skip; i++) gs.shoe.cards.push(drawn.pop()); // remis dans le sabot
@@ -92,7 +92,7 @@ const BlackjackEngine = (() => {
       if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
       const note = ensureShoe(H, gs);
-      const rules = H.query('bj.rules', { bjPay: C.bjPay, charlie: 0 });
+      const rules = H.query('bj.rules', { bjPay: C.bjPay, charlie: 0, standOn: C.standOn });
       const r = { hands: [{ cards: [], bet }], dealer: [], active: 0, hideHole: true, bribed: false, stage: 'deal', insurance: 0, lastHit: null, notes: note ? [note] : [], rules, done: false };
       const h = r.hands[0];
       for (const t of [h.cards, r.dealer, h.cards, r.dealer]) t.push(draw(H, gs, r));

@@ -12,7 +12,8 @@ const UTHEngine = (() => {
       const max = H.maxBet('uth');
       if (ante > max || trips > max) return { error: `Mise maximale : ${max} (Ante) et ${max} (Trips).` };
       if (ante * 2 < H.minBet()) return { error: `Mise minimale à cette table : ${Math.ceil(H.minBet() / 2)} d'Ante.` };
-      if (!H.canAfford(ante * 2 + trips)) return { error: `Solde insuffisant (il faut ${ante * 2 + trips} : Ante + Blind${trips ? ' + Trips' : ''}).` };
+      // il faut pouvoir suivre jusqu'au bout : Ante + Blind + au moins un Play ×1
+      if (!H.canAfford(ante * 3 + trips)) return { error: `Solde insuffisant : il faut ${ante * 3 + trips} jetons (Ante + Blind + Play ×1${trips ? ' + Trips' : ''}) pour lancer une main. Baisse l'Ante.` };
       H.stake(ante * 2 + trips);
       const deck = Deck.create(H.rng, { decks: 1, exclude: H.excludedRanks() });
       const d = () => Deck.draw(deck, H.rng);

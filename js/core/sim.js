@@ -74,7 +74,7 @@ const Sim = (() => {
   function shop(H, opts) {
     const st = H.state;
     const next = H.objective(st.etage, st.tableType);
-    const floor = next * (opts.reserve != null ? opts.reserve : 0.5);
+    const floor = next * (opts.reserve != null ? opts.reserve : 0.65);
     const offers = st.shop.offers.map((o, i) => ({ ...o, i }));
     if (!opts.noJokers) offers.filter(o => o.kind === 'joker').map(o => ({ ...o, v: value(H, o.id) })).filter(o => o.v > 1).sort((a, b) => b.v - a.v)
       .forEach(o => { if (H.bankroll() - o.price >= floor && st.jokers.length < st.jokerSlots) H.buy(o.i); });
@@ -111,7 +111,7 @@ const Sim = (() => {
       if (st.phase !== 'play') break;
       useConsumables(H);
       const need = st.table.target - H.bankroll();
-      const game = opts.game || favorite(H) || (opts.strategy === 'blackjack' ? 'bj' : 'dice');
+      const game = H.onlyGame() || opts.game || favorite(H) || (opts.strategy === 'blackjack' ? 'bj' : 'dice');
       if (game === 'dice') {
         // « Sniper » : mise max au Dice, avec la chance calibrée pour combler l'écart en un coup
         const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));

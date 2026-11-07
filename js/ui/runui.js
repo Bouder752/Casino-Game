@@ -124,7 +124,7 @@ const UI = (() => {
     const art = d.kind === 'joker' ? JokerArt.svg(id) : `<div class="jc-emoji">${d.icon}</div>`;
     const sym = d.kind === 'joker' ? RAR_SYM[d.rarity] : '';
     e.innerHTML = `<div class="jc-frame"><div class="jc-art">${art}</div><div class="jc-name">${sym ? `<i>${sym}</i> ` : ''}${d.name}</div></div>` +
-      (id === 'jackpot' ? `<div class="jc-badge">×${META.jackpot.toFixed(1)}</div>` : '') +
+      (id === 'jackpot' && uid && isRun() ? `<div class="jc-badge">×${((S().jokers.find(x => x.uid === +uid) || {}).state || {}).x ? S().jokers.find(x => x.uid === +uid).state.x.toFixed(1) : '1'}</div>` : '') +
       (price !== undefined ? `<div class="jc-price ${typeof price === 'number' && !H().canAfford(price) ? 'cant' : ''}">${typeof price === 'number' ? '<span class="wallet-chip s"></span>' : ''}${price}</div>` : '');
     e.setAttribute('aria-label', `${d.name} : ${d.desc(H(), uid && isRun() ? S().jokers.find(x => x.uid === +uid) : null)}`);
     if (d.grows) e.classList.add('grows');
@@ -581,7 +581,7 @@ const UI = (() => {
   function renderMenu() {
     $('m-continue').hidden = !Engine.hasSave();
     $('m-prestige').textContent = `✦ ${META.prestige}`;
-    $('m-stats').innerHTML = `Meilleur étage : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b> · Jackpot Éternel : <b>×${META.jackpot.toFixed(1)}</b>`;
+    $('m-stats').innerHTML = `Meilleur étage : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b>`;
   }
   function renderCosmetics() {
     const root = $('cosmetics');

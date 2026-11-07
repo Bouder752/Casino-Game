@@ -12,7 +12,7 @@ const DiceEngine = (() => {
     r.roll = v;
     r.rolls.push(v);
     r.win = r.mode === 'under' ? v < r.target : v >= r.target;
-    r.stage = !r.win && H.charges('dice') > 0 ? 'decide' : 'done';
+    r.stage = !r.win && r.chance >= C.minRerollChance && H.charges('dice') > 0 ? 'decide' : 'done';
     r.done = r.stage === 'done';
   }
   return Games.register({
@@ -21,7 +21,10 @@ const DiceEngine = (() => {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
       if (bet > H.maxBet('dice')) return { error: `Mise maximale : ${H.maxBet('dice')}.` };
       if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
-      target = Math.max(C.minTarget, Math.min(C.maxTarget, Math.round(target)));
+      target = Math.round(target);
+      // la chance de gagner reste entre minTarget et maxTarget %, au-dessus comme en dessous
+      if (mode === 'over') target = Math.max(100 - C.maxTarget, Math.min(100 - C.minTarget, target));
+      else target = Math.max(C.minTarget, Math.min(C.maxTarget, target));
       if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
       const r = { bet, target, mode, rolls: [], ...quote(H, target, mode) };
       roll(H, r);

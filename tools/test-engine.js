@@ -25,7 +25,7 @@ ok([1, 2, 3].every(() => r1.next() === r2.next()), 'RNG reproductible');
 // 2. Objectifs et structure des étages
 let H = Engine.newRun({ seed: 'O', meta: meta(), persist: false });
 const objs = []; for (let e = 1; e <= 9; e++) ['petite', 'grande', 'boss'].forEach(t => objs.push(H.objective(e, t)));
-ok(objs[0] === 130 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
+ok(objs[0] === 120 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
 ok(objs.every((v, i) => i < 2 || v / objs[i - 1] >= objs[i - 1] / objs[i - 2] - 0.05), 'la croissance des paliers s\'accélère');
 ok(H.state.starter && H.state.starter.length === P.jokerDeDepart && H.state.starter.every(id => JOKERS[id].rarity === 'commun'), 'choix du joker de départ');
 const st0 = H.state.starter[0];
@@ -45,7 +45,7 @@ ok(H.state.phase === 'shop' && H.state.tableType === 'grande', 'palier atteint �
 ok(H.state.summary.lines[0].value === Math.round(P.recompenseTable.petite * H.state.summary.target), 'récompense de table = part du palier');
 ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= P.interets.maxPalier * H.state.summary.target), 'intérêts plafonnés');
 const cheap = Math.min(...H.state.shop.offers.filter(o => o.kind === 'joker').map(o => o.price));
-ok(H.state.shop.offers.every(o => o.price === H.scale(api.CATALOG[o.id].price)) && H.scale(P.prixReference) === H.tableTarget('grande'), `prix proportionnels au palier visé (joker le moins cher : ${cheap})`);
+ok(H.state.shop.offers.every(o => o.price === H.scale(api.CATALOG[o.id].price)) && H.scale(P.prixReference) === H.objective(1, 'grande'), `prix proportionnels au palier visé (joker le moins cher : ${cheap})`);
 H.leaveShop();
 ok(H.state.phase === 'choose', 'sortie du shop → choix de table');
 
@@ -55,6 +55,7 @@ const sk = H.skipTable();
 ok(sk.ok && H.state.tableType === 'boss' && H.state.etageLog.grande === 'skipped', 'grande table passée');
 ok(tag === 'cadeau' || H.state.statuses.some(s => s.id === tag), `tag obtenu (${tag})`);
 ok(!!H.skipTable().error, 'le boss ne se passe pas');
+H.state.bossId = 'sobre';
 H.chooseTable();
 ok(!!H.state.table.boss, 'table du boss');
 winTable(H);
@@ -83,8 +84,8 @@ H = withBoss('sobre'); H.addJoker('fantome');
 ok(H.charges('dice') === 0, 'Le Videur : aucune relance');
 H = withBoss('avare'); let s = play(H, 10, 30);
 ok(s.mult === 0.75 && s.net === 15, `Croupier Avare : gains −25 % (net ${s.net})`);
-H = withBoss('gourmand'); H.state.table.target = 150; s = play(H, 10, 20);
-ok(s.net === 10 - 3 && H.chips() === P.jetonsDepart + 7, `Gourmand : 3 jetons par mise au palier 150 (net ${s.net})`);
+H = withBoss('gourmand'); H.state.table.target = 1e9; const fee = H.scale(3); s = play(H, 10, 20);
+ok(s.net === 10 - fee && H.chips() === P.jetonsDepart + 10 - fee, `Gourmand : frais de mise selon le palier (net ${s.net})`);
 H = withBoss('endormi'); ['tricheur', 'porte'].forEach(id => H.addJoker(id)); s = play(H, 10, 20);
 ok(s.mult === 1 && Math.abs(s.add - 0.2) < 1e-9, 'Gardien Endormi : joker de gauche désactivé');
 const realRL = api.Games.get('roulette');
@@ -108,11 +109,13 @@ H = run('T2'); ['miroir', 'miroir', 'tricheur'].forEach(id => H.addJoker(id));
 ok(play(H, 10, 20).mult === 15.63, 'miroir ×2,5 ×2,5 ×2,5');
 H = run('T3'); ['tricheur', 'miroir'].forEach(id => H.addJoker(id));
 ok(play(H, 10, 20).mult === 2.5, 'miroir sans voisin à droite : aucun effet');
-H = run('T4'); H.addJoker('martingale');
-play(H, 10, 0); play(H, 10, 0); newTable(H);
+H = run('T4'); H.addJoker('martingale'); H.state.table.target = 400; H.state.chips = 300;
+play(H, 2, 0);
+ok(!H.state.jokers[0].state.streak, 'martingale : une mini-mise ne compte pas');
+play(H, 30, 0); play(H, 30, 0); newTable(H);
 ok(H.state.jokers[0].state.streak === 2, 'martingale : série conservée d\'une table à l\'autre');
 s = play(H, 10, 20);
-ok(Math.abs(s.add - 1) < 1e-9 && H.state.jokers[0].state.streak === 0, 'martingale +50 % par perte puis remise à zéro');
+ok(Math.abs(s.add - 0.8) < 1e-9 && H.state.jokers[0].state.streak === 0, 'martingale +40 % par perte puis remise à zéro');
 
 // 10. Main Molle (1re défaite de blackjack par table) et Consolation
 H = run('T5'); ['molle', 'consolation'].forEach(id => H.addJoker(id));
@@ -140,7 +143,7 @@ for (let k = 0; k < 30; k++) {
 ok(H.state.jokers.length === H.state.jokerSlots, 'emplacements remplis');
 const off = H.state.shop.offers.findIndex(o => o.kind === 'joker');
 ok(off < 0 || H.buy(off).error, 'achat refusé faute d\'emplacement');
-ok(H.state.shop.rerollCost === H.scale(CONFIG.shop.reroll.base + 30 * CONFIG.shop.reroll.step), 'reroll à prix croissant');
+ok(H.state.shop.rerolls === 30 && H.state.shop.rerollCost === H.scale(CONFIG.shop.reroll.base + 30 * CONFIG.shop.reroll.step), 'reroll à prix croissant');
 const j0 = H.state.jokers[0], before = H.chips();
 H.sellJoker(j0.uid);
 ok(H.chips() - before === Math.floor(j0.paid / 2), 'revente à 50 % du prix payé');
@@ -242,6 +245,14 @@ api.Games.register({ ...api.Games.get('test'), id: 'dice' });
 s = sev.startPlay('dice', { bet: 10, back: 0, draws: [{ kind: 'number', value: '17.77' }] }).settlement;
 ok(s.flats === 1.5, `Septième Ciel au Dice : seule la partie entière compte (bonus ${s.flats})`);
 api.Games.register(realDice);
+
+// 25. Boss « un seul jeu »
+const mono = Engine.newRun({ seed: 'MONO', meta: meta(), persist: false }); mono.state.tableType = 'boss'; mono.state.bossId = 'mono_bj'; mono.state.chips = 100; mono.chooseTable();
+ok(mono.onlyGame() === 'bj' && /seul le Blackjack/.test(mono.startPlay('dice', { bet: 10, target: 50, mode: 'under' }).error || ''), 'boss « Le Puriste » : seul le Blackjack est ouvert');
+ok(!mono.startPlay('bj', { bet: 10 }).error, 'le jeu imposé reste jouable');
+// 26. Hold'em : impossible de lancer une main sans pouvoir payer le Play ×1
+const u = Engine.newRun({ seed: 'UTH', meta: meta(), persist: false }); u.chooseTable(); u.state.chips = 25;
+ok(/Play ×1/.test(u.startPlay('uth', { ante: 10 }).error || '') && u.chips() === 25, 'Hold\'em : il faut Ante + Blind + Play ×1');
 
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

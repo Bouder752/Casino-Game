@@ -117,7 +117,7 @@ const Engine = (() => {
     }
     H.mods = mods;
     function currentBoss() { return state.table && state.table.boss ? BOSSES[state.table.boss] : null; }
-    function disabled(boss, def, i) { return !!(boss && ((boss.disables && boss.disables(def)) || (boss.disablesIndex && boss.disablesIndex(i)))); }
+    function disabled(boss, def, i) { return !!(boss && ((boss.disables && boss.disables(def)) || (boss.disablesIndex && boss.disablesIndex(i, state.jokers)))); }
     // Émet un événement ; les modificateurs lisent/modifient e, qui est renvoyé
     H.emit = (name, e = {}) => {
       for (const { def, me } of mods()) {
@@ -207,14 +207,18 @@ const Engine = (() => {
     H.gameState = gameState;
     H.active = () => active;
     H.busy = () => !!active;
-    H.canStart = () => {
+    // Jeu imposé par le boss (null = tous les jeux ouverts)
+    H.onlyGame = () => { const b = currentBoss(); return b && b.onlyGame ? b.onlyGame : null; };
+    H.canStart = id => {
+      const only = H.onlyGame();
+      if (only && id && id !== only) return `${currentBoss().name} : seul le ${Games.get(only).name} est ouvert à cette table.`;
       if (active) return `Termine d'abord ta main en cours (${Games.get(active.id).name}).`;
       if (!isRun) return null;
       if (state.phase !== 'play') return 'Aucune table en cours.';
       return null;
     };
     H.startPlay = (id, params) => {
-      const err = H.canStart();
+      const err = H.canStart(id);
       if (err) return { error: err };
       const G = Games.get(id);
       const play = { game: id, steps: [] };
@@ -289,6 +293,8 @@ const Engine = (() => {
       e.outcome = e.gain > 0 ? 'win' : e.gain < 0 ? 'loss' : 'push';
       H.emit('onSettle', e);
       H.emit(e.outcome === 'win' ? 'onWin' : e.outcome === 'loss' ? 'onLoss' : 'onPush', e);
+      // La Fusion : chaque bonus en % devient un multiplicateur
+      if (mods().some(m => m.def.fusion)) e.steps = e.steps.map(s => (s.kind === 'add' ? { ...s, kind: 'mult', value: Math.round((1 + s.value) * 1000) / 1000, label: (s.label ? s.label + ' · ' : '') + 'fusion' } : s));
       const steps = e.steps.map((s, i) => ({ s, i })).sort((a, b) => KIND_ORDER[a.s.kind] - KIND_ORDER[b.s.kind] || a.i - b.i).map(x => x.s);
       const add = steps.filter(s => s.kind === 'add').reduce((a, s) => a + s.value, 0);
       const mult = steps.filter(s => s.kind === 'mult').reduce((a, s) => a * s.value, 1);
@@ -369,7 +375,8 @@ const Engine = (() => {
       return nice(t);
     };
     // Les prix et montants de la config sont donnés pour un palier de référence (150) : ils suivent le palier visé
-    const refTarget = () => (state.table ? state.table.target : isRun ? H.objective(state.etage || 1, state.tableType || 'petite') : P.prixReference);
+    // prix : selon le palier prévu de la table (pas selon ta bankroll : être riche ne rend pas le Comptoir plus cher)
+    const refTarget = () => (isRun ? H.objective(state.etage || 1, state.table ? state.table.type : state.tableType || 'petite') : P.prixReference);
     H.scale = v => (v > 0 ? Math.max(1, Math.round(v * refTarget() / P.prixReference)) : 0);
     H.sellValue = j => Math.floor((j.paid != null ? j.paid : H.scale(JOKERS[j.id].price)) * CONFIG.shop.sellRatio);
     H.loanOptions = () => CONFIG.loans.options.map(o => ({ ...o, amount: H.scale(o.amount) }));
@@ -665,7 +672,8 @@ const Engine = (() => {
       const opt = H.loanOptions().find(o => o.id === id);
       if (!opt) return { error: 'Prêt inconnu.' };
       if (state.debts.length >= CONFIG.loans.maxActive) return { error: 'Rembourse d\'abord ton prêt en cours.' };
-      const total = Math.round(opt.amount * (1 + opt.rate));
+      const free = state.jokers.some(j => JOKERS[j.id].noLoanInterest);
+      const total = Math.round(opt.amount * (1 + (free ? 0 : opt.rate)));
       state.debts.push({ id, name: opt.name, total, left: total, per: Math.ceil(total / opt.tables), missed: 0 });
       H.give(opt.amount);
       save(); notify('change');

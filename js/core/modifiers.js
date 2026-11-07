@@ -54,10 +54,13 @@ const JOKER_DEFS = [
   { id: 'corrompu', name: 'Le Croupier Corrompu', icon: '🤵', tags: ['Blackjack'], desc: () => 'Blackjack : le croupier tire une carte de moins.',
     'bj.dealerSkip'(e, me) { e.skip += J.corrompu.cards; e.sources.push(me); } },
   { id: 'martingale', name: 'La Martingale', icon: '📈', tags: ['Tous les jeux', 'Grandit'], grows: true,
-    desc: (h, j) => `Chaque perte d'affilée ajoute +${pct(J.martingale.pct)} à ton prochain gain.${j && j.state.streak ? ` En réserve : +${pct(J.martingale.pct * j.state.streak)}.` : ''}`,
+    desc: (h, j) => `Chaque perte d'affilée (mise d'au moins ${pct(J.martingale.minStake)} de la mise max) ajoute +${pct(J.martingale.pct)} à ton prochain gain, ${J.martingale.cap} pertes au plus.${j && j.state.streak ? ` En réserve : +${pct(J.martingale.pct * j.state.streak)}.` : ''}`,
     onSettle(e, me) { if (winOn(e) && me.state.streak) e.add(me, J.martingale.pct * me.state.streak, `${me.state.streak} perte(s) d'affilée`); },
     onWin(e, me) { me.state.streak = 0; },
-    onLoss(e, me) { me.state.streak = (me.state.streak || 0) + 1; me.flash(`+${pct(J.martingale.pct * me.state.streak)}`); } },
+    onLoss(e, me) {
+      if (e.staked < me.host.maxBet(e.game) * J.martingale.minStake) return; // les mini-mises ne comptent pas
+      me.state.streak = Math.min(J.martingale.cap, (me.state.streak || 0) + 1); me.flash(`+${pct(J.martingale.pct * me.state.streak)}`);
+    } },
   { id: 'zero', name: 'Le Zéro Ami', icon: '🟢', tags: ['Roulette'], desc: () => `Roulette : le 0 te rend tes mises, et un numéro plein gagnant paie ×${J.zero.straightMult}.`,
     onResolve(e, me) {
       if (e.game !== 'roulette') return;
@@ -129,14 +132,80 @@ const JOKER_DEFS = [
   { id: 'fantome', name: 'Le Fantôme du Casino', icon: '👻', tags: ['Relances'], desc: () => `${J.fantome.charges} relances de plus par table : annule un tirage et refais-le (carte, dé, roulette, machine).`,
     onRoundStart(e, me) { me.host.addCharge(me, 'any', J.fantome.charges); } },
   { id: 'jackpot', name: 'Jackpot Éternel', icon: '💎', tags: ['Multiplicateur', 'Grandit'], grows: true,
-    desc: h => `Gains ×${h ? h.meta.jackpot.toFixed(1) : '1'} : +${J.jackpot.step} à chaque table gagnée (×${J.jackpot.max} max). Il ne se réinitialise jamais, même entre les parties.`,
-    onSettle(e, me) { if (winOn(e) && me.host.meta.jackpot !== 1) e.mult(me, me.host.meta.jackpot); },
-    onRoundEnd(e, me) { me.host.meta.jackpot = Math.min(J.jackpot.max, Math.round((me.host.meta.jackpot + J.jackpot.step) * 10) / 10); me.host.saveMeta(); me.flash(`×${me.host.meta.jackpot.toFixed(1)}`); } },
+    desc: (h, j) => `Gains ×${j ? (j.state.x || 1).toFixed(2).replace('.', ',') : '1'} : +${String(J.jackpot.step).replace('.', ',')} à chaque table gagnée tant que tu le gardes (×${J.jackpot.max} max).`,
+    onSettle(e, me) { if (winOn(e) && (me.state.x || 1) > 1) e.mult(me, me.state.x); },
+    onRoundEnd(e, me) { me.state.x = Math.min(J.jackpot.max, Math.round(((me.state.x || 1) + J.jackpot.step) * 100) / 100); me.flash(`×${me.state.x.toFixed(2)}`); } },
   { id: 'midas', name: 'Le Roi Midas', icon: '👑', tags: ['Multiplicateur', 'Grandit'], grows: true,
     desc: (h, j) => `Gains ×${j ? (1 + J.midas.step * (j.state.wins || 0)).toFixed(2).replace('.', ',') : '1'} : +${String(J.midas.step).replace('.', ',')} à chaque victoire, retour à ×1 à chaque défaite.`,
     onSettle(e, me) { if (winOn(e) && me.state.wins) e.mult(me, 1 + J.midas.step * me.state.wins, `${me.state.wins} victoire(s)`); },
     onWin(e, me) { me.state.wins = (me.state.wins || 0) + 1; me.flash(`×${(1 + J.midas.step * me.state.wins).toFixed(2)}`); },
     onLoss(e, me) { if (me.state.wins) me.flash('×1'); me.state.wins = 0; } },
+
+  // ---------------- Nouvelles stratégies ----------------
+  { id: 'touriste', name: 'Le Touriste', icon: '🧳', tags: ['Variété'], desc: () => `+${pct(J.touriste.pct)} sur ta première victoire dans chaque jeu différent, à chaque table.`,
+    onRoundStart(e, me) { me.state.games = []; },
+    onSettle(e, me) {
+      const g = me.state.games || (me.state.games = []);
+      if (winOn(e) && !g.includes(e.game)) { g.push(e.game); e.add(me, J.touriste.pct, `1re victoire au ${Games.get(e.game).name}`); }
+    } },
+  { id: 'habitue', name: "L'Habitué", icon: '☕', tags: ['Spécialiste', 'Grandit'], grows: true,
+    desc: (h, j) => `+${pct(J.habitue.pct)} sur tes gains par table d'affilée gagnée en ne jouant qu'au même jeu. Changer de jeu le remet à zéro.${j && j.state.stack ? ` Actuellement : +${pct(J.habitue.pct * j.state.stack)} (${Games.get(j.state.game).name}).` : ''}`,
+    onRoundStart(e, me) { me.state.played = []; },
+    onBetPlaced(e, me) { const p = me.state.played || (me.state.played = []); if (!p.includes(e.game)) p.push(e.game); },
+    onSettle(e, me) { if (winOn(e) && me.state.stack && e.game === me.state.game) e.add(me, J.habitue.pct * me.state.stack, `${me.state.stack} table(s) au même jeu`); },
+    onRoundEnd(e, me) {
+      const p = me.state.played || [];
+      if (p.length === 1 && p[0] === me.state.game) me.state.stack = (me.state.stack || 0) + 1;
+      else if (p.length === 1) { me.state.game = p[0]; me.state.stack = 1; }
+      else me.state.stack = 0;
+      if (me.state.stack) me.flash(`+${pct(J.habitue.pct * me.state.stack)}`);
+    } },
+  { id: 'marchand', name: 'Le Marchand', icon: '🛒', tags: ['Économie'], desc: () => 'Au Comptoir : un joker et un consommable de plus en vitrine.',
+    onShopEnter(e, me) {
+      const id = e.rollJoker({ exclude: e.shop.offers.map(o => o.id) });
+      if (id) e.shop.offers.unshift({ kind: 'joker', id, price: e.scale(JOKERS[id].price), sold: false });
+      const c = CONSUMABLE_DEFS[Math.floor(me.host.rng.next() * CONSUMABLE_DEFS.length)];
+      e.shop.offers.push({ kind: 'consumable', id: c.id, price: e.scale(c.price), sold: false });
+    } },
+  { id: 'collect7', name: 'Le Collectionneur de 7', icon: '🎰', tags: ['Sept', 'Multiplicateur', 'Grandit'], grows: true,
+    desc: (h, j) => `Gains ×${j ? (1 + J.collect7.step * (j.state.n || 0)).toFixed(2).replace('.', ',') : '1'} : +${String(J.collect7.step).replace('.', ',')} pour toujours à chaque 7 tiré (carte, dé, roulette, machine).`,
+    onSettle(e, me) { if (winOn(e) && me.state.n) e.mult(me, 1 + J.collect7.step * me.state.n, `${me.state.n} × 7 collectionnés`); },
+    onCardDrawn(e, me) { if (e.card.rank === 7) me.state.n = (me.state.n || 0) + 1; },
+    onDraw(e, me) {
+      const n = e.kind === 'symbol' ? (e.value === 'sept' ? 1 : 0) : countSevens(e.game === 'dice' ? Math.floor(+e.value) : e.value);
+      if (n) { me.state.n = (me.state.n || 0) + n; me.flash(`7 ×${me.state.n}`); }
+    } },
+  { id: 'tapis', name: 'Le Tapis Vert', icon: '🟩', tags: ['Risque', 'Multiplicateur', 'Grandit'], grows: true,
+    desc: (h, j) => `Gains ×${j ? (1 + J.tapis.step * (j.state.k || 0)).toFixed(1).replace('.', ',') : '1'}. Une table gagnée en ${J.tapis.fast} mises ou moins : +${String(J.tapis.step).replace('.', ',')} pour toujours. Plus de ${J.tapis.slow} mises à une table : il perd tout.`,
+    onRoundStart(e, me) { me.state.bets = 0; },
+    onBetPlaced(e, me) {
+      me.state.bets = (me.state.bets || 0) + 1;
+      if (me.state.bets === J.tapis.slow + 1 && me.state.k) { me.state.k = 0; me.flash('Tout perdu !'); }
+    },
+    onSettle(e, me) { if (winOn(e) && me.state.k) e.mult(me, 1 + J.tapis.step * me.state.k, 'tapis vert'); },
+    onRoundEnd(e, me) { if ((me.state.bets || 0) <= J.tapis.fast) { me.state.k = (me.state.k || 0) + 1; me.flash(`×${(1 + J.tapis.step * me.state.k).toFixed(1)}`); } } },
+  { id: 'faussaire', name: 'Le Faussaire', icon: '🖋️', tags: ['Consommables'], desc: () => 'À chaque table gagnée, il copie ton dernier consommable (s\'il te reste de la place).',
+    onRoundEnd(e, me) {
+      const st = me.host.state, last = st.consumables[st.consumables.length - 1];
+      if (last && st.consumables.length < st.consSlots) { st.consumables.push(last); e.lines.push({ label: `🖋️ Faussaire : ${CONSUMABLES[last].name} copié`, value: 0 }); me.flash('Copie !'); }
+    } },
+  { id: 'carnet', name: 'Le Carnet de Dettes', icon: '📒', tags: ['Dette'], desc: () => `Tes prêts sont sans intérêts, et +${pct(J.carnet.pct)} sur tes gains tant que tu as une dette.`,
+    noLoanInterest: true,
+    onSettle(e, me) { if (winOn(e) && me.host.state.debts.length) e.add(me, J.carnet.pct, 'dette en cours'); } },
+  { id: 'ivre', name: 'Le Croupier Ivre', icon: '🍾', tags: ['Blackjack'], desc: () => `Blackjack : le croupier tire tant qu'il a moins de ${J.ivre.standOn} (il saute bien plus souvent).`,
+    'bj.rules'(e) { e.standOn = Math.max(e.standOn || 17, J.ivre.standOn); } },
+  { id: 'fusion', name: 'La Fusion', icon: '⚗️', tags: ['Multiplicateur'], fusion: true, desc: () => 'Tous tes bonus en % deviennent des multiplicateurs : ils se multiplient au lieu de s\'additionner.' },
+  { id: 'russe', name: 'La Roulette Russe', icon: '🔫', tags: ['Risque', 'Multiplicateur'], desc: () => `Gains ×${J.russe.mult}. Mais ta première perte de chaque table détruit le joker à sa droite.`,
+    onRoundStart(e, me) { me.state.fired = false; },
+    onSettle(e, me) { if (winOn(e)) e.mult(me, J.russe.mult); },
+    onLoss(e, me) {
+      if (me.state.fired) return;
+      me.state.fired = true;
+      const js = me.host.state.jokers, i = js.findIndex(j => j.uid === me.uid);
+      const victim = i >= 0 ? js[i + 1] : null;
+      if (victim) { me.host.notify('toast', { text: `🔫 La Roulette Russe a parlé : ${JOKERS[victim.id].name} est détruit.` }); me.host.removeJoker(victim.uid); }
+      else me.flash('Clic… à vide');
+    } },
 ];
 JOKER_DEFS.forEach(d => Object.assign(d, { kind: 'joker', rarity: J[d.id].rarity, price: J[d.id].price }));
 const JOKERS = Object.fromEntries(JOKER_DEFS.map(d => [d.id, d]));
@@ -173,10 +242,18 @@ const BOSS_DEFS = [
       if (e.game === 'roulette' && b && e.info.color === 'red') { e.info.redVoid = true; e.adjust(me, -b * CONFIG.games.roulette.even, 'le rouge ne paie rien'); }
     } },
   { id: 'sobre', name: 'Le Videur', desc: () => 'Aucune relance autorisée.', onRoundStart(e) { e.table.noRerolls = true; } },
-  { id: 'endormi', name: 'Le Gardien Endormi', desc: () => 'Le joker le plus à gauche est désactivé.', disablesIndex: i => i === 0 },
+  { id: 'endormi', name: 'Le Gardien Endormi', desc: () => 'Ton joker le plus cher est désactivé.',
+    disablesIndex: (i, jokers) => { let best = 0; jokers.forEach((j, k) => { if (JOKERS[j.id].price > JOKERS[jokers[best].id].price) best = k; }); return i === best; } },
   { id: 'gourmand', name: 'Le Gourmand', desc: h => `Chaque mise coûte ${h ? h.scale(B.gourmand.fee) : B.gourmand.fee} jetons en plus.`,
     betFee(e, me) { e.fee += me.host.scale(B.gourmand.fee); e.sources.push(me); } },
 ];
+  // Boss « un seul jeu » : la table n'ouvre qu'un jeu, ton build doit s'adapter
+const MONO = [
+  ['mono_bj', 'Le Puriste', 'bj', 'Blackjack'], ['mono_uth', 'Le Requin du Poker', 'uth', "Hold'em"],
+  ['mono_slots', 'La Reine des Machines', 'slots', 'Machine'], ['mono_roulette', 'Le Croupier Tournant', 'roulette', 'Roulette'],
+  ['mono_dice', 'Le Lanceur de Dés', 'dice', 'Dice'],
+];
+MONO.forEach(([id, name, game, label]) => BOSS_DEFS.push({ id, name, onlyGame: game, desc: () => `Seul le ${label} est ouvert à cette table.` }));
   // Boss final de l'étage 8 : le patron du casino en personne
 BOSS_DEFS.push({ id: 'patron', final: true, name: 'Le Patron du Casino', desc: () => `Boss final : gains −${pct(1 - B.patron.mult)} et mise max −${pct(1 - B.patron.maxBet)}.`,
   onSettle(e, me) { if (e.outcome === 'win') e.mult(me, B.patron.mult, 'le Patron surveille'); },
