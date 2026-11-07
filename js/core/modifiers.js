@@ -102,12 +102,14 @@ const JOKER_DEFS = [
       const n = me.host.state.jokers.length - 1;
       if (winOn(e) && n > 0) e.mult(me, 1 + n * J.parrain.perJoker, `${n} autre(s) joker(s)`);
     } },
-  { id: 'tricheur', name: 'Le Tricheur Maladroit', icon: '🃏', tags: ['Tous les jeux', 'Multiplicateur'], desc: () => `Gains ×${String(J.tricheur.mult).replace('.', ',')}, mais à chaque table gagnée tu as ${pct(J.tricheur.catchChance)} de chances d'être pris : tu perds un joker au hasard.`,
+  { id: 'tricheur', name: 'Le Tricheur Maladroit', icon: '🃏', tags: ['Tous les jeux', 'Multiplicateur'], desc: () => `Gains ×${String(J.tricheur.mult).replace('.', ',')}, mais à chaque table gagnée tu as ${pct(J.tricheur.catchChance)} de chances d'être pris : tu perds un autre joker au hasard.`,
     onSettle(e, me) { if (winOn(e)) e.mult(me, J.tricheur.mult); },
     onRoundEnd(e, me) {
       const H = me.host;
       if (!H.state.jokers.length || !H.rng.chance(J.tricheur.catchChance)) return;
-      const victim = H.rng.pick(H.state.jokers);
+      const others = H.state.jokers.filter(j => j.uid !== me.uid);
+      if (!others.length) return;
+      const victim = H.rng.pick(others);
       e.lines.push({ label: `🃏 Tricheur pris la main dans le sac : ${JOKERS[victim.id].name} confisqué`, value: 0, bad: true });
       H.removeJoker(victim.uid);
     } },
@@ -175,6 +177,10 @@ const BOSS_DEFS = [
   { id: 'gourmand', name: 'Le Gourmand', desc: h => `Chaque mise coûte ${h ? h.scale(B.gourmand.fee) : B.gourmand.fee} jetons en plus.`,
     betFee(e, me) { e.fee += me.host.scale(B.gourmand.fee); e.sources.push(me); } },
 ];
+  // Boss final de l'étage 8 : le patron du casino en personne
+BOSS_DEFS.push({ id: 'patron', final: true, name: 'Le Patron du Casino', desc: () => `Boss final : gains −${pct(1 - B.patron.mult)} et mise max −${pct(1 - B.patron.maxBet)}.`,
+  onSettle(e, me) { if (e.outcome === 'win') e.mult(me, B.patron.mult, 'le Patron surveille'); },
+  maxBet(e) { e.value *= B.patron.maxBet; } });
 BOSS_DEFS.forEach(d => (d.kind = 'boss'));
 const BOSSES = Object.fromEntries(BOSS_DEFS.map(d => [d.id, d]));
 

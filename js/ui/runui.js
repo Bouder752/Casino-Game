@@ -2,7 +2,7 @@
 const UI = (() => {
   const $ = id => document.getElementById(id);
   const el = Util.el;
-  let tab = 'uth';
+  let tab = 'bj';
   const H = () => App.host;
   const S = () => App.host.state;
   const isRun = () => !!App.host && App.host.isRun;
@@ -459,55 +459,47 @@ const UI = (() => {
   function renderShop() {
     const st = S();
     const nextInfo = H().tableInfo(st.tableType);
-    const sum = st.summary;
     const debt = st.debts[0];
+    const next = H().tableTarget(st.tableType);
     $('shop').innerHTML = `
-      <div class="shop-head">
+      <div class="sh-top">
         <h2>Le Comptoir</h2>
-        ${sum ? `<div class="shop-summary">
-          ${sum.type === 'boss' ? `<div class="boss-down">☠ Boss vaincu !</div>` : ''}
-          <div class="ss-title">${sum.victory ? '🏆 Boss final vaincu !' : `${TABLE_NAME[sum.type]} de l'étage ${sum.etage} gagnée`}</div>
-          ${sum.lines.map(l => `<div class="ss-line ${l.bad || l.value < 0 ? 'bad' : ''}"><span>${l.label}</span>${l.value ? `<b>${Util.signed(l.value)}</b>` : ''}</div>`).join('')}
-        </div>` : ''}
-      </div>
-      <div class="shop-body">
-        <div class="shop-offers">
-          <div class="shop-row-title">Jokers</div><div class="shop-row" id="shop-jokers"></div>
-          <div class="shop-row-title">Consommables</div><div class="shop-row" id="shop-cons"></div>
-          <div class="shop-row-title">Packs · Améliorations</div><div class="shop-row" id="shop-items"></div>
-        </div>
-        <div class="shop-side">
-          <div class="ss-bal"><span class="wallet-chip"></span>${Util.fmt(H().chips())}</div>
-          <div class="ss-next">
-            <div>Prochaine table : <b>${TABLE_NAME[st.tableType]}</b> — ${etageText(st)}</div>
-            <div>Bankroll à atteindre : <b>${Util.fmt(nextInfo.target)}</b> · mise max ${Util.fmt(nextInfo.maxBet)}</div>
-            ${nextInfo.boss ? `<div class="boss-warn">☠ ${BOSSES[nextInfo.boss].name} : ${BOSSES[nextInfo.boss].desc()}</div>` : ''}
-          </div>
-          <button class="btn" id="shop-reroll">🔄 Relancer le shop · <span class="wallet-chip s"></span> ${st.shop.rerollCost}</button>
-          <button class="btn" id="shop-slot" ${H().slotPrice() ? '' : 'disabled'}>➕ Emplacement de joker ${H().slotPrice() ? `· <span class="wallet-chip s"></span> ${H().slotPrice()}` : '(max)'}</button>
-          <div class="loans">
-            <div class="shop-row-title">💳 Le Prêteur</div>
-            ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque table gagnée.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
-              : H().loanOptions().map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${Util.fmt(o.amount)} maintenant<br><small>${Util.fmt(Math.round(o.amount * (1 + o.rate)))} à rendre en ${o.tables} tables</small></button>`).join('')}
-            <p class="hint">Les jetons prêtés t'évitent la faillite, mais la dette est déduite de ta bankroll : elle ne fait pas avancer le palier.</p>
-          </div>
-
+        <div class="sh-next">
+          <span class="shn-bank"><span class="wallet-chip s"></span> Bankroll <b>${Util.fmt(H().bankroll())}</b></span>
+          <span class="shn-arrow">➜</span>
+          <span class="shn-goal">${TABLE_NAME[st.tableType]} · palier <b>${Util.fmt(next)}</b></span>
+          ${nextInfo.boss ? `<span class="shn-boss" title="${BOSSES[nextInfo.boss].desc()}">☠ ${BOSSES[nextInfo.boss].name}</span>` : ''}
         </div>
       </div>
-      <div class="shop-owned">
-        <div class="shop-row-title">Tes jokers (${st.jokers.length}/${st.jokerSlots}) — touche un joker pour le déplacer ou le vendre</div>
-        <div class="joker-slots" id="shop-owned-jokers"></div>
-        <div class="shop-row-title">Consommables (${st.consumables.length}/${st.consSlots}) · Améliorations</div>
-        <div class="shop-row small" id="shop-owned-items"></div>
+      <div class="sh-main">
+        <div class="sh-jokers" id="shop-jokers"></div>
+        <div class="sh-shelf">
+          <div class="sh-items" id="shop-items"></div>
+          <div class="sh-tools">
+            <button class="btn reroll" id="shop-reroll">🔄 Relancer · <span class="wallet-chip s"></span> ${Util.fmt(st.shop.rerollCost)}</button>
+            <button class="btn" id="shop-slot" ${H().slotPrice() ? '' : 'disabled'}>➕ Place de joker ${H().slotPrice() ? `· <span class="wallet-chip s"></span> ${Util.fmt(H().slotPrice())}` : '(max)'}</button>
+            <button class="btn ghost" id="shop-loan">💳 ${debt ? `Dette : ${Util.fmt(debt.left)}` : 'Le Prêteur'}</button>
+          </div>
+        </div>
       </div>
-      <div class="shop-leave"><span class="ss-bal small"><span class="wallet-chip"></span>${Util.fmt(H().chips())}</span>
-        <button class="btn primary big" id="shop-next">Quitter le shop ➜</button></div>`;
+      <div class="sh-hand">
+        <div class="sh-hand-t">Ta main · ${st.jokers.length}/${st.jokerSlots} jokers <small>(touche un joker pour le déplacer ou le vendre)</small></div>
+        <div class="sh-hand-row"><div class="joker-slots" id="shop-owned-jokers"></div><div class="sh-owned-items" id="shop-owned-items"></div></div>
+      </div>
+      <div class="shop-leave"><button class="btn primary big" id="shop-next">Table suivante ➜</button></div>`;
+    const after = price => `<p class="pop-after">Après achat : bankroll <b>${Util.fmt(H().bankroll() - price)}</b> / palier <b>${Util.fmt(next)}</b></p>`;
     st.shop.offers.forEach((o, i) => {
-      const box = $(o.kind === 'joker' ? 'shop-jokers' : o.kind === 'consumable' ? 'shop-cons' : 'shop-items');
-      box.appendChild(itemCard(o.id, {
-        price: o.sold ? 'vendu' : o.price, disabled: o.sold,
-        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id) + `<p class="pop-after">Après achat : bankroll <b>${Util.fmt(H().bankroll() - o.price)}</b> / prochain palier <b>${Util.fmt(H().tableTarget(S().tableType))}</b></p>`, [[`Acheter · <span class="wallet-chip s"></span> ${o.price} jetons`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
-      }));
+      const card = itemCard(o.id, { big: o.kind === 'joker', disabled: o.sold, onClick: node => popover(node, sheetHtml(o.id) + (o.sold ? '' : after(o.price)), o.sold ? [] : [[`Acheter · <span class="wallet-chip s"></span> ${Util.fmt(o.price)}`, () => buy(i, node), 'primary', !H().canAfford(o.price)]]) });
+      const wrap = el('div', 'offer ' + o.kind + (o.sold ? ' sold' : ''));
+      wrap.appendChild(card);
+      if (o.kind === 'joker') wrap.appendChild(el('p', 'offer-desc', CATALOG[o.id].desc(H())));
+      const b = el('button', 'btn small ' + (H().canAfford(o.price) ? 'primary' : ''), '');
+      b.innerHTML = o.sold ? 'Vendu' : `<span class="wallet-chip s"></span> ${Util.fmt(o.price)}`;
+      b.disabled = o.sold || !H().canAfford(o.price);
+      b.title = o.sold ? '' : `Acheter ${CATALOG[o.id].name}`;
+      b.onclick = () => buy(i, card);
+      wrap.appendChild(b);
+      $(o.kind === 'joker' ? 'shop-jokers' : 'shop-items').appendChild(wrap);
     });
     renderJokers($('shop-owned-jokers'));
     const owned = $('shop-owned-items');
@@ -515,7 +507,13 @@ const UI = (() => {
     st.upgrades.forEach(id => owned.appendChild(itemCard(id, { onClick: node => popover(node, sheetHtml(id), []) })));
     $('shop-reroll').onclick = () => { if (report(H().reroll())) { Sfx.play('buy'); App.syncBalance(); } };
     $('shop-slot').onclick = () => { if (report(H().buySlot())) { Sfx.play('buy'); App.syncBalance(); } };
-    document.querySelectorAll('.loan').forEach(b => (b.onclick = () => { if (report(H().takeLoan(b.dataset.id))) { Sfx.play('coins'); App.syncBalance(); toast('💳 Prêt accordé. Attention aux échéances !'); } }));
+    $('shop-loan').onclick = () => {
+      Sfx.play('click');
+      const d = S().debts[0];
+      const box = modal(`<h2>💳 Le Prêteur</h2>${d ? `<p>Dette en cours : <b>${Util.fmt(d.left)}</b> — ${Util.fmt(Math.min(d.per, d.left))} prélevés à chaque table gagnée.</p>`
+        : `<p>Les jetons prêtés t'évitent la faillite, mais la dette est déduite de ta bankroll : elle ne fait pas avancer le palier.</p><div class="loan-row">${H().loanOptions().map(o => `<button class="btn loan" data-id="${o.id}">${o.name}<br><b>+${Util.fmt(o.amount)}</b><br><small>${Util.fmt(Math.round(o.amount * (1 + o.rate)))} à rendre en ${o.tables} tables</small></button>`).join('')}</div>`}`, [['Fermer', () => {}]]);
+      box.querySelectorAll('.loan').forEach(b => (b.onclick = () => { if (report(H().takeLoan(b.dataset.id))) { Sfx.play('coins'); App.syncBalance(); closeModal(); toast('💳 Prêt accordé. Attention aux échéances !'); } }));
+    };
     $('shop-next').onclick = () => {
       Sfx.play('click');
       if (S().phase === 'victory') return victoryModal();
@@ -527,7 +525,19 @@ const UI = (() => {
         [['Rester', () => {}], ['Quitter quand même', () => H().leaveShop(), 'primary']], '', { esc: 0 });
     };
   }
-  function buy(i) {
+  function buy(i, node) {
+    // la carte achetée s'envole vers ta main
+    if (node && node.isConnected && H().canAfford(S().shop.offers[i].price)) {
+      const r0 = node.getBoundingClientRect(), hand = $('shop-owned-jokers');
+      if (hand) {
+        const r1 = hand.getBoundingClientRect(), fly = node.cloneNode(true);
+        fly.className += ' flying';
+        Object.assign(fly.style, { position: 'fixed', left: r0.left + 'px', top: r0.top + 'px', width: r0.width + 'px', height: r0.height + 'px', margin: 0, zIndex: 120 });
+        document.body.appendChild(fly);
+        requestAnimationFrame(() => { fly.style.transform = `translate(${r1.left + 40 - r0.left}px, ${r1.top - r0.top}px) scale(.55) rotate(-12deg)`; fly.style.opacity = '.2'; });
+        setTimeout(() => fly.remove(), 650);
+      }
+    }
     const r = H().buy(i);
     if (!report(r)) return;
     Sfx.play('buy');

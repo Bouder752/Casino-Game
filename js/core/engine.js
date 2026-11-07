@@ -173,12 +173,23 @@ const Engine = (() => {
     const perBetLeft = () => (active && CONFIG.progression.relancesParMise ? CONFIG.progression.relancesParMise - (active.play.rerolls || 0) : Infinity);
     H.charges = game => (isRun ? Math.min(perBetLeft(), state.charges.filter(c => c.games === 'any' || c.games === game).length) : 0);
     H.chargesTotal = () => (isRun ? state.charges.length : 0);
+    // Coût d'une relance : une part de la mise en cours (une relance n'est jamais gratuite)
+    const roundStake = r => !r ? 0 : r.hands ? r.hands.reduce((a, h) => a + (h.bet || 0), 0)
+      : r.ante ? r.ante * 2 + (r.trips || 0) + (r.play || 0) : r.bets ? Object.values(r.bets).reduce((a, v) => a + v, 0) : r.bet || 0;
+    H.rerollCost = () => (isRun && active ? Math.max(1, Math.round(roundStake(active.round) * (CONFIG.progression.coutRelance || 0))) : 0);
     H.useCharge = game => {
       if (perBetLeft() <= 0) return false;
-      if (active) active.play.rerolls = (active.play.rerolls || 0) + 1;
       let i = state.charges.findIndex(c => c.games === game);
       if (i < 0) i = state.charges.findIndex(c => c.games === 'any');
       if (i < 0) return false;
+      const cost = H.rerollCost();
+      if (cost && !H.canAfford(cost)) return false;
+      if (cost) {
+        H.stake(cost);
+        active.play.prepaid = (active.play.prepaid || 0) + cost;
+        active.play.steps.push(step('flat', { uid: 'reroll', name: 'Relance', icon: '🔄' }, -cost, 'coût de la relance'));
+      }
+      if (active) active.play.rerolls = (active.play.rerolls || 0) + 1;
       const c = state.charges.splice(i, 1)[0];
       notify('flash', { uid: c.src, text: 'Relance !' });
       notify('sound', { name: 'joker' });
@@ -375,7 +386,10 @@ const Engine = (() => {
         * (type === 'boss' && state.bossId === 'presse' ? CONFIG.bosses.presse.maxBet : 1))),
     });
     function newEtage() {
-      state.bossId = rng.pick(BOSS_DEFS).id;
+      const seen = state.bossSeen || (state.bossSeen = []);
+      const pool = BOSS_DEFS.filter(b => !b.final && !seen.includes(b.id));
+      state.bossId = state.etage === P.etagesPourGagner && !state.infinite ? 'patron' : (pool.length ? rng.pick(pool) : rng.pick(BOSS_DEFS.filter(b => !b.final))).id;
+      seen.push(state.bossId); if (seen.length >= BOSS_DEFS.length - 1) seen.length = 0;
       state.tagOffers = { petite: rng.pick(TAG_DEFS).id, grande: rng.pick(TAG_DEFS).id };
       state.etageLog = {};
       state.tableType = 'petite';

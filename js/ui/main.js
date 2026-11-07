@@ -17,7 +17,7 @@
   for (let i = 0; i < 28; i++) lights.appendChild(Util.el('i'));
 
   Cosmetics.apply();
-  const saved = Storage.get('casino.tab', 'slots');
+  const saved = Storage.get('casino.tab', 'bj');
   UI.showTab(document.getElementById(saved) ? saved : 'uth');
   App.attach(null);
   UI.renderMenu();

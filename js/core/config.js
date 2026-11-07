@@ -9,19 +9,20 @@ const CONFIG = {
   // bankroll (jetons − dettes) atteint le palier. Pas de limite de mises :
   // on ne perd que par faillite. La mise max suit le palier.
   // Palier de la table n (0 = petite table de l'étage 1) : jetonsDepart × Π (croissanceDepart + croissanceParTable × k)
-  // → 140, 210, 320 | 490, 750, 1 200 | … | 22 M, 44 M au boss final. Il faut un build pour suivre.
+  // → 130, 200, 310 | 490, 810, 1 400 | … des millions au boss final. Il faut un build pour suivre.
   progression: {
     etagesPourGagner: 8,
     jetonsDepart: 100,
-    croissanceDepart: 1.45,    // la 1re table demande ×1,45
-    croissanceParTable: 0.05, // puis chaque table un peu plus (×2 au boss final)
+    croissanceDepart: 1.3,     // la 1re table demande ×1,3
+    croissanceParTable: 0.05, // puis chaque table un peu plus (×2,45 au boss final)
     miseMaxRatio: 0.25,        // mise max = 25 % du palier visé à l'étage 1…
-    miseMaxDecroissance: 0.85, // …puis ×0,88 par étage (≈ 10 % du palier à l'étage 8) : il faut des multiplicateurs
+    miseMaxDecroissance: 0.85, // …puis ×0,85 par étage (≈ 8 % du palier à l'étage 8) : il faut des multiplicateurs
     miseMin: 1,
     miseMinRatio: 0.03,        // mise minimale = 3 % du palier (en dessous, c'est la faillite)
     croissanceMin: 1.25,       // une table demande toujours au moins +25 % de ta bankroll de départ
     relancesParTable: 3,       // refaire un tirage raté sans miser à nouveau
     relancesParMise: 1,        // relances utilisables sur une même mise
+    coutRelance: 0.15,         // une relance coûte 15 % de la mise en cours
     jokerDeDepart: 3,          // choix entre 3 jokers communs en début de partie
 
     // Récompense de table : une part du palier atteint
@@ -126,7 +127,8 @@ const CONFIG = {
     noir: {},
     sobre: {},
     endormi: {},
-    gourmand: { fee: 3 },              // jetons par mise pour un palier de 150 (suit le palier)
+    gourmand: { fee: 3 },
+    patron: { mult: 0.8, maxBet: 0.75 }, // boss final              // jetons par mise pour un palier de 150 (suit le palier)
   },
   rules: {
     bj21: { bjPay: 2 },

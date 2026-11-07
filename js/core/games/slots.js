@@ -112,7 +112,7 @@ const SlotsEngine = (() => {
       spinAll(H, r);
       return { round: r };
     },
-    actions: (H, gs, r) => (r.stage === 'decide' ? [{ id: 'reroll', label: `👻 Relancer (${H.charges('slots')})`, ghost: true }, { id: 'accept', label: 'Accepter' }] : []),
+    actions: (H, gs, r) => (r.stage === 'decide' ? [{ id: 'reroll', label: `🔄 Relancer (${H.charges('slots')})${H.rerollCost() ? ` · −${H.rerollCost()}` : ''}`, ghost: true }, { id: 'accept', label: 'Accepter' }] : []),
     act(H, gs, r, id) {
       if (id === 'accept') { r.done = true; r.stage = 'done'; return; }
       if (id === 'reroll' && H.useCharge('slots')) spinAll(H, r);

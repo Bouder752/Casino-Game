@@ -108,7 +108,7 @@ const BlackjackEngine = (() => {
         const ins = Math.round(r.hands[0].bet / 2 * 100) / 100;
         return [{ id: 'insure', label: `Assurance (${ins})`, primary: true }, { id: 'noinsure', label: 'Pas d\'assurance' }];
       }
-      const redo = { id: 'redo', label: `👻 Refaire la carte (${H.charges('bj')})`, ghost: true };
+      const redo = { id: 'redo', label: `🔄 Refaire la carte (${H.charges('bj')})${H.rerollCost() ? ` · −${H.rerollCost()}` : ''}`, ghost: true };
       if (r.stage === 'bust') return [redo, { id: 'accept', label: 'Accepter' }];
       const h = current(r);
       const list = [

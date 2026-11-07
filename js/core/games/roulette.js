@@ -59,7 +59,7 @@ const RouletteEngine = (() => {
       spin(H, r);
       return { round: r };
     },
-    actions: (H, gs, r) => (r.stage === 'decide' ? [{ id: 'reroll', label: `👻 Relancer la bille (${H.charges('roulette')})`, ghost: true }, { id: 'accept', label: 'Accepter' }] : []),
+    actions: (H, gs, r) => (r.stage === 'decide' ? [{ id: 'reroll', label: `🔄 Relancer (${H.charges('roulette')})${H.rerollCost() ? ` · −${H.rerollCost()}` : ''}`, ghost: true }, { id: 'accept', label: 'Accepter' }] : []),
     act(H, gs, r, id) {
       if (id === 'accept') { r.done = true; r.stage = 'done'; return; }
       if (id === 'reroll' && H.useCharge('roulette')) spin(H, r);

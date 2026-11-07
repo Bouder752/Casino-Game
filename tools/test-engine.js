@@ -25,7 +25,7 @@ ok([1, 2, 3].every(() => r1.next() === r2.next()), 'RNG reproductible');
 // 2. Objectifs et structure des étages
 let H = Engine.newRun({ seed: 'O', meta: meta(), persist: false });
 const objs = []; for (let e = 1; e <= 9; e++) ['petite', 'grande', 'boss'].forEach(t => objs.push(H.objective(e, t)));
-ok(objs[0] === 150 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
+ok(objs[0] === 130 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
 ok(objs.every((v, i) => i < 2 || v / objs[i - 1] >= objs[i - 1] / objs[i - 2] - 0.05), 'la croissance des paliers s\'accélère');
 ok(H.state.starter && H.state.starter.length === P.jokerDeDepart && H.state.starter.every(id => JOKERS[id].rarity === 'commun'), 'choix du joker de départ');
 const st0 = H.state.starter[0];
@@ -42,10 +42,10 @@ for (let i = 0; i < 12; i++) play(H, 1, 0.5); // beaucoup de petites mises perda
 ok(H.state.phase === 'play', 'pas de limite de mises');
 winTable(H);
 ok(H.state.phase === 'shop' && H.state.tableType === 'grande', 'palier atteint → shop puis grande table');
-ok(H.state.summary.lines[0].value === Math.round(P.recompenseTable.petite * 150), 'récompense de table = part du palier');
-ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= P.interets.maxPalier * 150), 'intérêts plafonnés');
+ok(H.state.summary.lines[0].value === Math.round(P.recompenseTable.petite * H.state.summary.target), 'récompense de table = part du palier');
+ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= P.interets.maxPalier * H.state.summary.target), 'intérêts plafonnés');
 const cheap = Math.min(...H.state.shop.offers.filter(o => o.kind === 'joker').map(o => o.price));
-ok(H.state.shop.offers.every(o => o.price === H.scale(api.CATALOG[o.id].price)) && H.scale(150) === H.objective(1, 'grande'), `prix proportionnels au palier visé (joker le moins cher : ${cheap})`);
+ok(H.state.shop.offers.every(o => o.price === H.scale(api.CATALOG[o.id].price)) && H.scale(P.prixReference) === H.tableTarget('grande'), `prix proportionnels au palier visé (joker le moins cher : ${cheap})`);
 H.leaveShop();
 ok(H.state.phase === 'choose', 'sortie du shop → choix de table');
 
@@ -125,7 +125,7 @@ api.Games.register(realBJ);
 // 11. Assurance-Vie
 H = run('T6', true); H.addJoker('assurance');
 play(H, H.chips(), 0);
-ok(H.state.phase === 'play' && H.chips() === 90 && H.state.jokers.length === 0, 'Assurance-Vie : 60 % du palier, puis disparaît');
+ok(H.state.phase === 'play' && H.chips() === Math.round(0.6 * H.state.table.target) && H.state.jokers.length === 0, 'Assurance-Vie : 60 % du palier, puis disparaît');
 
 // 12. Shop : pas de joker possédé, emplacements limités, reroll croissant, revente 50 %
 H = run('T7', true); H.state.chips = 100000; winTable(H);
@@ -160,10 +160,11 @@ ok(H.state.charges.length === P.relancesParTable, 'relances du joker retirées �
 // 15. Prêt : remboursement à chaque table gagnée, pénalité + huissier si impayé
 H = run('T10', true);
 H.takeLoan('petit');
-ok(H.chips() === P.jetonsDepart + 60 && H.state.debts[0].left === 72, 'prêt accordé (montant au palier 150)');
+const loan = H.scale(60), owed = Math.round(loan * 1.2);
+ok(H.chips() === P.jetonsDepart + loan && H.state.debts[0].left === owed, `prêt accordé (${loan}, ${owed} à rendre)`);
 ok(!!H.takeLoan('gros').error, 'un seul prêt à la fois');
 winTable(H);
-ok(H.state.debts[0].left === 48, `échéance prélevée (reste ${H.state.debts[0].left})`);
+ok(H.state.debts[0].left === owed - Math.ceil(owed / 3), `échéance prélevée (reste ${H.state.debts[0].left})`);
 H.leaveShop(); H.state.chips = 100; H.chooseTable();
 ok(H.bankroll() === H.chips() - H.state.debts[0].left, 'bankroll = jetons − dettes');
 
@@ -232,7 +233,7 @@ ok(rr.round.rolls.length <= 1 + (P.relancesParMise || 99), `une seule relance pa
 
 // 24. Retours des testeurs (2) : pas de farm à 1 jeton, pas de table gagnée sans jouer
 H = Engine.newRun({ seed: 'MIN', meta: meta(), persist: false }); H.chooseTable();
-ok(H.minBet() === Math.round(150 * P.miseMinRatio) && !!H.startPlay('dice', { bet: 1, target: 50, mode: 'under' }).error, `mise minimale ${H.minBet()} : une mise de 1 est refusée`);
+ok(H.minBet() === Math.round(H.state.table.target * P.miseMinRatio) && !!H.startPlay('dice', { bet: 1, target: 50, mode: 'under' }).error, `mise minimale ${H.minBet()} : une mise de 1 est refusée`);
 H = Engine.newRun({ seed: 'BIG', meta: meta(), persist: false }); H.state.chips = 100000; H.chooseTable();
 ok(H.state.phase === 'play' && H.state.table.target >= 100000 * P.croissanceMin * 0.95, `grosse avance : la table demande quand même +25 % (palier ${H.state.table.target})`);
 const sev = Engine.newRun({ seed: 'SEV', meta: meta(), persist: false }); sev.chooseTable(); sev.addJoker('septieme');
