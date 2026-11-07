@@ -72,9 +72,20 @@ const SlotsEngine = (() => {
     return { total: Math.round(total * 100) / 100, wins, sevens, wildUsed, scatters };
   }
 
+  // Achat du bonus : la grille de départ contient d'office 3 Pelotes (sur 3 rouleaux au hasard)
+  function forceScatters(H, g) {
+    const reels = H.rng.shuffle([0, 1, 2, 3, 4]).slice(0, C.scatter.min);
+    reels.forEach(x => { const y = H.rng.int(C.rows); g[x][y] = { id: C.scatter.id }; });
+    return g;
+  }
   function spinAll(H, r) {
     const lineBet = r.bet / C.lines.length;
-    const base = grid(H, r.symbols);
+    let base = grid(H, r.symbols);
+    if (r.buy) {
+      // une seule Pelote par rouleau : on retire celles déjà tombées, puis on en pose 3
+      base = base.map(col => col.map(c => (c.id === C.scatter.id ? { id: r.symbols[0].id } : c)));
+      forceScatters(H, base);
+    }
     const ev = evaluate(base, r.symbols, r.wild, lineBet);
     const spins = [{ grid: base, ...ev, free: false }];
     if (ev.scatters >= C.scatter.min) {
@@ -96,19 +107,34 @@ const SlotsEngine = (() => {
     r.spins = spins;
     r.total = Math.round(spins.reduce((a, s) => a + s.total, 0) * 100) / 100;
     r.attempts.push(r.total);
-    r.stage = r.total < r.bet && H.charges('slots') > 0 ? 'decide' : 'done';
+    r.stage = !r.buy && r.total < r.bet && H.charges('slots') > 0 ? 'decide' : 'done';
     r.done = r.stage === 'done';
   }
 
   return Games.register({
     id: 'slots', name: 'Machine', symbols, evaluate, grid,
-    start(H, gs, { bet }) {
+    // Prix et mise d'un achat de bonus : la mise par tour est ajustée pour rester sous le plafond
+    buyQuote(H, bet) {
+      const cap = H.maxBet('slots') * C.buy.capMult;
+      const b = Math.max(0.05, Math.min(bet, Math.floor(cap / C.buy.cost * 100) / 100));
+      const cost = Math.round(b * C.buy.cost);
+      return { bet: b, cost, ok: cost >= H.minBet() && cost <= cap && H.canAfford(cost) };
+    },
+    start(H, gs, { bet, buy = false }) {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
-      if (bet > H.maxBet('slots')) return { error: `Mise maximale : ${H.maxBet('slots')}.` };
-      if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
-      if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
+      let stake = bet;
+      if (buy) {
+        const q = this.buyQuote(H, bet);
+        if (q.cost < H.minBet()) return { error: `Le bonus doit coûter au moins ${H.minBet()} (mise minimale).` };
+        if (!H.canAfford(q.cost)) return { error: `Il faut ${q.cost} jetons pour acheter le bonus.` };
+        bet = q.bet; stake = q.cost;
+      } else {
+        if (bet > H.maxBet('slots')) return { error: `Mise maximale : ${H.maxBet('slots')}.` };
+        if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
+      }
+      if (!H.stake(stake)) return { error: 'Solde insuffisant.' };
       const wild = H.query('slots.wild', { wild: null, ratio: 1, sources: [] });
-      const r = { bet, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio }, wildSources: wild.sources };
+      const r = { bet, stake, buy, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio }, wildSources: wild.sources };
       spinAll(H, r);
       return { round: r };
     },
@@ -121,8 +147,8 @@ const SlotsEngine = (() => {
       if (r.spins.some(s => s.wildUsed)) r.wildSources.forEach(me => me.flash('Joker !'));
       const sevens = r.spins.reduce((a, s) => a + s.sevens, 0);
       return {
-        staked: r.bet, back: r.total,
-        info: { free: r.spins.length - 1 },
+        staked: r.stake || r.bet, back: r.total,
+        info: { free: r.spins.length - 1, buy: !!r.buy },
         draws: Array.from({ length: sevens }, () => ({ kind: 'symbol', value: 'sept' })),
       };
     },

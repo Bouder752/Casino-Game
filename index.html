@@ -226,28 +226,35 @@
           <button class="felt-btn rules-btn" data-rules="slots" aria-label="Règles et paiements" title="Règles et paiements">?</button>
           <div class="palace">
             <div class="palace-sky" aria-hidden="true"><i class="moon"></i><i class="roofs"></i></div>
-            <div class="palace-top">
-              <div class="palace-title">Les Chats des Toits</div>
+            <div class="sl-logo" aria-hidden="true">
+              <div class="sl-logo-cat"><i></i><i></i></div>
+              <div class="palace-title">Les Chats<span>des Toits</span></div>
             </div>
             <div class="fs-banner" id="sl-fs" hidden></div>
-            <div class="sl-window">
-              <div class="sl-grid" id="sl-reels"></div>
-              <div class="sl-sticky" id="sl-sticky" aria-hidden="true"></div>
-              <svg class="sl-lines" id="sl-lines" aria-hidden="true"></svg>
-              <div class="sl-win" id="sl-win"></div>
-              <div class="sl-intro" id="sl-intro" hidden></div>
+            <div class="sl-frame">
+              <div class="sl-window">
+                <div class="sl-grid" id="sl-reels"></div>
+                <div class="sl-sticky" id="sl-sticky" aria-hidden="true"></div>
+                <svg class="sl-lines" id="sl-lines" aria-hidden="true"></svg>
+                <div class="sl-win" id="sl-win"></div>
+                <div class="sl-intro" id="sl-intro" hidden></div>
+              </div>
             </div>
-            <div class="sl-leds">
-              <div class="sl-led"><small>Mise</small><b id="sl-led-bet">0</b></div>
-              <div class="sl-led win"><small id="sl-led-label">Gain</small><b id="sl-led-win">0</b></div>
+            <div class="sl-deck">
+              <button class="sl-buy" id="sl-buy" title="Acheter les tours gratuits"><small>Acheter</small><b>Bonus</b><span id="sl-buy-cost">—</span></button>
+              <div class="sl-bar">
+                <div class="sl-cell"><small>Solde</small><b id="sl-led-bal">0</b></div>
+                <div class="sl-cell bet"><button class="sl-step" id="sl-minus" aria-label="Baisser la mise">−</button><div><small>Mise</small><b id="sl-led-bet">0</b></div><button class="sl-step" id="sl-plus" aria-label="Monter la mise">+</button></div>
+                <div class="sl-cell win"><small id="sl-led-label">Gain</small><b id="sl-led-win">0</b></div>
+              </div>
+              <div class="actions sl-spin" id="sl-actions"></div>
             </div>
             <div class="sl-lights" id="sl-lights"></div>
           </div>
           <div class="msg" id="sl-msg" role="status" aria-live="polite"></div>
         </div>
-        <div class="rail">
+        <div class="rail sl-rail" hidden>
           <div class="rail-bets" id="sl-bet"></div>
-          <div class="actions" id="sl-actions"></div>
         </div>
       </div>
       <div class="rules-src" id="rules-slots" hidden>
@@ -256,6 +263,7 @@
           <li>5 rouleaux, 3 rangées, 20 lignes. La mise est répartie sur les 20 lignes.</li>
           <li>Le <b>Carton</b> (wild, rouleaux 2 à 4) remplace tout et multiplie le gain ×2 ou ×3.</li>
           <li>3 <b>Pelotes</b> : 10 tours gratuits, les wilds restent collés.</li>
+          <li><b>Achat du bonus</b> : 75 × la mise par tour pour lancer directement les tours gratuits (au plus 2 × la mise max).</li>
         </ul>
         <div id="sl-paytable"></div>
       </div>

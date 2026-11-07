@@ -9,7 +9,8 @@ App.register((() => {
   const els = {
     grid: $('sl-reels'), lines: $('sl-lines'), actions: $('sl-actions'), msg: $('sl-msg'), pay: $('sl-paytable'), win: $('sl-win'),
     fs: $('sl-fs'), lights: $('sl-lights'), sticky: $('sl-sticky'), intro: $('sl-intro'), palace: document.querySelector('#slots .palace'),
-    ledBet: $('sl-led-bet'), ledWin: $('sl-led-win'), ledLabel: $('sl-led-label'),
+    ledBet: $('sl-led-bet'), ledWin: $('sl-led-win'), ledLabel: $('sl-led-label'), ledBal: $('sl-led-bal'),
+    buy: $('sl-buy'), buyCost: $('sl-buy-cost'), minus: $('sl-minus'), plus: $('sl-plus'),
   };
   const bet = new BetControl($('sl-bet'), { label: 'Mise', initial: 20, max: betLimit('slots') });
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
@@ -34,6 +35,7 @@ App.register((() => {
   };
   function drawStatic() {
     reels.forEach(R => {
+      R.strip.getAnimations().forEach(a => a.cancel());
       R.strip.style.transition = 'none'; R.strip.style.transform = 'translateY(0)';
       R.strip.innerHTML = '';
       R.cells.forEach(c => R.strip.appendChild(cellEl(c)));
@@ -53,6 +55,7 @@ App.register((() => {
   }
   function led(win = null, label = 'Gain') {
     els.ledBet.textContent = Util.fmt(bet.value);
+    paintBuy();
     els.ledLabel.textContent = label;
     els.ledWin.textContent = win == null ? '—' : Util.fmt(win);
   }
@@ -67,66 +70,60 @@ App.register((() => {
       ${wild.wild ? `<p class="wild-note">🍒 Triple Cerise : les cerises remplacent n'importe quel symbole (ligne complétée payée × ${String(wild.ratio).replace('.', ',')}).</p>` : ''}`;
   }
 
-  // Lancer animé jusqu'à la grille donnée, avec suspense dès 2 Pelotes posées
+  // Lancer animé jusqu'à la grille donnée (Web Animations : fluide, sur le compositeur),
+  // avec suspense dès 2 Pelotes posées et arrêt rapide
+  let anims = [];
   async function spinTo(g, sticky = {}) {
     els.lines.innerHTML = '';
     els.grid.classList.remove('has-wins');
-    els.grid.querySelectorAll('.win').forEach(c => c.classList.remove('win'));
     els.lights.classList.add('chase');
     const h = reels[0].el.clientHeight / ROWS || 76;
-    // nombre de Pelotes posées avant chaque rouleau → rouleaux suivants plus lents
     let seen = 0, extra = 0;
     const plan = g.map((col, x) => {
       const antic = seen >= C.scatter.min - 1 && x > 0;
-      if (antic) extra += Util.dur(1100);
-      const dur = Util.dur(520 + x * 170) + extra;
-      seen += col.some(c => c.id === C.scatter.id) ? 1 : 0;
-      return { dur, antic, scatter: col.some(c => c.id === C.scatter.id) };
+      if (antic) extra += Util.dur(1200);
+      const scat = col.some(c => c.id === C.scatter.id);
+      const dur = Util.dur(700 + x * 220) + extra;
+      seen += scat ? 1 : 0;
+      return { dur, antic, scatter: scat };
     });
-    const t0 = performance.now();
     let landed = 0;
+    anims = [];
     const stops = reels.map((R, x) => new Promise(res => {
       const seq = [...R.cells];
-      const n = 10 + x * 4 + (plan[x].antic ? 12 : 0);
+      const n = 12 + x * 4 + (plan[x].antic ? 14 : 0);
       for (let k = 0; k < n; k++) seq.push({ id: fxSym() });
       g[x].forEach(c => seq.push(c));
-      R.strip.style.transition = 'none'; R.strip.style.transform = 'translateY(0)';
+      R.strip.getAnimations().forEach(a => a.cancel());
+      R.strip.style.transform = '';
       R.strip.innerHTML = '';
-      seq.forEach(c => R.strip.appendChild(cellEl(c)));
+      const frag = document.createDocumentFragment();
+      seq.forEach(c => frag.appendChild(cellEl(c)));
+      R.strip.appendChild(frag);
       R.cells = g[x];
-      void R.strip.offsetWidth;
+      const D = (seq.length - ROWS) * h;
       R.el.classList.add('spinning');
-      const finish = () => {
-        if (R.done) return;
-        R.done = true;
-        R.strip.style.transition = `transform ${quick ? 120 : 260}ms cubic-bezier(.2,1.6,.4,1)`;
-        R.strip.style.transform = `translateY(${-(seq.length - ROWS) * h}px)`;
-        setTimeout(() => {
-          R.el.classList.remove('spinning', 'antic');
-          R.el.classList.add('stopped');
-          setTimeout(() => R.el.classList.remove('stopped'), 300);
-          Sfx.play('stopn', x);
-          if (plan[x].scatter) { landed++; Sfx.play('scatter', landed); R.el.classList.add('has-scatter'); }
-          res();
-        }, quick ? 110 : 250);
-      };
-      R.done = false;
-      // défilement continu puis arrêt avec rebond
-      R.strip.style.transition = `transform ${plan[x].dur}ms cubic-bezier(.35,.1,.6,1)`;
-      R.strip.style.transform = `translateY(${-(seq.length - ROWS - 1) * h}px)`;
-      R.finish = finish;
-      const wait = () => {
-        if (R.done) return;
-        const t = performance.now() - t0;
-        if (plan[x].antic && !R.el.classList.contains('antic') && t > plan[x].dur - Util.dur(1300) && !quick) {
-          R.el.classList.add('antic'); els.palace.classList.add('tense'); Sfx.play('antic');
-        }
-        if (quick || t >= plan[x].dur) finish(); else requestAnimationFrame(wait);
-      };
-      requestAnimationFrame(wait);
+      // départ en arrière (élan), défilement, puis léger dépassement et retour
+      const a = R.strip.animate([
+        { transform: 'translate3d(0,0,0)', offset: 0 },
+        { transform: `translate3d(0,${Math.min(18, h * 0.2)}px,0)`, offset: 0.04, easing: 'ease-in' },
+        { transform: `translate3d(0,${-D - h * 0.18}px,0)`, offset: 0.93, easing: 'cubic-bezier(.25,.1,.35,1)' },
+        { transform: `translate3d(0,${-D}px,0)`, offset: 1 },
+      ], { duration: quick ? Util.dur(260) : plan[x].dur, easing: 'linear', fill: 'forwards' });
+      anims.push(a);
+      if (plan[x].antic && !quick) setTimeout(() => { if (a.playState === 'running' && !quick) { R.el.classList.add('antic'); els.palace.classList.add('tense'); Sfx.play('antic'); } }, Math.max(0, plan[x].dur - Util.dur(1400)));
+      setTimeout(() => R.el.classList.remove('spinning'), Math.max(0, (quick ? Util.dur(260) : plan[x].dur) - Util.dur(240)));
+      a.finished.then(() => {
+        R.el.classList.remove('spinning', 'antic');
+        R.el.classList.add('stopped');
+        setTimeout(() => R.el.classList.remove('stopped'), 300);
+        Sfx.play('stopn', x);
+        if (plan[x].scatter) { landed++; Sfx.play('scatter', landed); R.el.classList.add('has-scatter'); }
+        res();
+      }, res);
     }));
     let ticking = true;
-    (async () => { while (ticking) { Sfx.play('tick'); await Util.sleep(90); } })();
+    (async () => { while (ticking) { Sfx.play('tick'); await Util.sleep(95); } })();
     await Promise.all(stops);
     ticking = false;
     els.palace.classList.remove('tense');
@@ -134,6 +131,11 @@ App.register((() => {
     els.lights.classList.remove('chase');
     drawStatic();
     drawSticky(sticky);
+  }
+  // Arrêt rapide : les rouleaux en cours accélèrent jusqu'à leur position finale
+  function stopNow() {
+    quick = true; skip = true;
+    anims.forEach(a => { if (a.playState === 'running') { const left = (a.effect.getTiming().duration - a.currentTime); if (left > 0) a.updatePlaybackRate(Math.max(1, left / Util.dur(220))); } });
   }
 
   // Lignes gagnantes : toutes ensemble, puis une par une avec leur montant
@@ -254,7 +256,7 @@ App.register((() => {
     const r = res.round;
     quick = false; skip = false;
     if (animate) {
-      setActions(els.actions, [['Stop', () => { quick = true; skip = true; reels.forEach(R => R.finish && R.finish()); }, { cls: 'stop' }]]);
+      setActions(els.actions, [['Stop', () => stopNow(), { cls: 'stop' }]]);
       await play(r);
       setActions(els.actions, []);
     }
@@ -271,13 +273,14 @@ App.register((() => {
     bet.setEnabled(true);
     idle();
   }
-  function spin() {
+  function spin(buy = false) {
     return App.animate(async () => {
-      const res = App.host.startPlay('slots', { bet: bet.value });
+      const res = App.host.startPlay('slots', buy ? { bet: bet.value, buy: true } : { bet: bet.value });
       if (res.error) { Sfx.play('error'); return msg(res.error, 'warn'); }
       App.syncStake(res);
-      bet.setEnabled(false);
+      bet.setEnabled(false); setBusy(true);
       msg(''); els.win.className = 'sl-win'; els.fs.hidden = true;
+      if (buy) { Sfx.play('fanfare'); }
       await after(res);
     });
   }
@@ -290,7 +293,37 @@ App.register((() => {
       await after(res, id === 'reroll');
     });
   }
-  function idle() { setActions(els.actions, [['Lancer', spin, { cls: 'primary big' }]]); }
+  function idle() { setActions(els.actions, [['Lancer', () => spin(), { cls: 'primary big' }]]); setBusy(false); }
+  function setBusy(b) { els.buy.disabled = b; els.minus.disabled = b; els.plus.disabled = b; els.palace.classList.toggle('playing', b); }
+
+  // ---- Panneau de commande : mise −/+ par paliers, achat du bonus, solde ----
+  const LADDER = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 600, 800];
+  const ladder = () => { const out = []; for (let m = 1; m <= 1e9; m *= 1000) LADDER.forEach(v => out.push(v * m)); return out; };
+  function step(dir) {
+    const lo = App.host ? App.host.minBet() : 1, hi = bet.maxFn();
+    const vals = ladder().filter(v => v >= lo && v <= hi);
+    if (!vals.length) return;
+    const cur = bet.value;
+    const next = dir > 0 ? vals.find(v => v > cur + 1e-9) : vals.slice().reverse().find(v => v < cur - 1e-9);
+    bet.set(next != null ? next : dir > 0 ? vals[vals.length - 1] : vals[0]);
+    Sfx.play('chip');
+  }
+  els.minus.onclick = () => step(-1);
+  els.plus.onclick = () => step(1);
+  function paintBuy() {
+    if (!App.host) return;
+    const q = E.buyQuote(App.host, bet.value || 1);
+    els.buyCost.innerHTML = `<span class="wallet-chip s"></span> ${Util.fmt(q.cost)}`;
+    els.buy.classList.toggle('off', !q.ok);
+  }
+  els.buy.onclick = () => {
+    if (!App.host || App.host.busy()) return;
+    const q = E.buyQuote(App.host, bet.value || 1);
+    Sfx.play('click');
+    if (!q.ok) { Sfx.play('error'); return msg(q.cost < App.host.minBet() ? `Monte la mise : le bonus doit coûter au moins ${Util.fmt(App.host.minBet())}.` : `Il te faut ${Util.fmt(q.cost)} jetons pour acheter le bonus.`, 'warn'); }
+    UI.confirm(`<h2>Acheter le bonus ?</h2><p class="center"><b>${C.scatter.spins} tours gratuits</b> avec des Cartons collants, à <b>${Util.fmt(q.bet)}</b> par tour.</p><p class="center buy-price">Prix : <span class="wallet-chip s"></span> <b>${Util.fmt(q.cost)}</b></p>`, 'Acheter', () => spin(true));
+  };
+  App.on('balance', v => { els.ledBal.textContent = Util.fmt(Math.round(v)); });
   drawStatic();
   bet.onChange = () => { paytable(); led(null); };
   App.on('change', paytable);

@@ -424,3 +424,113 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
 .tab.locked { opacity: .45; filter: grayscale(.9); cursor: not-allowed; }
 .tab.locked::before { content: '🔒'; position: absolute; top: -6px; left: -4px; font-size: 16px; filter: drop-shadow(0 2px 0 var(--ink)); }
 .tab:disabled { transform: none !important; }
+
+/* =====================================================================
+   Machine « Les Chats des Toits » v3 : cabinet de machine moderne
+   (cadre doré à biseau, gros logo, rouleaux nuit séparés, panneau de commande
+   avec bouton rond, achat du bonus, barre SOLDE / MISE / GAIN)
+   ===================================================================== */
+.palace {
+  background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 0 6px !important;
+  display: flex; flex-direction: column; align-items: center; width: fit-content; max-width: 100%;
+}
+.palace-top { display: none; }
+.palace-sky { position: absolute !important; inset: -40px -200px auto; height: 80px; margin: 0 !important; z-index: 0; }
+.palace-sky .moon { right: 160px; top: 4px; }
+/* Logo : tête de chat derrière le titre */
+.sl-logo { position: relative; z-index: 3; margin-bottom: -26px; display: grid; place-items: center; }
+.sl-logo-cat { position: absolute; width: 240px; height: 86px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; background: linear-gradient(180deg, #3a1f5a, #1c0d33); border: 4px solid var(--ink); box-shadow: 0 0 0 4px #ffcf4a, 0 0 0 7px var(--ink), 0 10px 30px rgba(0, 0, 0, .6), 0 0 50px rgba(255, 190, 60, .4); }
+.sl-logo-cat i { position: absolute; top: -34px; width: 0; height: 0; border-left: 26px solid transparent; border-right: 26px solid transparent; border-bottom: 46px solid #ffcf4a; filter: drop-shadow(0 -3px 0 var(--ink)); }
+.sl-logo-cat i::after { content: ''; position: absolute; left: -15px; top: 12px; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 28px solid #3a1f5a; }
+.sl-logo-cat i:first-child { left: 18px; transform: rotate(-14deg); } .sl-logo-cat i:last-child { right: 18px; transform: rotate(14deg); }
+.palace .palace-title { position: relative; display: flex; flex-direction: column; align-items: center; line-height: .9; font-size: 44px !important; padding: 8px 0 18px; }
+.palace .palace-title span { font-size: 22px; letter-spacing: 3px; text-transform: uppercase; -webkit-text-stroke: 1.5px var(--ink); }
+/* Cadre : biseau doré épais */
+.sl-frame {
+  position: relative; z-index: 2; padding: 12px; border-radius: 26px;
+  background: linear-gradient(145deg, #fff3b0 0%, #e0a92b 22%, #8a5a0c 48%, #f6d266 70%, #a8700e 100%);
+  border: 4px solid var(--ink);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .7), inset 0 -3px 0 rgba(0, 0, 0, .35), 0 8px 0 var(--ink), 0 0 60px rgba(255, 190, 60, .35), 0 30px 50px rgba(0, 0, 0, .6);
+}
+.palace.tense .sl-frame { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .7), 0 8px 0 var(--ink), 0 0 80px 14px rgba(255, 92, 168, .7) !important; }
+.palace.bonus .sl-frame { background: linear-gradient(145deg, #ffd0f0 0%, #ff5ca8 25%, #7a1a5a 50%, #ff9ad0 72%, #8a1a5a 100%); }
+.sl-window {
+  padding: 8px !important; border-radius: 16px !important; border: 4px solid var(--ink) !important;
+  background: radial-gradient(ellipse at 50% 40%, #1b2a6e, #0a0f30 75%) !important;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, .8) !important;
+}
+.sl-window::after { inset: 8px !important; border-radius: 10px !important; background: linear-gradient(180deg, rgba(0, 0, 0, .45) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, .45) 100%) !important; }
+.sl-grid { gap: 0 !important; }
+.palace .reel { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none; }
+.palace .reel + .reel { border-left: 2px solid rgba(255, 207, 74, .35) !important; }
+.palace .reel::after { display: none; }
+.palace .reel .strip { will-change: transform; }
+.palace .reel.spinning .strip { filter: blur(1.4px); }
+.palace .reel.spinning .sym svg { filter: none !important; }
+.palace .sym { padding: 4px !important; }
+.palace .reel.antic { box-shadow: inset 0 0 0 3px #ff5ca8, inset 0 0 30px rgba(255, 92, 168, .7) !important; background: rgba(255, 92, 168, .12) !important; }
+.sl-sticky { left: 8px !important; top: 8px !important; }
+.palace { --gap: 2px; }
+/* Panneau de commande */
+.sl-deck { position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; margin-top: 14px; width: 100%; justify-content: center; }
+.sl-buy {
+  flex: none; width: 92px; height: 92px; border-radius: 50%; border: 4px solid var(--ink); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: #fff;
+  background: radial-gradient(circle at 40% 30%, #ff9ad0, #e0307f 55%, #8a1a5a);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, .5), inset 0 -5px 0 rgba(0, 0, 0, .25), 0 5px 0 var(--ink), 0 0 24px rgba(255, 92, 168, .5);
+  font-family: var(--f-title); text-shadow: 0 2px 0 var(--ink); transition: transform .1s;
+}
+.sl-buy small { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.sl-buy b { font-size: 20px; font-weight: 400; text-transform: uppercase; }
+.sl-buy span { font-family: var(--f-num); font-size: 13px; margin-top: 3px; display: inline-flex; align-items: center; gap: 3px; }
+.sl-buy:hover:not(:disabled) { transform: scale(1.06) rotate(-3deg); }
+.sl-buy:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+.sl-buy.off { filter: grayscale(.7) brightness(.75); }
+.sl-buy:disabled { opacity: .5; cursor: not-allowed; }
+.sl-bar { display: flex; gap: 6px; padding: 6px; border-radius: 18px; border: 3px solid var(--ink); background: rgba(8, 6, 18, .85); box-shadow: inset 0 3px 8px #000, 0 4px 0 var(--ink); }
+.sl-cell { min-width: 110px; padding: 2px 10px; text-align: center; border-radius: 12px; background: linear-gradient(180deg, #1a1838, #0c0a1e); display: flex; flex-direction: column; justify-content: center; }
+.sl-cell small { font-family: var(--f-title); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #9aa3c0; }
+.sl-cell b { font-family: var(--f-num); font-weight: 400; font-size: 22px; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, .25); }
+.sl-cell.win b { color: #ffd23f; text-shadow: 0 0 12px rgba(255, 210, 63, .7); }
+.sl-cell.bet { flex-direction: row; align-items: center; gap: 6px; }
+.sl-cell.bet b { color: #7dd3ff; }
+.sl-step { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--ink); background: radial-gradient(circle at 40% 30%, #6a7aa8, #2c3660); color: #fff; font-family: var(--f-title); font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+.sl-step:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+.sl-step:disabled { opacity: .4; }
+/* Gros bouton rond pour lancer */
+.sl-spin { flex: none; position: static !important; margin: 0 !important; padding: 0 !important; background: none !important; }
+.sl-spin .btn { width: 96px; height: 96px; min-height: 0 !important; min-width: 0 !important; padding: 0 !important; border-radius: 50% !important; font-size: 0 !important; position: relative;
+  background: radial-gradient(circle at 40% 30%, #9cff9c, #2fbf71 55%, #126a3a) !important; box-shadow: inset 0 3px 0 rgba(255, 255, 255, .5), inset 0 -5px 0 rgba(0, 0, 0, .25), 0 6px 0 var(--ink), 0 0 30px rgba(79, 224, 138, .5) !important; animation: none !important; }
+.sl-spin .btn::before { content: '⟳'; font-size: 54px; line-height: 1; color: #fff; text-shadow: 0 3px 0 var(--ink); display: block; }
+.sl-spin .btn.stop { background: radial-gradient(circle at 40% 30%, #ffb0b0, #f0444f 55%, #8a1020) !important; }
+.sl-spin .btn.stop::before { content: '■'; font-size: 34px; }
+.sl-spin .btn.ghost::before { content: '↻'; font-size: 40px; }
+.sl-spin .btn:not(.primary):not(.stop):not(.ghost) { width: 72px; height: 72px; background: radial-gradient(circle at 40% 30%, #c9d3d8, #5a6a72 55%, #2c363c) !important; }
+.sl-spin .btn:not(.primary):not(.stop):not(.ghost)::before { content: '✓'; font-size: 34px; }
+.sl-spin { display: flex; gap: 8px; align-items: center; }
+.palace.playing .sl-spin .btn.stop::before { animation: none; }
+.palace:not(.playing) .sl-spin .btn.primary:hover::before { animation: spinIcon .6s ease; }
+@keyframes spinIcon { to { transform: rotate(360deg); } }
+.sl-leds { display: none !important; }
+.sl-rail { display: none !important; }
+#slots .table.cabinet .felt { padding-bottom: 16px; }
+.palace .sl-lights { display: none; }
+.confirm-box .buy-price { font-size: 20px; }
+.confirm-box .buy-price b { font-family: var(--f-num); font-weight: 400; color: var(--c-gold); font-size: 28px; }
+@media (min-width: 761px) {
+  .palace { --sym: clamp(58px, min(9.6vw, calc((100vh - var(--dock-h) - 390px) / 3)), 132px) !important; }
+}
+@media (max-width: 760px) {
+  .palace { --sym: calc((100vw - 64px) / 5) !important; }
+  .sl-logo-cat { width: 180px; height: 66px; }
+  .palace .palace-title { font-size: 32px !important; padding-bottom: 12px; }
+  .palace .palace-title span { font-size: 16px; }
+  .sl-frame { padding: 7px; border-radius: 18px; }
+  .sl-deck { flex-wrap: wrap; gap: 8px; }
+  .sl-bar { order: -1; width: 100%; }
+  .sl-cell { min-width: 0; flex: 1; padding: 2px 4px; }
+  .sl-cell b { font-size: 17px; }
+  .sl-buy { width: 74px; height: 74px; }
+  .sl-buy b { font-size: 16px; }
+  .sl-spin .btn { width: 80px; height: 80px; }
+}

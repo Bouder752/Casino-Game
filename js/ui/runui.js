@@ -840,5 +840,7 @@ const UI = (() => {
     if (want) { const b = btns.find(x => want.test(x.textContent.trim().replace(/^[^\wÀ-ÿ]+/, ''))); if (b) { e.preventDefault(); b.click(); } }
   });
 
-  return { screen, showTab, renderMenu, renderRunBar, toast };
+  // Petite fenêtre de confirmation réutilisable (achat de bonus…)
+  const confirm = (html, label, fn) => modal(html, [['Annuler', () => {}], [label, fn, 'primary']], 'confirm-box', { esc: 0 });
+  return { screen, showTab, renderMenu, renderRunBar, toast, confirm };
 })();
