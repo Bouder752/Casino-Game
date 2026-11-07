@@ -236,6 +236,49 @@ const JokerArt = (() => {
       <path d="M44 66 H116 M60 54 L70 66 L80 54 L90 66 L100 54 M70 66 L80 126 L90 66" fill="none" ${ink} stroke-width="1.6"/>
       <path d="M48 66 L76 118 L70 66Z" fill="#fff" opacity=".45"/><path d="M90 66 L84 118 L112 66Z" fill="#3fa9d6" opacity=".4"/>
       ${sparkle(30, 70, 8)}${sparkle(132, 80, 7)}${sparkle(122, 34, 5)}${sparkle(36, 116, 5)}`,
+    // 🔥 Jeton en feu, lunettes noires, très sûr de lui
+    serie: () => sun('#3a1408', '#ffb36b') + `
+      <path d="M80 18 C96 38 112 44 108 70 C118 62 120 50 118 42 C132 60 130 96 108 112 C96 122 64 122 52 112 C30 96 28 64 44 46 C44 58 50 66 56 70 C52 48 64 34 80 18Z" fill="#ff7a1a" ${ink}/>
+      <path d="M80 44 C90 58 100 62 98 80 C104 76 106 70 106 64 C114 80 110 100 96 108 C88 114 72 114 64 108 C50 98 50 80 58 70 C58 78 62 84 66 86 C64 70 70 56 80 44Z" fill="#ffd23f"/>
+      ${chip(80, 92, 22, '#c4161c')}
+      <path d="M64 86 H96 L94 92 C92 96 86 96 84 92 L82 88 H78 L76 92 C74 96 68 96 66 92Z" fill="${K}"/>
+      <path d="M70 102 Q80 108 92 100" fill="none" ${ink}/>${sparkle(128, 30, 6)}${sparkle(30, 34, 4)}`,
+
+    // ✌️ Deux cartes jumelles qui font le V de la victoire
+    doubleur: () => sun('#14304a', '#bfe0ff') + `
+      <g transform="translate(56 40) rotate(-12)"><rect width="42" height="60" rx="5" fill="${CR}" ${ink}/><text x="7" y="17" font-family="Georgia,serif" font-weight="700" font-size="15" fill="${K}">A</text><text x="21" y="42" text-anchor="middle" font-size="22" fill="${K}">♠</text></g>
+      <g transform="translate(70 36) rotate(12)"><rect width="42" height="60" rx="5" fill="${CR}" ${ink}/><text x="7" y="17" font-family="Georgia,serif" font-weight="700" font-size="15" fill="#c4161c">10</text><text x="21" y="42" text-anchor="middle" font-size="22" fill="#c4161c">♥</text></g>
+      ${eye(84, 70, 3.6, 1)}${eye(98, 72, 3.6, 1)}<path d="M84 82 Q92 88 100 82" fill="none" ${ink}/>
+      <path d="M100 112 L94 96 C93 92 98 90 100 94 L104 104 L106 90 C107 86 112 87 112 91 L110 108 C116 106 120 110 116 116 C110 124 100 124 100 112Z" fill="#f2c19a" ${ink}/>
+      <rect x="40" y="104" width="34" height="20" rx="10" fill="${G}" ${ink}/><text x="57" y="119" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="14" fill="${K}">×2</text>${sparkle(130, 40, 5)}`,
+
+    // 🔮 Boule de cristal qui louche sur ta main
+    cristal: () => sun('#2a1450', '#e0c8ff') + `
+      <path d="M52 118 H108 L100 104 H60Z" fill="${G}" ${ink}/><rect x="46" y="116" width="68" height="12" rx="4" fill="${BX}" ${ink}/>
+      <circle cx="80" cy="66" r="40" fill="#8a5ad8" opacity=".9" ${ink}/>
+      <path d="M50 70 C60 50 84 44 102 58 C88 54 72 60 64 74 C60 82 52 82 50 70Z" fill="#c9a8ff" opacity=".7"/>
+      <ellipse cx="66" cy="46" rx="10" ry="6" fill="#fff" opacity=".55" transform="rotate(-25 66 46)"/>
+      ${eye(70, 70, 5, 2)}${eye(92, 70, 5, -2)}<path d="M72 86 Q82 82 90 88" fill="none" ${ink}/>
+      <g transform="translate(70 92) scale(.5)"><rect width="18" height="24" rx="2" fill="#fff" ${ink}/><text x="9" y="17" text-anchor="middle" font-size="12" fill="#c4161c">♦</text></g>
+      ${sparkle(128, 32, 6)}${sparkle(30, 40, 5)}${sparkle(124, 100, 4)}`,
+
+    // 💪 Gros bras tatoué qui serre un jeton
+    grosbras: () => sun('#3a2010', '#ffd8a8') + `
+      <path d="M22 128 C26 104 40 92 58 90 C60 70 66 52 84 44 C100 36 118 42 122 56 C126 70 114 80 100 78 C94 78 90 74 92 68 C84 72 82 82 84 92 C104 92 116 104 118 128Z" fill="#f2b98a" ${ink}/>
+      <path d="M58 90 C66 84 76 84 84 92" fill="none" ${ink}/>
+      <path d="M44 112 C44 104 54 102 56 110 C58 102 68 104 68 112 C68 120 56 124 56 126 C56 124 44 120 44 112Z" fill="#e8243c" ${ink} stroke-width="1.6"/>
+      <rect x="40" y="114" width="32" height="8" rx="2" fill="${CR}" ${ink} stroke-width="1.2"/><text x="56" y="121" text-anchor="middle" font-size="6.5" font-family="Georgia,serif" font-weight="700" fill="${K}">MAMAN</text>
+      ${chip(112, 56, 16, '#1f8a4c')}${sparkle(30, 40, 6)}${sparkle(136, 104, 4)}`,
+
+    // 👑 Le Roi Midas : une couronne, tout ce qu'il touche devient or
+    midas: () => sun('#2c2412', '#ffe9a8') + `
+      <path d="M44 60 L52 26 L66 46 L80 18 L94 46 L108 26 L116 60Z" fill="${G}" ${ink}/>
+      <circle cx="80" cy="24" r="4" fill="#e8243c" ${ink} stroke-width="1.5"/><circle cx="52" cy="28" r="3" fill="#4fc3ff"/><circle cx="108" cy="28" r="3" fill="#4fc3ff"/>
+      <rect x="42" y="58" width="76" height="12" rx="3" fill="${G2}" ${ink}/>
+      <circle cx="80" cy="96" r="26" fill="#f6cd52" ${ink}/>
+      ${eye(70, 92, 4, 0)}${eye(90, 92, 4, 0)}<path d="M68 104 Q80 114 92 104" fill="none" ${ink}/>
+      <path d="M62 84 L74 88 M98 84 L86 88" ${ink}/>
+      ${chip(30, 112, 12, G)}${chip(132, 108, 12, G)}${sparkle(130, 40, 7)}${sparkle(28, 44, 5)}${sparkle(116, 130, 4)}`,
   };
 
   const cache = {};

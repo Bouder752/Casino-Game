@@ -104,14 +104,15 @@ const UI = (() => {
   const RAR_SYM = { commun: '●', rare: '◆', legendaire: '★' };
   const kindCls = d => (d.kind === 'joker' ? 'r-' + d.rarity : d.kind === 'consumable' ? 'r-cons' : d.kind === 'pack' ? 'r-pack' : 'r-upgrade');
   const KIND_LABEL = { consumable: 'Consommable', pack: 'Pack', upgrade: 'Amélioration' };
-  // Synergies (aperçu au survol d'un joker du shop)
-  const SYN = {
-    porte: ['gain'], rouge: ['roulette'], septieme: ['sept'], molle: ['bj', 'perte'], compteur: ['bj'], consolation: ['perte'],
-    depipe: ['dice', 'relance'], corrompu: ['bj'], martingale: ['perte', 'gain'], zero: ['roulette'], cerise: ['slots'],
-    pickpocket: ['roulette'], miroir: ['copie'], assurance: ['survie'], parrain: ['nombre', 'gain'], tricheur: ['gain'],
-    roue: ['regles'], banquier: ['eco'], fantome: ['relance'], jackpot: ['gain'],
+  // Synergies (aperçu au survol d'un joker du shop) : même jeu, ou jokers qui profitent de tout
+  const GAME_TAGS = ['Blackjack', 'Roulette', 'Dice', "Hold'em", 'Machine'];
+  const synergic = (a, b) => {
+    if (a === b) return false;
+    if (['miroir', 'parrain'].includes(a) || ['miroir', 'parrain'].includes(b)) return true;
+    const ta = JOKERS[a].tags || [], tb = JOKERS[b].tags || [];
+    if (ta.some(t => GAME_TAGS.includes(t) && tb.includes(t))) return true;
+    return (ta.includes('Multiplicateur') && tb.includes('Tous les jeux')) || (tb.includes('Multiplicateur') && ta.includes('Tous les jeux'));
   };
-  const synergic = (a, b) => a !== b && (a === 'miroir' || b === 'miroir' || a === 'parrain' || b === 'parrain' || (SYN[a] || []).some(t => (SYN[b] || []).includes(t)));
 
   function itemCard(id, { uid, price, onClick, disabled, big } = {}) {
     const d = CATALOG[id];
@@ -123,7 +124,8 @@ const UI = (() => {
     e.innerHTML = `<div class="jc-frame"><div class="jc-art">${art}</div><div class="jc-name">${sym ? `<i>${sym}</i> ` : ''}${d.name}</div></div>` +
       (id === 'jackpot' ? `<div class="jc-badge">×${META.jackpot.toFixed(1)}</div>` : '') +
       (price !== undefined ? `<div class="jc-price ${typeof price === 'number' && !H().canAfford(price) ? 'cant' : ''}">${typeof price === 'number' ? '<span class="wallet-chip s"></span>' : ''}${price}</div>` : '');
-    e.setAttribute('aria-label', `${d.name} : ${d.desc(H())}`);
+    e.setAttribute('aria-label', `${d.name} : ${d.desc(H(), uid && isRun() ? S().jokers.find(x => x.uid === +uid) : null)}`);
+    if (d.grows) e.classList.add('grows');
     if (disabled) e.classList.add('sold');
     if (onClick) e.onclick = ev => { ev.stopPropagation(); if (e._dragged) return; onClick(e); };
     if (d.kind === 'joker') attachHover(e, id, uid);
@@ -139,7 +141,7 @@ const UI = (() => {
       const st = j.stats || { earned: 0, triggers: 0 };
       extra += `<p class="pop-stat">A rapporté <b>${Util.fmt(Math.round(st.earned))}</b> jetons cette partie · déclenché ${st.triggers} fois</p>`;
       extra += jokerStateText(j);
-      extra += `<p class="pop-sell">Revente : <b>${Math.floor(d.price * CONFIG.shop.sellRatio)}</b> jetons</p>`;
+      extra += `<p class="pop-sell">Revente : <b>${Util.fmt(H().sellValue(j))}</b> jetons</p>`;
     } else if (d.kind === 'joker') {
       const c = (META.collection && META.collection.jokers[id]) || null;
       if (c && c.owned) extra += `<p class="pop-stat">Collection : possédé ${c.owned} fois, ${c.wins} victoire(s), ${Util.fmt(Math.round(c.earned))} jetons rapportés au total</p>`;
@@ -147,13 +149,11 @@ const UI = (() => {
       if (syn.length) extra += `<p class="pop-syn">✦ Synergie avec : ${syn.join(', ')}</p>`;
     }
     return `<div class="pop-head">${d.kind === 'joker' ? `<div class="pop-art r-${d.rarity}">${JokerArt.svg(id)}</div>` : ''}
-      <div><div class="pop-title r-${d.rarity || d.kind}">${d.icon} ${d.name}</div>${tag}</div></div><p class="pop-desc">${d.desc(H())}</p>${extra}`;
+      <div><div class="pop-title r-${d.rarity || d.kind}">${d.icon} ${d.name}</div>${tag}${(d.tags || []).map(t => `<span class="tag jt">${t}</span>`).join('')}</div></div><p class="pop-desc">${d.desc(H(), j)}</p>${extra}`;
   }
   function jokerStateText(j) {
     const s = j.state || {};
-    if (j.id === 'martingale' && s.streak) return `<p class="pop-extra">Série de pertes : ${s.streak} (+${s.streak * CONFIG.jokers.martingale.pct * 100} % au prochain gain)</p>`;
     if (j.id === 'roue' && s.rules && s.rules.length) return `<p class="pop-extra">Règle active : ${RULES[s.rules[0]].desc()}</p>`;
-    if (j.id === 'molle') return `<p class="pop-extra">${s.used ? 'Déjà utilisée à cette table' : 'Prête pour cette table'}</p>`;
     if (j.id === 'miroir') { const t = H().mirrorTarget(j.uid); return `<p class="pop-extra">Copie : ${t ? t.name : 'rien (aucun joker à droite)'}</p>`; }
     return '';
   }
@@ -197,7 +197,7 @@ const UI = (() => {
     popover(node, sheetHtml(j.id, j.uid), [
       ['◀', () => H().moveJoker(j.uid, -1), '', i === 0],
       ['▶', () => H().moveJoker(j.uid, 1), '', i === S().jokers.length - 1],
-      [`Vendre (+${Math.floor(JOKERS[j.id].price * CONFIG.shop.sellRatio)})`, () => sell(j), 'danger', H().busy()],
+      [`Vendre (+${Util.fmt(H().sellValue(j))})`, () => sell(j), 'danger', H().busy()],
     ]);
   }
   function sell(j) {
@@ -265,7 +265,7 @@ const UI = (() => {
       const c = itemCard(id, {
         onClick: node => popover(node, sheetHtml(id), [
           ['Utiliser', () => useConsumable(i), 'primary', !usable],
-          [`Vendre (+${Math.floor(def.price * CONFIG.shop.sellRatio)})`, () => { H().sellConsumable(i); App.syncBalance(); }, 'danger'],
+          [`Vendre (+${Util.fmt(Math.floor(H().scale(def.price) * CONFIG.shop.sellRatio))})`, () => { H().sellConsumable(i); App.syncBalance(); }, 'danger'],
         ]),
       });
       c.classList.add('ccard');
@@ -481,7 +481,7 @@ const UI = (() => {
           <div class="loans">
             <div class="shop-row-title">💳 Le Prêteur</div>
             ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque table gagnée.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
-              : CONFIG.loans.options.map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${o.amount} maintenant<br><small>${Math.round(o.amount * (1 + o.rate))} à rendre en ${o.tables} tables</small></button>`).join('')}
+              : H().loanOptions().map(o => `<button class="btn small loan" data-id="${o.id}">${o.name} : +${Util.fmt(o.amount)} maintenant<br><small>${Util.fmt(Math.round(o.amount * (1 + o.rate)))} à rendre en ${o.tables} tables</small></button>`).join('')}
             <p class="hint">Les jetons prêtés t'évitent la faillite, mais la dette est déduite de ta bankroll : elle ne fait pas avancer le palier.</p>
           </div>
 
@@ -542,6 +542,24 @@ const UI = (() => {
     });
   }
 
+  // Joker de départ : le premier choix de build
+  function starterModal() {
+    const ids = isRun() && S().starter;
+    if (!ids || !ids.length) return;
+    const box = modal(`<h2>Ton joker de départ</h2><p class="center">Le premier joker de ton build. Les paliers montent vite : choisis bien.</p><div class="pack-cards starter-cards"></div>`, [], 'wide starter-box', { esc: -1 });
+    const row = box.querySelector('.starter-cards');
+    ids.forEach((id, k) => {
+      const wrap = el('div', 'pack-choice');
+      wrap.style.animationDelay = `${k * 0.12}s`;
+      wrap.appendChild(itemCard(id, { big: true }));
+      wrap.appendChild(el('p', '', JOKERS[id].desc(H())));
+      const b = el('button', 'btn primary', 'Prendre');
+      b.onclick = () => { if (report(H().pickStarter(id))) { Sfx.play('joker'); closeModal(); renderRunBar(); toast(`${JOKERS[id].icon} ${JOKERS[id].name} rejoint ta main !`); } };
+      wrap.appendChild(b);
+      row.appendChild(wrap);
+    });
+  }
+
   // ---------- Menu, cosmétiques, aide ----------
   function renderMenu() {
     $('m-continue').hidden = !Engine.hasSave();
@@ -581,7 +599,8 @@ const UI = (() => {
         <li>À chaque table, fais monter ta <b>bankroll</b> (tes jetons, moins tes dettes) jusqu'au <b>palier</b> affiché en haut, sur le jeu de ton choix. Mises illimitées.</li>
         <li>La <b>mise max</b> vaut ${Math.round(P.miseMaxRatio * 100)} % du palier : plus les paliers montent, plus tu peux miser gros.</li>
         <li>Tu as <b>${P.relancesParTable} relances</b> par table pour refaire un tirage raté sans miser à nouveau.</li>
-        <li>Palier atteint : récompense et ${P.interetsParTranche.gain} jetons d'intérêts par tranche de ${P.interetsParTranche.tranche} (${P.interetsParTranche.max} max), puis le <b>Comptoir</b>.</li>
+        <li>Palier atteint : récompense (une part du palier) et ${Math.round(P.interets.taux * 100)} % d'intérêts sur tes jetons, puis le <b>Comptoir</b>. Les prix y suivent tes paliers : un joker coûte toujours une vraie part de ta bankroll.</li>
+        <li>Les paliers montent de plus en plus vite et la mise max baisse en proportion : sans <b>build</b> de jokers (multiplicateurs, jokers qui grandissent, spécialistes d'un jeu), impossible d'atteindre les derniers étages.</li>
         <li>Tu peux <b>passer</b> la petite ou la grande table pour gagner un <b>tag</b> (bonus), mais pas le Boss, qui impose une règle spéciale.</li>
         <li>Tu ne perds qu'à la <b>faillite</b>. Bats le boss de l'étage ${P.etagesPourGagner} pour gagner, puis continue en mode infini.</li>
         <li>Les jokers s'appliquent de <b>gauche à droite</b>. Chaque gain affiche son détail. Chaque partie a une <b>seed</b> : même seed et mêmes choix = même partie.</li>
@@ -594,7 +613,7 @@ const UI = (() => {
     const ph = S().phase;
     renderRunBar();
     if (S().pendingPack && S().pendingPack.length) setTimeout(() => openPack(S().pendingPack), 300);
-    if (ph === 'choose') { renderChoose(); screen('choose'); }
+    if (ph === 'choose') { renderChoose(); screen('choose'); if (Settings.tutorialDone) setTimeout(starterModal, 150); }
     else if (ph === 'shop' || ph === 'victory') { renderShop(); screen('shop'); if (ph === 'victory') victoryModal(); }
     else enterGame();
   }
@@ -608,8 +627,8 @@ const UI = (() => {
       `<div class="tuto"><div class="tuto-n">3 / 3</div><h2>Les jokers</h2><p>Entre les tables, achète des <b>jokers</b> au Comptoir : ils boostent tes gains. Ils apparaissent en bas de l'écran ; touche-les pour voir ce qu'ils font.<br>Raté un tirage ? Une <b>relance</b> te donne une 2ᵉ chance.</p></div>`,
     ];
     modal(steps[step], step < steps.length - 1
-      ? [['Passer', () => Settings.set('tutorialDone', true)], ['Suivant ➜', () => { setTimeout(() => tutorial(step + 1), 0); }, 'primary']]
-      : [['C\'est parti !', () => Settings.set('tutorialDone', true), 'primary']], 'tuto-box', { esc: 0 });
+      ? [['Passer', () => { Settings.set('tutorialDone', true); setTimeout(starterModal, 50); }], ['Suivant ➜', () => { setTimeout(() => tutorial(step + 1), 0); }, 'primary']]
+      : [['C\'est parti !', () => { Settings.set('tutorialDone', true); setTimeout(starterModal, 50); }, 'primary']], 'tuto-box', { esc: 0 });
   }
   function resume() {
     const h = Engine.load({ meta: META });

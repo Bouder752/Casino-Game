@@ -30,7 +30,12 @@ const Util = {
   sleep(ms) { return new Promise(r => setTimeout(r, ms / Settings.speed)); },
   dur(ms) { return ms / Settings.speed; },
   round2(x) { return Math.round(x * 100) / 100; },
+  // Nombres : décimales seulement pour les petits montants, « M » / « Md » pour les très grands
   fmt(n) {
+    const a = Math.abs(n);
+    if (a >= 1e9) return (n / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: a >= 1e11 ? 0 : 2 }) + ' Md';
+    if (a >= 1e6) return (n / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: a >= 1e8 ? 0 : 2 }) + ' M';
+    if (a >= 1000) return Math.round(n).toLocaleString('fr-FR');
     return n.toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
   },
   signed(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Util.fmt(Math.abs(n)); },
