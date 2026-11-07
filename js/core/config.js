@@ -24,6 +24,7 @@ const CONFIG = {
     relancesParMise: 1,        // relances utilisables sur une même mise
     coutRelance: 0.25,         // une relance coûte 25 % de la mise en cours
     jokerDeDepart: 3,          // choix entre 3 jokers communs en début de partie
+    filet: { etages: 2, part: 0.5 }, // une fois par partie, faillite aux étages 1-2 : +50 % du palier
 
     // Récompense de table : une part du palier atteint
     recompenseTable: { petite: 0.06, grande: 0.08, boss: 0.12 },

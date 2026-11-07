@@ -62,9 +62,11 @@ winTable(H);
 ok(H.state.etage === 2 && H.state.tableType === 'petite', 'boss vaincu → étage suivant');
 
 // 5. On ne perd que par faillite
-H = run('GO2', true);
+H = run('GO2', true); H.state.rescued = true;
 play(H, H.chips(), 0);
 ok(H.state.phase === 'over' && /[Ff]aillite/.test(H.state.reason), 'faillite → perdu');
+H = run('NET', true); const before0 = H.chips(); play(H, H.chips(), 0);
+ok(H.state.phase === 'play' && H.state.rescued && H.chips() === Math.round(H.state.table.target * P.filet.part), 'filet de sécurité aux premiers étages, une seule fois');
 // Un prêt ne fait pas gagner la table (bankroll = jetons − dettes)
 H = Engine.newRun({ seed: 'LOAN', meta: meta(), persist: false }); H.chooseTable(); H.takeLoan('gros');
 ok(H.state.phase === 'play' && H.bankroll() < H.state.table.target, 'un prêt ne compte pas dans la bankroll');
@@ -220,7 +222,7 @@ ok(top && top.mult === 2 && top.win === SC.symbols.find(x => x.id === 'chatnoir'
 const st = { chips: 1e9 };
 const Hs = Engine.free({ meta: meta(), persist: false }); Hs.state.chips = 1e9;
 let fsSeen = false;
-for (let i = 0; i < 2000 && !fsSeen; i++) { const r = Hs.startPlay('slots', { bet: 20 }); if (r.round.spins.length > 1) { fsSeen = true; ok(r.round.spins.length === 1 + SC.scatter.spins, 'tours gratuits complets'); const sticky = r.round.spins.slice(1).every((sp, k) => k === 0 || true); ok(sticky, 'tours gratuits'); } if (!r.settlement) Hs.act('accept'); }
+for (let i = 0; i < 2000 && !fsSeen; i++) { const r = Hs.startPlay('slots', { bet: 20 }); if (r.round.spins.length > 1) { fsSeen = true; ok(r.round.spins.length >= 1 + SC.scatter.spins && r.round.spins.length <= 1 + SC.scatter.maxSpins, 'tours gratuits complets (relances comprises)'); const sticky = r.round.spins.slice(1).every((sp, k) => k === 0 || true); ok(sticky, 'tours gratuits'); } if (!r.settlement) Hs.act('accept'); }
 ok(fsSeen, 'tours gratuits déclenchés en 2000 lancers');
 void st;
 

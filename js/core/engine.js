@@ -357,6 +357,15 @@ const Engine = (() => {
       if (!isRun || active || state.chips >= H.minBet()) return false;
       const e = H.emit('onBankrupt', { saved: false });
       if (e.saved && state.chips >= H.minBet()) { notify('change'); return false; }
+      // Filet de sécurité : une seule fois par partie, aux premiers étages, le casino te renfloue
+      if (state.etage <= P.filet.etages && !state.rescued && state.table) {
+        state.rescued = true;
+        const v = Math.round(state.table.target * P.filet.part);
+        H.give(v);
+        notify('toast', { text: `🎁 Le casino te fait une fleur : +${v} jetons (une seule fois par partie, aux étages 1 et 2).` });
+        notify('change');
+        return false;
+      }
       gameOver('Faillite : plus assez de jetons pour miser.');
       return true;
     }
@@ -395,7 +404,8 @@ const Engine = (() => {
     });
     function newEtage() {
       const seen = state.bossSeen || (state.bossSeen = []);
-      const pool = BOSS_DEFS.filter(b => !b.final && !seen.includes(b.id));
+      // pas de boss « un seul jeu » à l'étage 1 : on laisse le temps de construire son build
+      const pool = BOSS_DEFS.filter(b => !b.final && !seen.includes(b.id) && !(state.etage === 1 && b.onlyGame));
       state.bossId = state.etage === P.etagesPourGagner && !state.infinite ? 'patron' : (pool.length ? rng.pick(pool) : rng.pick(BOSS_DEFS.filter(b => !b.final))).id;
       seen.push(state.bossId); if (seen.length >= BOSS_DEFS.length - 1) seen.length = 0;
       state.tagOffers = { petite: rng.pick(TAG_DEFS).id, grande: rng.pick(TAG_DEFS).id };
