@@ -24,23 +24,28 @@ ok([1, 2, 3].every(() => r1.next() === r2.next()), 'RNG reproductible');
 
 // 2. Objectifs et structure des étages
 let H = Engine.newRun({ seed: 'O', meta: meta(), persist: false });
-const O1 = P.objectifBase[1], TM = P.multiplicateurTable;
-ok(H.objective(1, 'petite') === Math.round(O1 * TM.petite) && H.objective(1, 'grande') === Math.round(O1 * TM.grande) && H.objective(1, 'boss') === Math.round(O1 * TM.boss), 'objectifs de l\'étage 1');
-ok(H.objective(9, 'petite') === Math.round(P.objectifBase[8] * P.croissanceInfinie), 'croissance du mode infini');
+const objs = []; for (let e = 1; e <= 9; e++) ['petite', 'grande', 'boss'].forEach(t => objs.push(H.objective(e, t)));
+ok(objs[0] === 150 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
+ok(objs.every((v, i) => i < 2 || v / objs[i - 1] >= objs[i - 1] / objs[i - 2] - 0.05), 'la croissance des paliers s\'accélère');
+ok(H.state.starter && H.state.starter.length === P.jokerDeDepart && H.state.starter.every(id => JOKERS[id].rarity === 'commun'), 'choix du joker de départ');
+const st0 = H.state.starter[0];
+ok(H.pickStarter(st0).ok && H.state.jokers[0].id === st0 && !H.state.starter, 'joker de départ pris');
 ok(H.state.phase === 'choose' && H.state.tableType === 'petite', 'la partie commence au choix de la petite table');
 ok(!!H.startPlay('test', { bet: 1, back: 0 }).error, 'pas de mise sans table ouverte');
 H.chooseTable();
 ok(H.charges('dice') === P.relancesParTable, 'relances par table');
 ok(H.maxBet('bj') === Math.round(H.state.table.target * P.miseMaxRatio), 'mise max = part du palier');
+ok(H.maxBetRatio(8) < P.miseMaxRatio * 0.4, 'la part du palier en mise max baisse avec les étages');
 
 // 3. Palier de bankroll : la table est gagnée dès que la bankroll l'atteint, sans limite de mises
 for (let i = 0; i < 12; i++) play(H, 1, 0.5); // beaucoup de petites mises perdantes : pas de limite
 ok(H.state.phase === 'play', 'pas de limite de mises');
 winTable(H);
 ok(H.state.phase === 'shop' && H.state.tableType === 'grande', 'palier atteint → shop puis grande table');
-const I = P.interetsParTranche;
-ok(H.state.summary.lines[0].value === P.recompenseTable.petite, 'récompense de table');
-ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= I.max), 'intérêts plafonnés');
+ok(H.state.summary.lines[0].value === Math.round(P.recompenseTable.petite * 150), 'récompense de table = part du palier');
+ok(H.state.summary.lines.some(l => l.label.startsWith('Intérêts') && l.value <= P.interets.maxPalier * 150), 'intérêts plafonnés');
+const cheap = Math.min(...H.state.shop.offers.filter(o => o.kind === 'joker').map(o => o.price));
+ok(H.state.shop.offers.every(o => o.price === H.scale(api.CATALOG[o.id].price)) && H.scale(150) === H.objective(1, 'grande'), `prix proportionnels au palier visé (joker le moins cher : ${cheap})`);
 H.leaveShop();
 ok(H.state.phase === 'choose', 'sortie du shop → choix de table');
 
@@ -78,51 +83,49 @@ H = withBoss('sobre'); H.addJoker('fantome');
 ok(H.charges('dice') === 0, 'Le Videur : aucune relance');
 H = withBoss('avare'); let s = play(H, 10, 30);
 ok(s.mult === 0.75 && s.net === 15, `Croupier Avare : gains −25 % (net ${s.net})`);
-H = withBoss('gourmand'); s = play(H, 10, 20);
-ok(s.net === 10 - 5 && H.chips() === P.jetonsDepart + 5, `Gourmand : 5 jetons par mise (net ${s.net})`);
+H = withBoss('gourmand'); H.state.table.target = 150; s = play(H, 10, 20);
+ok(s.net === 10 - 3 && H.chips() === P.jetonsDepart + 7, `Gourmand : 3 jetons par mise au palier 150 (net ${s.net})`);
 H = withBoss('endormi'); ['tricheur', 'porte'].forEach(id => H.addJoker(id)); s = play(H, 10, 20);
-ok(s.mult === 1 && Math.abs(s.add - 0.05) < 1e-9, 'Gardien Endormi : joker de gauche désactivé');
+ok(s.mult === 1 && Math.abs(s.add - 0.2) < 1e-9, 'Gardien Endormi : joker de gauche désactivé');
 const realRL = api.Games.get('roulette');
 api.Games.register({ ...api.Games.get('test'), id: 'roulette' });
 H = withBoss('noir'); s = H.startPlay('roulette', { bet: 10, back: 20, info: { bets: { red: 10 }, color: 'red', n: 1 } }).settlement;
 ok(s.net === -10, 'Dame en Noir : le rouge ne paie rien');
 api.Games.register(realRL);
 
-// 8. Formule : Porte-Bonheur (+5 %) + Parrain (+2) puis Tricheur ×2, Septième +10
+// 8. Formule : Porte-Bonheur (+20 %), Parrain ×(1 + 0,3 × 2 autres), Tricheur ×2,5, Septième 15 % de la mise
 H = run('T1');
 ['porte', 'parrain', 'tricheur'].forEach(id => H.addJoker(id));
 s = play(H, 10, 20);
-// Porte-Bonheur +5 % et Parrain +0,5 × 2 autres jokers = +105 %, puis Tricheur ×2 : 10 × 2,05 × 2 = 41
-ok(s.gain === 10 && Math.abs(s.add - 1.05) < 1e-9 && s.mult === 2 && s.gainFinal === 41, `formule gain (obtenu ${s.gainFinal})`);
+// 10 × 1,2 × 1,6 × 2,5 = 48
+ok(s.gain === 10 && Math.abs(s.add - 0.2) < 1e-9 && s.mult === 4 && s.gainFinal === 48, `formule gain (obtenu ${s.gainFinal})`);
 H.addJoker('septieme');
 s = play(H, 10, 20, { draws: [{ kind: 'card', card: { rank: 7, suit: 0 } }] });
-ok(s.flats === 10 && s.steps.map(x => x.kind).join() === 'add,add,mult,flat', 'Septième Ciel et ordre des étapes');
+ok(s.flats === 1.5 && s.steps.map(x => x.kind).join() === 'add,mult,mult,flat', 'Septième Ciel et ordre des étapes');
 
 // 9. Miroir (chaîne sans boucle), Martingale (état persistant entre les tables)
 H = run('T2'); ['miroir', 'miroir', 'tricheur'].forEach(id => H.addJoker(id));
-ok(play(H, 10, 20).mult === 8, 'miroir ×2 ×2 ×2');
+ok(play(H, 10, 20).mult === 15.63, 'miroir ×2,5 ×2,5 ×2,5');
 H = run('T3'); ['tricheur', 'miroir'].forEach(id => H.addJoker(id));
-ok(play(H, 10, 20).mult === 2, 'miroir sans voisin à droite : aucun effet');
+ok(play(H, 10, 20).mult === 2.5, 'miroir sans voisin à droite : aucun effet');
 H = run('T4'); H.addJoker('martingale');
 play(H, 10, 0); play(H, 10, 0); newTable(H);
 ok(H.state.jokers[0].state.streak === 2, 'martingale : série conservée d\'une table à l\'autre');
 s = play(H, 10, 20);
-ok(Math.abs(s.add - 0.5) < 1e-9 && H.state.jokers[0].state.streak === 0, 'martingale +50 % puis remise à zéro');
+ok(Math.abs(s.add - 1) < 1e-9 && H.state.jokers[0].state.streak === 0, 'martingale +50 % par perte puis remise à zéro');
 
 // 10. Main Molle (1re défaite de blackjack par table) et Consolation
 H = run('T5'); ['molle', 'consolation'].forEach(id => H.addJoker(id));
 const realBJ = api.Games.get('bj');
 api.Games.register({ ...api.Games.get('test'), id: 'bj' });
-ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -2, 'Main Molle 50 % + Consolation 3');
-ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -7, 'Main Molle une seule fois par table');
-newTable(H);
-ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -2, 'Main Molle réarmée à la table suivante');
+ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6.5, 'Main Molle 25 % + Consolation 10 % de la mise');
+ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6.5, 'Main Molle à chaque défaite');
 api.Games.register(realBJ);
 
 // 11. Assurance-Vie
-H = run('T6'); H.addJoker('assurance');
+H = run('T6', true); H.addJoker('assurance');
 play(H, H.chips(), 0);
-ok(H.state.phase === 'play' && H.chips() === 50 && H.state.jokers.length === 0, 'Assurance-Vie sauve et disparaît');
+ok(H.state.phase === 'play' && H.chips() === 90 && H.state.jokers.length === 0, 'Assurance-Vie : 60 % du palier, puis disparaît');
 
 // 12. Shop : pas de joker possédé, emplacements limités, reroll croissant, revente 50 %
 H = run('T7', true); H.state.chips = 100000; winTable(H);
@@ -137,30 +140,30 @@ for (let k = 0; k < 30; k++) {
 ok(H.state.jokers.length === H.state.jokerSlots, 'emplacements remplis');
 const off = H.state.shop.offers.findIndex(o => o.kind === 'joker');
 ok(off < 0 || H.buy(off).error, 'achat refusé faute d\'emplacement');
-ok(H.state.shop.rerollCost === CONFIG.shop.reroll.base + 30 * CONFIG.shop.reroll.step, 'reroll à prix croissant');
+ok(H.state.shop.rerollCost === H.scale(CONFIG.shop.reroll.base + 30 * CONFIG.shop.reroll.step), 'reroll à prix croissant');
 const j0 = H.state.jokers[0], before = H.chips();
 H.sellJoker(j0.uid);
-ok(H.chips() - before === Math.floor(JOKERS[j0.id].price / 2), 'revente à 50 %');
+ok(H.chips() - before === Math.floor(j0.paid / 2), 'revente à 50 % du prix payé');
 
 // 13. Tags : Soldes (−50 % au prochain shop), Turbo (+2 mises)
 H = run('T8', true); H.addStatus('soldes'); H.state.chips = 10000; winTable(H);
-ok(H.state.shop.offers.every(o => o.price === Math.ceil(api.CATALOG[o.id].price * 0.5)), 'Soldes : prix divisés par 2');
+ok(H.state.shop.offers.every(o => o.price === Math.ceil(H.scale(api.CATALOG[o.id].price) * 0.5)), 'Soldes : prix divisés par 2');
 H.leaveShop(); const mb = H.maxBet('dice'); H.addStatus('turbo'); H.chooseTable();
 ok(H.maxBet('dice') > mb, 'Turbo : mise max augmentée');
 
 // 14. Vente d'un joker actif : ses relances disparaissent
 H = run('T9'); H.addJoker('fantome'); newTable(H);
-ok(H.charges('dice') === P.relancesParTable + 1, 'Fantôme : +1 relance');
+ok(H.state.charges.length === P.relancesParTable + 2, 'Fantôme : +2 relances');
 H.sellJoker(H.state.jokers[0].uid);
-ok(H.charges('dice') === P.relancesParTable, 'relance du joker retirée à la vente');
+ok(H.state.charges.length === P.relancesParTable, 'relances du joker retirées à la vente');
 
 // 15. Prêt : remboursement à chaque table gagnée, pénalité + huissier si impayé
 H = run('T10', true);
 H.takeLoan('petit');
-ok(H.chips() === P.jetonsDepart + 100 && H.state.debts[0].left === 120, 'prêt accordé');
+ok(H.chips() === P.jetonsDepart + 60 && H.state.debts[0].left === 72, 'prêt accordé (montant au palier 150)');
 ok(!!H.takeLoan('gros').error, 'un seul prêt à la fois');
 winTable(H);
-ok(H.state.debts[0].left === 80, `échéance prélevée (reste ${H.state.debts[0].left})`);
+ok(H.state.debts[0].left === 48, `échéance prélevée (reste ${H.state.debts[0].left})`);
 H.leaveShop(); H.state.chips = 100; H.chooseTable();
 ok(H.bankroll() === H.chips() - H.state.debts[0].left, 'bankroll = jetons − dettes');
 

@@ -16,8 +16,8 @@ const Games = (() => {
 })();
 
 const Engine = (() => {
-  const VERSION = 3;
-  const SAVE_KEY = 'boubouzino.run.v3';
+  const VERSION = 4;
+  const SAVE_KEY = 'boubouzino.run.v4';
   const META_KEY = 'boubouzino.meta';
   const FREE_KEY = 'boubouzino.free';
   const round2 = x => Math.round(x * 100) / 100;
@@ -154,10 +154,11 @@ const Engine = (() => {
     H.maxBet = game => {
       if (!isRun) return Infinity;
       const target = state.table ? state.table.target : H.objective(state.etage, state.tableType);
-      const e = H.emit('maxBet', { value: target * CONFIG.progression.miseMaxRatio, game });
+      const e = H.emit('maxBet', { value: target * H.maxBetRatio(), game });
       const m = Math.max(5, Math.round(e.value));
       return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
+    H.maxBetRatio = (etage = state.etage || 1) => CONFIG.progression.miseMaxRatio * Math.pow(CONFIG.progression.miseMaxDecroissance || 1, Math.max(0, Math.min(etage, CONFIG.progression.etagesPourGagner) - 1));
     H.excludedRanks = () => H.emit('deck.exclude', { ranks: [] }).ranks;
     H.query = (name, ctx) => H.emit(name, ctx);
 
@@ -257,6 +258,7 @@ const Engine = (() => {
     function finish() {
       const { id, round, play } = active;
       const r = Games.get(id).resolve(H, gameState(id), round);
+      play.stake = round2(r.staked);
       (r.draws || []).forEach(d => {
         if (d.kind === 'card') H.emit('onCardDrawn', { game: id, card: d.card, play });
         else H.emit('onDraw', { game: id, kind: d.kind, value: d.value, play });
@@ -343,18 +345,27 @@ const Engine = (() => {
     const NEXT = { petite: 'grande', grande: 'boss' };
     // Bankroll = jetons − dettes (un prêt ne fait pas gagner une table)
     H.bankroll = () => round2(state.chips - state.debts.reduce((a, d) => a + d.left, 0));
+    // Palier de la table n° k (0 = petite table de l'étage 1) : croissance de plus en plus forte
+    const TYPE_INDEX = { petite: 0, grande: 1, boss: 2 };
+    const nice = x => { const e = Math.pow(10, Math.max(0, Math.floor(Math.log10(x)) - 1)); return Math.round(x / e) * e; };
     H.objective = (etage, type) => {
-      const base = etage <= P.etagesPourGagner ? P.objectifBase[etage]
-        : P.objectifBase[P.etagesPourGagner] * Math.pow(P.croissanceInfinie, etage - P.etagesPourGagner);
-      return Math.round(base * P.multiplicateurTable[type]);
+      const k = (etage - 1) * 3 + TYPE_INDEX[type];
+      let t = P.jetonsDepart;
+      for (let i = 0; i <= k; i++) t *= P.croissanceDepart + P.croissanceParTable * i;
+      return nice(t);
     };
+    // Les prix et montants de la config sont donnés pour un palier de référence (150) : ils suivent le palier visé
+    const refTarget = () => (state.table ? state.table.target : isRun ? H.objective(state.etage || 1, state.tableType || 'petite') : P.prixReference);
+    H.scale = v => (v > 0 ? Math.max(1, Math.round(v * refTarget() / P.prixReference)) : 0);
+    H.sellValue = j => Math.floor((j.paid != null ? j.paid : H.scale(JOKERS[j.id].price)) * CONFIG.shop.sellRatio);
+    H.loanOptions = () => CONFIG.loans.options.map(o => ({ ...o, amount: H.scale(o.amount) }));
     // Infos d'une table de l'étage courant (pour l'écran de choix)
     H.tableInfo = type => ({
-      type, target: H.objective(state.etage, type), reward: P.recompenseTable[type],
+      type, target: H.objective(state.etage, type), reward: Math.round(P.recompenseTable[type] * H.objective(state.etage, type)),
       boss: type === 'boss' ? state.bossId : null, tag: state.tagOffers[type] || null,
       status: state.etageLog[type] || (state.tableType === type ? 'current' : 'upcoming'),
       // mise max de base (sans jokers ni tags), réduite par le Directeur Pressé
-      maxBet: Math.max(5, Math.round(H.objective(state.etage, type) * CONFIG.progression.miseMaxRatio
+      maxBet: Math.max(5, Math.round(H.objective(state.etage, type) * H.maxBetRatio()
         * (type === 'boss' && state.bossId === 'presse' ? CONFIG.bosses.presse.maxBet : 1))),
     });
     function newEtage() {
@@ -365,6 +376,7 @@ const Engine = (() => {
     }
     H.chooseTable = () => {
       if (state.phase !== 'choose') return { error: 'Choisis d\'abord ta table.' };
+      state.starter = null; // joker de départ non choisi : tant pis
       const t = state.table = {
         type: state.tableType, etage: state.etage, target: H.objective(state.etage, state.tableType), gains: 0,
         boss: state.tableType === 'boss' ? state.bossId : null, start: H.bankroll(),
@@ -380,6 +392,18 @@ const Engine = (() => {
       if (!checkBankrupt()) save();
       return { ok: true };
     };
+    // Joker de départ : choix entre quelques jokers communs
+    H.offerStarter = () => {
+      const pool = JOKER_DEFS.filter(d => d.rarity === 'commun').map(d => d.id);
+      state.starter = rng.shuffle(pool).slice(0, P.jokerDeDepart);
+    };
+    H.pickStarter = id => {
+      if (!state.starter || !state.starter.includes(id)) return { error: 'Choix impossible.' };
+      state.starter = null;
+      H.addJoker(id);
+      save(); notify('change');
+      return { ok: true };
+    };
     // Passer la petite ou la grande table contre un tag
     H.skipTable = () => {
       if (state.phase !== 'choose') return { error: 'Impossible maintenant.' };
@@ -389,7 +413,7 @@ const Engine = (() => {
       if (tag === 'cadeau') {
         const id = rng.pick(CONSUMABLE_DEFS).id;
         if (state.consumables.length < state.consSlots) { state.consumables.push(id); text = `🎁 ${CONSUMABLES[id].name} offert !`; }
-        else { H.give(CONSUMABLES[id].price); text = `🎁 Poches pleines : ${CONSUMABLES[id].price} jetons à la place.`; }
+        else { const v = H.scale(CONSUMABLES[id].price); H.give(v); text = `🎁 Poches pleines : ${v} jetons à la place.`; }
       } else if (tag) { H.addStatus(tag); text = `${STATUSES[tag].icon} Tag ${STATUSES[tag].name} obtenu.`; }
       state.etageLog[state.tableType] = 'skipped';
       state.tableType = NEXT[state.tableType];
@@ -399,12 +423,12 @@ const Engine = (() => {
 
     function tableWon() {
       const t = state.table;
-      const I = P.interetsParTranche;
+      const I = P.interets;
       const lines = [];
-      const interest = Math.min(I.max, Math.floor(state.chips / I.tranche) * I.gain);
-      const reward = P.recompenseTable[t.type];
+      const interest = Math.floor(Math.min(I.maxPalier * t.target, I.taux * state.chips));
+      const reward = Math.round(P.recompenseTable[t.type] * t.target);
       H.give(reward); lines.push({ label: { petite: 'Petite table gagnée', grande: 'Grande table gagnée', boss: 'Boss vaincu' }[t.type], value: reward });
-      if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${I.gain} par ${I.tranche} jetons, ${I.max} max)`, value: interest }); }
+      if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${Math.round(I.taux * 100)} % de tes jetons)`, value: interest }); }
       const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); attribute([{ kind: 'flat', value: v, src: { uid: me.uid } }], 0, 0, 1); } };
       H.emit('onRoundEnd', e);
       processDebts(lines);
@@ -426,8 +450,8 @@ const Engine = (() => {
       state.summary = { type: t.type, etage: t.etage, lines, victory, target: t.target, boss: t.boss };
       state.table = null;
       state.charges = [];
-      state.shop = genShop(CONFIG.shop.reroll.base);
-      H.emit('onShopEnter', { shop: state.shop, rollJoker });
+      state.shop = genShop(0);
+      H.emit('onShopEnter', { shop: state.shop, rollJoker, scale: H.scale });
       state.phase = victory ? 'victory' : 'shop';
       save();
       notify(victory ? 'victory' : 'shop');
@@ -475,7 +499,7 @@ const Engine = (() => {
       if (active) return { error: 'Impossible de vendre un joker pendant un coup.' };
       const j = state.jokers.find(x => x.uid === uid);
       if (!j) return { error: 'Joker introuvable.' };
-      const v = Math.floor(JOKERS[j.id].price * CONFIG.shop.sellRatio);
+      const v = H.sellValue(j);
       const index = state.jokers.indexOf(j);
       const charges = state.charges.filter(c => c.src === uid);
       H.removeJoker(uid);
@@ -525,7 +549,7 @@ const Engine = (() => {
       const tier = tiers.length ? rng.weighted(tiers).r : pool[0].rarity;
       return rng.pick(pool.filter(d => d.rarity === tier)).id;
     }
-    function genShop(rerollCost) {
+    function genShop(rerolls) {
       const S = CONFIG.shop, offers = [], taken = [];
       for (let i = 0; i < S.jokers; i++) { const id = rollJoker({ exclude: taken }); if (id) { taken.push(id); offers.push({ kind: 'joker', id }); } }
       const cons = CONSUMABLE_DEFS.slice();
@@ -533,20 +557,19 @@ const Engine = (() => {
       for (let i = 0; i < S.packs; i++) offers.push({ kind: 'pack', id: rng.pick(PACK_DEFS).id });
       const ups = UPGRADE_DEFS.filter(u => !state.upgrades.includes(u.id));
       for (let i = 0; i < S.upgrades && ups.length; i++) offers.push({ kind: 'upgrade', id: ups.splice(rng.int(ups.length), 1)[0].id });
-      const inflation = 1 + CONFIG.shop.priceGrowth * (state.etage - 1);
-      offers.forEach(o => { o.price = Math.round(CATALOG[o.id].price * inflation); o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
+      offers.forEach(o => { o.price = H.scale(CATALOG[o.id].price); o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
       H.saveMeta();
-      return { offers, rerollCost };
+      return { offers, rerolls, rerollCost: H.scale(CONFIG.shop.reroll.base + CONFIG.shop.reroll.step * rerolls) };
     }
     H.reroll = () => {
       if (state.phase !== 'shop') return { error: 'Le shop est fermé.' };
       const c = state.shop.rerollCost;
       if (!H.stake(c)) return { error: 'Pas assez de jetons.' };
-      state.shop = genShop(c + CONFIG.shop.reroll.step);
+      state.shop = genShop((state.shop.rerolls || 0) + 1);
       save(); notify('change');
       return { ok: true };
     };
-    H.slotPrice = () => CONFIG.shop.jokerSlots.prices[state.slotBuys];
+    H.slotPrice = () => { const p = CONFIG.shop.jokerSlots.prices[state.slotBuys]; return p ? H.scale(p) : 0; };
     H.buySlot = () => {
       const p = H.slotPrice();
       if (!p) return { error: 'Nombre maximal d\'emplacements atteint.' };
@@ -565,7 +588,7 @@ const Engine = (() => {
       H.stake(o.price);
       o.sold = true;
       let pack = null;
-      if (o.kind === 'joker') H.addJoker(o.id);
+      if (o.kind === 'joker') { H.addJoker(o.id); state.jokers[state.jokers.length - 1].paid = o.price; }
       else if (o.kind === 'consumable') state.consumables.push(o.id);
       else if (o.kind === 'upgrade') state.upgrades.push(o.id);
       else if (o.kind === 'pack') {
@@ -612,13 +635,13 @@ const Engine = (() => {
       const id = state.consumables[i];
       if (!id) return;
       state.consumables.splice(i, 1);
-      H.give(Math.floor(CONSUMABLES[id].price * CONFIG.shop.sellRatio));
+      H.give(Math.floor(H.scale(CONSUMABLES[id].price) * CONFIG.shop.sellRatio));
       save(); notify('change');
     };
 
     // ---------------- Prêts ----------------
     H.takeLoan = id => {
-      const opt = CONFIG.loans.options.find(o => o.id === id);
+      const opt = H.loanOptions().find(o => o.id === id);
       if (!opt) return { error: 'Prêt inconnu.' };
       if (state.debts.length >= CONFIG.loans.maxActive) return { error: 'Rembourse d\'abord ton prêt en cours.' };
       const total = Math.round(opt.amount * (1 + opt.rate));
@@ -666,6 +689,7 @@ const Engine = (() => {
       const H = createHost(newRunState(s), { meta, persist });
       H.meta.runs++; H.saveMeta();
       H.newEtage();
+      H.offerStarter();
       H.save();
       return H;
     },

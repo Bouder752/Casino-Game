@@ -174,7 +174,9 @@ const BlackjackEngine = (() => {
         h.net = Math.round((b - h.bet) * 100) / 100;
         staked += h.bet; back += b;
       });
-      return { staked, back, info: { dealerBJ: dBJ }, draws: inPlay(r).map(card => ({ kind: 'card', card })) };
+      const natural = r.hands.length === 1 && r.hands[0].isBJ && !dBJ;
+      const doubledWin = r.hands.some(h => h.doubled && h.cls === 'win');
+      return { staked, back, info: { dealerBJ: dBJ, natural, doubledWin }, draws: inPlay(r).map(card => ({ kind: 'card', card })) };
     },
 
     capabilities: {

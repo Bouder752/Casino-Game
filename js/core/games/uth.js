@@ -68,7 +68,7 @@ const UTHEngine = (() => {
         add('trips', 'Trips', r.trips, tp ? r.trips * (tp + 1) : 0, tp ? `${ph.name} ${tp}:1` : 'moins qu\'un brelan');
       }
       Object.assign(r, { ph, dh, qual, cmp, lines });
-      return { staked, back, info: { cmp, qual, folded: r.folded }, draws: all(r).map(card => ({ kind: 'card', card })) };
+      return { staked, back, info: { cmp, qual, folded: r.folded, cat: r.folded ? -1 : ph.cat }, draws: all(r).map(card => ({ kind: 'card', card })) };
     },
     capabilities: {
       bribe: {

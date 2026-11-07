@@ -51,20 +51,38 @@ const Sim = (() => {
     return res.settlement;
   }
 
-  // ---- Stratégie du shop : jokers d'abord, en gardant une réserve de jetons ----
+  // ---- Build : jeu favori selon les jokers possédés ----
+  const GAME_TAG = { Blackjack: 'bj', Roulette: 'roulette', Dice: 'dice', "Hold'em": 'uth', Machine: 'slots' };
+  function favorite(H) {
+    const c = {};
+    H.state.jokers.forEach(j => (JOKERS[j.id].tags || []).forEach(t => { const g = GAME_TAG[t]; if (g) c[g] = (c[g] || 0) + 1; }));
+    const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : null;
+  }
+  // ---- Stratégie du shop : jokers utiles au build, en gardant de quoi viser le palier ----
   const RANK = { legendaire: 3, rare: 2, commun: 1 };
-  function shop(H) {
+  function value(H, id) {
+    const d = JOKERS[id], tags = d.tags || [], fav = favorite(H);
+    let v = RANK[d.rarity];
+    if (tags.includes('Tous les jeux') || tags.includes('Multiplicateur')) v += 2;
+    if (tags.includes('Grandit')) v += 1;
+    const g = tags.map(t => GAME_TAG[t]).find(Boolean);
+    if (g) v += !fav || g === fav ? 2 : -3;
+    if (['compteur', 'assurance', 'roue', 'pickpocket', 'cerise'].includes(id)) v -= 1;
+    return v;
+  }
+  function shop(H, opts) {
     const st = H.state;
-    // garder de quoi atteindre le prochain palier : n'acheter qu'avec le surplus
-    const reserve = Math.max(60, H.objective(st.etage, st.tableType) * 0.75);
+    const next = H.objective(st.etage, st.tableType);
+    const floor = next * (opts.reserve != null ? opts.reserve : 0.5);
     const offers = st.shop.offers.map((o, i) => ({ ...o, i }));
-    offers.filter(o => o.kind === 'joker').sort((a, b) => RANK[JOKERS[b.id].rarity] - RANK[JOKERS[a.id].rarity] || a.price - b.price)
-      .forEach(o => { if (H.chips() - o.price >= reserve && st.jokers.length < st.jokerSlots) H.buy(o.i); });
-    offers.filter(o => o.kind === 'upgrade' && o.id === 'vip').forEach(o => { if (H.chips() - o.price >= reserve) H.buy(o.i); });
-    offers.filter(o => o.kind === 'consumable' && ['boisson', 'dore', 'ticket'].includes(o.id)).forEach(o => { if (H.chips() - o.price >= reserve) H.buy(o.i); });
-    offers.filter(o => o.kind === 'pack').forEach(o => {
-      if (H.chips() - o.price >= reserve && st.jokers.length < st.jokerSlots) { const r = H.buy(o.i); if (r.pack && r.pack.length) H.choosePack(r.pack[0]); }
+    if (!opts.noJokers) offers.filter(o => o.kind === 'joker').map(o => ({ ...o, v: value(H, o.id) })).filter(o => o.v > 1).sort((a, b) => b.v - a.v)
+      .forEach(o => { if (H.bankroll() - o.price >= floor && st.jokers.length < st.jokerSlots) H.buy(o.i); });
+    offers.filter(o => o.kind === 'upgrade' && o.id === 'vip').forEach(o => { if (H.bankroll() - o.price >= floor) H.buy(o.i); });
+    if (!opts.noJokers) offers.filter(o => o.kind === 'pack').forEach(o => {
+      if (H.bankroll() - o.price >= floor && st.jokers.length < st.jokerSlots) { const r = H.buy(o.i); if (r.pack && r.pack.length) H.choosePack(r.pack.slice().sort((a, b) => value(H, b) - value(H, a))[0]); }
     });
+    if (!opts.noJokers && st.jokers.length >= st.jokerSlots && H.slotPrice() && H.bankroll() - H.slotPrice() >= floor * 1.4) H.buySlot();
   }
   function useConsumables(H) {
     for (let i = H.state.consumables.length - 1; i >= 0; i--) {
@@ -72,35 +90,34 @@ const Sim = (() => {
     }
   }
 
-  // ---- Taille des mises : viser l'objectif en ~2 victoires, sans risquer plus de 40 % du solde ----
-  // ---- Taille des mises : « jeu audacieux » (le plus efficace contre un jeu à espérance
-  // négative) : viser ce qui manque pour atteindre le palier, dans la limite de la mise max ----
-  function betSize(H) {
+  // ---- Taille des mises : « jeu audacieux » : viser ce qui manque pour atteindre le palier,
+  // dans la limite de la mise max ----
+  function betSize(H, game) {
     const need = H.state.table.target - H.bankroll();
-    return Math.max(1, Math.min(H.maxBet('bj'), Math.floor(H.chips()), Math.ceil(need)));
+    return Math.max(1, Math.min(H.maxBet(game), Math.floor(H.chips()), Math.ceil(need)));
   }
 
   function playRun(seed, opts = {}) {
     const meta = freshMeta();
     const H = Engine.newRun({ seed, meta, persist: false });
     const F = CONFIG.progression.etagesPourGagner;
+    if (H.state.starter && !opts.noJokers) H.pickStarter(H.state.starter.slice().sort((a, b) => value(H, b) - value(H, a))[0]);
     let won = false, guard = 0;
     while (guard++ < 20000) {
       const st = H.state;
       if (st.phase === 'victory') { won = true; break; }
-      if (st.phase === 'shop') { shop(H); H.leaveShop(); continue; }
+      if (st.phase === 'shop') { shop(H, opts); H.leaveShop(); continue; }
       if (st.phase === 'choose') { H.chooseTable(); continue; }
       if (st.phase !== 'play') break;
       useConsumables(H);
       const need = st.table.target - H.bankroll();
-      const bet = betSize(H);
-      if (opts.strategy !== 'blackjack' && (!opts.game || opts.game === 'mixed')) {
+      const game = opts.game || favorite(H) || (opts.strategy === 'blackjack' ? 'bj' : 'dice');
+      if (game === 'dice') {
         // « Sniper » : mise max au Dice, avec la chance calibrée pour combler l'écart en un coup
         const b = Math.max(1, Math.min(H.maxBet('dice'), Math.floor(H.chips())));
         const chance = Math.max(CONFIG.games.dice.minTarget, Math.min(90, Math.floor(99 * b / (need + b))));
         playGame(H, 'dice', { bet: b, target: chance, mode: 'under' });
-      } else if (opts.game && opts.game !== 'mixed') playOne(H, opts.game, bet);
-      else playOne(H, 'bj', bet);
+      } else playOne(H, game, betSize(H, game));
     }
     const st = H.state;
     return { seed, won, etage: won ? F : Math.min(st.etage, F), tables: st.stats.tablesWon, jokers: st.stats.jokersOwned.slice(), plays: st.stats.plays, chips: H.chips() };
