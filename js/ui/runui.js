@@ -21,6 +21,8 @@ const UI = (() => {
   function showTab(id) {
     tab = id;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+    const act = App.host && App.host.active();
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('busy', !!act && act.id === t.dataset.tab && id !== t.dataset.tab));
     document.querySelectorAll('.game').forEach(g => (g.hidden = g.id !== id));
     Storage.set('casino.tab', id);
     renderConsumables();
@@ -346,9 +348,9 @@ const UI = (() => {
     paintMeter();
     const out = [];
     if (st.phase === 'play' && t) {
-      out.push(badge('maxbet', `<small>Mise max</small><b class="num">${Util.fmt(H().maxBet(tab))}</b>`,
-        `<b>Mise maximale</b> : ${Math.round(CONFIG.progression.miseMaxRatio * 100)} % du palier visé. Elle augmente avec les paliers.`));
-      out.push(badge('rr', `<b class="num">↻ ${st.charges.length}</b>`, '<b>Relances</b> : refaire un tirage raté sans miser à nouveau.'));
+      out.push(badge('maxbet', `<small>Mise</small><b class="num">${Util.fmt(H().minBet())}–${Util.fmt(H().maxBet(tab))}</b>`,
+        `<b>Mise minimale</b> : ${Math.round(CONFIG.progression.miseMinRatio * 100)} % du palier. <b>Mise maximale</b> : ${Math.round(H().maxBetRatio() * 100)} % du palier (cette part baisse à chaque étage : il te faut des multiplicateurs).`));
+      out.push(badge('rr', `<b class="num">↻ ${st.charges.length}</b>`, `<b>Relances</b> : ${st.charges.length} pour cette table, pour refaire un tirage raté sans miser à nouveau (${CONFIG.progression.relancesParMise} par mise au plus).`));
     }
     const boss = BOSSES[st.bossId];
     if (boss) out.push(badge('boss' + (type === 'boss' ? ' now' : ''), type === 'boss' ? `☠ <span>${boss.name}</span>` : '☠', `<b>☠ ${boss.name}</b>${type === 'boss' ? '' : ' (3ᵉ table de l\'étage)'}<br>${boss.desc()}`));
@@ -385,7 +387,7 @@ const UI = (() => {
       </div>`;
     };
     $('choose').innerHTML = `<div class="choose-head"><h2>${etageText(st)}</h2>
-        <p>Fais monter ta bankroll jusqu'au palier. Mises illimitées : tu ne perds qu'à la faillite.</p></div>
+        <p>Fais monter ta bankroll jusqu'au palier. Nombre de mises illimité : tu ne perds qu'à la faillite.</p></div>
       <div class="tables">${['petite', 'grande', 'boss'].map(card).join('')}</div>
       <div class="choose-foot"><span class="ri-chip seed">🌱 Seed ${st.seed}</span></div>`;
     $('choose').querySelectorAll('[data-act]').forEach(b => (b.onclick = () => {
@@ -396,6 +398,8 @@ const UI = (() => {
   }
   function startTableUI() {
     App.views().forEach(v => v.reset && v.reset());
+    // mise proposée : 40 % de la mise max (≈ 10 % du palier), jamais sous la mise minimale
+    BetControls.forEach(b => { if (!b.compact && Number.isFinite(b.maxFn())) b.set(Math.max(H().minBet(), Math.round(b.maxFn() * 0.4))); });
     enterGame();
     const t = S().table;
     if (t.boss) {
@@ -421,7 +425,7 @@ const UI = (() => {
         <h2 class="win-title">${title}</h2>
         <div class="win-bank"><span>Bankroll</span><b class="num" id="win-bank">0</b><i>/ ${Util.fmt(sum.target)}</i></div>
         <div class="win-bar"><i id="win-fill"></i></div>
-        <div class="win-lines">${sum.lines.filter(l => l.value || l.bad).map((l, i) => `<div class="wl ${l.value < 0 || l.bad ? 'bad' : ''}" style="animation-delay:${1.1 + i * 0.35}s"><span>${l.label}</span>${l.value ? `<b class="num">${Util.signed(l.value)}</b>` : ''}</div>`).join('')}</div>
+        <div class="win-lines" ${sum.lines.some(l => l.value || l.bad) ? '' : 'hidden'}>${sum.lines.filter(l => l.value || l.bad).map((l, i) => `<div class="wl ${l.value < 0 || l.bad ? 'bad' : ''}" style="animation-delay:${1.1 + i * 0.35}s"><span>${l.label}</span>${l.value ? `<b class="num">${Util.signed(l.value)}</b>` : ''}</div>`).join('')}</div>
         <button class="btn primary big win-go">Au Comptoir ➜</button>
       </div>`;
     document.body.appendChild(ov);
@@ -429,12 +433,15 @@ const UI = (() => {
     FX.confetti(160);
     setTimeout(() => FX.rain(45), 250);
     // la bankroll et la jauge se remplissent jusqu'au palier
-    const end = sum.target, t0 = performance.now(), dur = 900;
+    // la vraie bankroll (récompenses comprises) monte, remplit la jauge et déborde
+    const end = Math.max(sum.target, H().bankroll()), t0 = performance.now(), dur = 1100;
     const tick = t => {
       const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
       const b = ov.querySelector('#win-bank'); if (!b) return;
-      b.textContent = Util.fmt(Math.round(end * e));
-      ov.querySelector('#win-fill').style.width = e * 100 + '%';
+      const v = end * e;
+      b.textContent = Util.fmt(Math.round(v));
+      ov.querySelector('#win-fill').style.width = Math.min(100, v / sum.target * 100) + '%';
+      if (v >= sum.target && !ov.classList.contains('over')) { ov.classList.add('over'); Sfx.play('step', 7); }
       if (k < 1) requestAnimationFrame(tick); else { b.classList.add('done'); Sfx.play('coins'); }
     };
     requestAnimationFrame(tick);
@@ -499,7 +506,7 @@ const UI = (() => {
       const box = $(o.kind === 'joker' ? 'shop-jokers' : o.kind === 'consumable' ? 'shop-cons' : 'shop-items');
       box.appendChild(itemCard(o.id, {
         price: o.sold ? 'vendu' : o.price, disabled: o.sold,
-        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id), [[`Acheter · <span class="wallet-chip s"></span> ${o.price} jetons`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
+        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id) + `<p class="pop-after">Après achat : bankroll <b>${Util.fmt(H().bankroll() - o.price)}</b> / prochain palier <b>${Util.fmt(H().tableTarget(S().tableType))}</b></p>`, [[`Acheter · <span class="wallet-chip s"></span> ${o.price} jetons`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
       }));
     });
     renderJokers($('shop-owned-jokers'));
@@ -596,7 +603,7 @@ const UI = (() => {
     modal(`<h2>Comment jouer</h2>
       <ul class="howto">
         <li>Tu démarres avec <b>${P.jetonsDepart} jetons</b>. Il y a <b>${P.etagesPourGagner} étages</b>, chacun avec 3 tables : <b>petite</b>, <b>grande</b> et <b>table du Boss</b>.</li>
-        <li>À chaque table, fais monter ta <b>bankroll</b> (tes jetons, moins tes dettes) jusqu'au <b>palier</b> affiché en haut, sur le jeu de ton choix. Mises illimitées.</li>
+        <li>À chaque table, fais monter ta <b>bankroll</b> (tes jetons, moins tes dettes) jusqu'au <b>palier</b> affiché en haut, sur le jeu de ton choix. Nombre de mises illimité, avec une mise minimale et une mise maximale qui suivent le palier.</li>
         <li>La <b>mise max</b> vaut ${Math.round(P.miseMaxRatio * 100)} % du palier : plus les paliers montent, plus tu peux miser gros.</li>
         <li>Tu as <b>${P.relancesParTable} relances</b> par table pour refaire un tirage raté sans miser à nouveau.</li>
         <li>Palier atteint : récompense (une part du palier) et ${Math.round(P.interets.taux * 100)} % d'intérêts sur tes jetons, puis le <b>Comptoir</b>. Les prix y suivent tes paliers : un joker coûte toujours une vraie part de ta bankroll.</li>
@@ -622,7 +629,7 @@ const UI = (() => {
   function tutorial(step = 0) {
     const P = CONFIG.progression;
     const steps = [
-      `<div class="tuto"><div class="tuto-n">1 / 3</div><h2>Le but</h2><p>Fais grimper ta bankroll de <b>${P.jetonsDepart}</b> à <b>${Util.fmt(H().objective(1, 'petite'))} jetons</b>, puis à des paliers toujours plus hauts.<br>Mises illimitées : tu ne perds qu'à la <b>faillite</b>. La jauge en haut montre où tu en es.</p></div>`,
+      `<div class="tuto"><div class="tuto-n">1 / 3</div><h2>Le but</h2><p>Fais grimper ta bankroll de <b>${P.jetonsDepart}</b> à <b>${Util.fmt(H().objective(1, 'petite'))} jetons</b>, puis à des paliers toujours plus hauts.<br>Nombre de mises illimité : tu ne perds qu'à la <b>faillite</b>. La jauge en haut montre où tu en es.</p></div>`,
       `<div class="tuto"><div class="tuto-n">2 / 3</div><h2>Ta mise</h2><p>Choisis ta mise avec les <b>jetons</b> sur le rebord de la table, puis appuie sur le gros bouton doré.<br>La <b>mise max</b> grandit avec les paliers. Le bouton <b>?</b> sur le tapis donne les règles du jeu.</p></div>`,
       `<div class="tuto"><div class="tuto-n">3 / 3</div><h2>Les jokers</h2><p>Entre les tables, achète des <b>jokers</b> au Comptoir : ils boostent tes gains. Ils apparaissent en bas de l'écran ; touche-les pour voir ce qu'ils font.<br>Raté un tirage ? Une <b>relance</b> te donne une 2ᵉ chance.</p></div>`,
     ];
@@ -699,6 +706,9 @@ const UI = (() => {
   // ---------- Événements ----------
   App.on('session', () => renderRunBar());
   App.on('change', () => {
+    // pastille sur l'onglet du jeu où un coup est en cours
+    const act = App.host && App.host.active && App.host.active();
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('busy', !!act && act.id === t.dataset.tab && tab !== t.dataset.tab));
     if (!App.host) return;
     renderRunBar();
     if (isRun() && S().phase === 'shop' && !$('screen-shop').hidden) renderShop();
@@ -710,7 +720,8 @@ const UI = (() => {
   App.on('over', () => {
     const st = S();
     Sfx.play('gameover');
-    modal(`<div class="intro"><div class="intro-n lose">Partie terminée</div><p>${st.reason}</p>${recap(st)}</div>`,
+    FX.rain(0);
+    modal(`<div class="intro ruin"><div class="ruin-chips" aria-hidden="true">${'<i></i>'.repeat(7)}</div><div class="intro-n lose">Ruiné !</div><p>${st.reason} Étage ${st.etage}, ${st.stats.tablesWon} table(s) gagnée(s).</p>${recap(st)}</div>`,
     [['Nouvelle partie', () => startRun(), 'primary'], ['Rejouer cette seed', () => startRun(st.seed)], ['Menu principal', () => { App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
   });
   App.on('toast', toast);

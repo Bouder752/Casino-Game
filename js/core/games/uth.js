@@ -11,6 +11,7 @@ const UTHEngine = (() => {
       if (!(ante > 0)) return { error: 'Placez une mise Ante.' };
       const max = H.maxBet('uth');
       if (ante > max || trips > max) return { error: `Mise maximale : ${max} (Ante) et ${max} (Trips).` };
+      if (ante * 2 < H.minBet()) return { error: `Mise minimale à cette table : ${Math.ceil(H.minBet() / 2)} d'Ante.` };
       if (!H.canAfford(ante * 2 + trips)) return { error: `Solde insuffisant (il faut ${ante * 2 + trips} : Ante + Blind${trips ? ' + Trips' : ''}).` };
       H.stake(ante * 2 + trips);
       const deck = Deck.create(H.rng, { decks: 1, exclude: H.excludedRanks() });

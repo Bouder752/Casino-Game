@@ -14,10 +14,14 @@ const SlotsEngine = (() => {
       const pool = syms.slice();
       if (C.wild.reels.includes(r)) pool.push(C.wild);
       if (C.scatter.reels.includes(r)) pool.push(C.scatter);
+      const noScatter = pool.filter(s => s.id !== C.scatter.id);
+      let hasScatter = false;
       for (let y = 0; y < C.rows; y++) {
         const key = r + ':' + y;
         if (sticky[key]) { col.push({ ...sticky[key], sticky: true }); continue; }
-        const s = H.rng.weighted(pool);
+        // une seule Pelote par rouleau
+        let s = H.rng.weighted(hasScatter ? noScatter : pool);
+        if (s.id === C.scatter.id) hasScatter = true;
         col.push(s.id === C.wild.id ? { id: s.id, m: H.rng.weighted(C.wild.mults).m } : { id: s.id });
       }
       g.push(col);
@@ -56,6 +60,15 @@ const SlotsEngine = (() => {
       wins.push({ line: li, count, symbol: target, mult, win, cells: line.slice(0, count).map((row, reel) => [reel, row]) });
     });
     const scatters = g.reduce((a, col) => a + col.filter(c => c.id === C.scatter.id).length, 0);
+    // Les Pelotes paient n'importe où (× la mise totale)
+    if (scatters >= C.scatter.min) {
+      const x = C.scatter.pay[Math.min(scatters, C.scatter.pay.length + C.scatter.min - 1) - C.scatter.min];
+      const win = Math.round(lineBet * C.lines.length * x * 100) / 100;
+      total += win;
+      const cells = [];
+      g.forEach((col, reel) => col.forEach((c, row) => { if (c.id === C.scatter.id) cells.push([reel, row]); }));
+      wins.push({ line: -1, count: scatters, symbol: C.scatter.id, mult: 1, win, cells, scatter: true });
+    }
     return { total: Math.round(total * 100) / 100, wins, sevens, wildUsed, scatters };
   }
 
@@ -68,10 +81,16 @@ const SlotsEngine = (() => {
       const sticky = {};
       const stick = g => g.forEach((col, x) => col.forEach((c, y) => { if (c.id === C.wild.id) sticky[x + ':' + y] = { id: c.id, m: c.m }; }));
       stick(base);
-      for (let k = 0; k < C.scatter.spins; k++) {
+      // Tours gratuits ; 3 Pelotes pendant le bonus = tours en plus (plafonné)
+      let left = C.scatter.spins, played = 0;
+      while (left > 0 && played < C.scatter.maxSpins) {
+        left--; played++;
         const g = grid(H, r.symbols, sticky);
         stick(g);
-        spins.push({ grid: g, ...evaluate(g, r.symbols, r.wild, lineBet), free: true });
+        const ev2 = evaluate(g, r.symbols, r.wild, lineBet);
+        const retrigger = ev2.scatters >= C.scatter.min ? Math.min(C.scatter.retrigger, C.scatter.maxSpins - played - left) : 0;
+        left += Math.max(0, retrigger);
+        spins.push({ grid: g, ...ev2, free: true, retrigger: Math.max(0, retrigger) });
       }
     }
     r.spins = spins;
@@ -86,6 +105,7 @@ const SlotsEngine = (() => {
     start(H, gs, { bet }) {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
       if (bet > H.maxBet('slots')) return { error: `Mise maximale : ${H.maxBet('slots')}.` };
+      if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
       const wild = H.query('slots.wild', { wild: null, ratio: 1, sources: [] });
       const r = { bet, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio }, wildSources: wild.sources };

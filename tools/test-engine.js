@@ -70,7 +70,7 @@ ok(H.state.phase === 'play' && H.bankroll() < H.state.table.target, 'un prêt ne
 
 // 6. Victoire à l'étage 8 puis mode infini
 H = run('WIN');
-H.state.etage = P.etagesPourGagner; H.state.tableType = 'boss'; H.state.bossId = 'sobre'; newTable(H, true);
+H.state.etage = P.etagesPourGagner; H.state.tableType = 'boss'; H.state.bossId = 'sobre'; H.state.chips = 1e9; newTable(H, true);
 winTable(H);
 ok(H.state.phase === 'victory' && H.state.summary.victory, 'victoire après le boss de l\'étage 8');
 H.continueInfinite();
@@ -118,8 +118,8 @@ ok(Math.abs(s.add - 1) < 1e-9 && H.state.jokers[0].state.streak === 0, 'martinga
 H = run('T5'); ['molle', 'consolation'].forEach(id => H.addJoker(id));
 const realBJ = api.Games.get('bj');
 api.Games.register({ ...api.Games.get('test'), id: 'bj' });
-ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6.5, 'Main Molle 25 % + Consolation 10 % de la mise');
-ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6.5, 'Main Molle à chaque défaite');
+ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6, 'Main Molle 25 % + Consolation 10 % de la mise (arrondi au jeton)');
+ok(H.startPlay('bj', { bet: 10, back: 0 }).settlement.net === -6, 'Main Molle à chaque défaite');
 api.Games.register(realBJ);
 
 // 11. Assurance-Vie
@@ -192,7 +192,7 @@ ok(JSON.stringify(x1.hands) === JSON.stringify(x2.hands), 'même suite aléatoir
 H = run('A1'); ['porte', 'tricheur', 'septieme'].forEach(id => H.addJoker(id));
 s = play(H, 10, 20, { draws: [{ kind: 'card', card: { rank: 7, suit: 0 } }] });
 const earned = H.state.jokers.map(j => j.stats.earned);
-ok(Math.abs(earned.reduce((a, b) => a + b, 0) - (s.net - 10)) < 0.05, `somme des contributions = bonus des jokers (${earned})`);
+ok(Math.abs(earned.reduce((a, b) => a + b, 0) - (s.net - 10)) <= 0.5, `somme des contributions (à l'arrondi du jeton près) = bonus des jokers (${earned})`);
 ok(H.state.stats.jokerEarned.tricheur > H.state.stats.jokerEarned.porte, 'Tricheur plus rentable que Porte-Bonheur ici');
 ok(H.meta.collection.jokers.tricheur.owned === 1, 'collection : joker possédé');
 
@@ -225,10 +225,22 @@ H = run('P2'); H.addJoker('consolation');
 const g0 = H.state.table.gains; play(H, 1, 0);
 ok(H.state.table.gains === g0, 'un bonus sur une perte ne compte pas pour l\'objectif');
 H = run('P3'); H.state.chips = 1000;
-let rr = H.startPlay('dice', { bet: 1, target: 10, mode: 'under' });
+let rr = H.startPlay('dice', { bet: 5, target: 10, mode: 'under' });
 let guard = 0;
 while (rr.round && !rr.settlement && guard++ < 10) { if (H.actions().some(a => a.id === 'reroll')) rr = H.act('reroll'); else rr = H.act('accept'); }
 ok(rr.round.rolls.length <= 1 + (P.relancesParMise || 99), `une seule relance par mise (${rr.round.rolls.length} tirages)`);
+
+// 24. Retours des testeurs (2) : pas de farm à 1 jeton, pas de table gagnée sans jouer
+H = Engine.newRun({ seed: 'MIN', meta: meta(), persist: false }); H.chooseTable();
+ok(H.minBet() === Math.round(150 * P.miseMinRatio) && !!H.startPlay('dice', { bet: 1, target: 50, mode: 'under' }).error, `mise minimale ${H.minBet()} : une mise de 1 est refusée`);
+H = Engine.newRun({ seed: 'BIG', meta: meta(), persist: false }); H.state.chips = 100000; H.chooseTable();
+ok(H.state.phase === 'play' && H.state.table.target >= 100000 * P.croissanceMin * 0.95, `grosse avance : la table demande quand même +25 % (palier ${H.state.table.target})`);
+const sev = Engine.newRun({ seed: 'SEV', meta: meta(), persist: false }); sev.chooseTable(); sev.addJoker('septieme');
+const realDice = api.Games.get('dice');
+api.Games.register({ ...api.Games.get('test'), id: 'dice' });
+s = sev.startPlay('dice', { bet: 10, back: 0, draws: [{ kind: 'number', value: '17.77' }] }).settlement;
+ok(s.flats === 1.5, `Septième Ciel au Dice : seule la partie entière compte (bonus ${s.flats})`);
+api.Games.register(realDice);
 
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

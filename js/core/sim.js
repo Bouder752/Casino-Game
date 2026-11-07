@@ -94,7 +94,7 @@ const Sim = (() => {
   // dans la limite de la mise max ----
   function betSize(H, game) {
     const need = H.state.table.target - H.bankroll();
-    return Math.max(1, Math.min(H.maxBet(game), Math.floor(H.chips()), Math.ceil(need)));
+    return Math.max(H.minBet(), Math.min(H.maxBet(game), Math.floor(H.chips()), Math.ceil(need)));
   }
 
   function playRun(seed, opts = {}) {
@@ -123,7 +123,7 @@ const Sim = (() => {
     return { seed, won, etage: won ? F : Math.min(st.etage, F), tables: st.stats.tablesWon, jokers: st.stats.jokersOwned.slice(), plays: st.stats.plays, chips: H.chips() };
   }
   function playOne(H, game, bet) {
-    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(1, Math.min(H.maxBet('uth'), Math.floor(H.chips() / 6), Math.floor(bet / 3))) });
+    if (game === 'uth') return playGame(H, 'uth', { ante: Math.max(Math.ceil(H.minBet() / 2), Math.min(H.maxBet('uth'), Math.floor(H.chips() / 6), Math.floor(bet / 3))) });
     if (game === 'dice') return playGame(H, 'dice', { bet, target: 50, mode: 'under' });
     if (game === 'roulette') return playGame(H, 'roulette', { bets: { red: bet } });
     if (game === 'slots') return playGame(H, 'slots', { bet });

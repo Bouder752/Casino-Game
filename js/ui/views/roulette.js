@@ -167,7 +167,7 @@ App.register((() => {
     return play(async () => {
       const res = App.host.startPlay('roulette', { bets });
       if (res.error) { Sfx.play('error'); msg(res.error, 'warn'); return idle(); }
-      App.syncBalance();
+      App.syncStake(res);
       lastBets = { ...bets };
       msg('');
       setActions(els.actions, []);

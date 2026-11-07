@@ -96,7 +96,7 @@ App.register((() => {
     anim = true;
     const res = App.host.startPlay('uth', { ante: ante.value, trips: trips.value });
     if (res.error) { anim = false; Sfx.play('error'); return msg(res.error, 'warn'); }
-    App.syncBalance();
+    App.syncStake(res);
     ante.setEnabled(false); trips.setEnabled(false);
     msg(''); els.results.innerHTML = '';
     resetOdds();

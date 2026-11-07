@@ -53,6 +53,7 @@ const RouletteEngine = (() => {
       const total = Object.values(clean).reduce((a, b) => a + b, 0);
       if (total <= 0) return { error: 'Placez vos jetons sur le tapis.' };
       if (total > H.maxBet('roulette')) return { error: `Mise maximale : ${H.maxBet('roulette')}.` };
+      if (total < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       if (!H.stake(total)) return { error: 'Solde insuffisant.' };
       const r = { bets: clean, total, spins: [], ai: aiBets(H) };
       spin(H, r);

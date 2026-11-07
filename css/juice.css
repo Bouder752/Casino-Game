@@ -220,3 +220,133 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
   .btn { font-size: 14px; }
   .lights { filter: blur(50px) saturate(1.2); }
 }
+
+/* =====================================================================
+   Gros gains par paliers (tous les jeux)
+   ===================================================================== */
+.tier-ov { position: fixed; inset: 0; z-index: 160; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 45%, rgba(40, 10, 60, .55), rgba(0, 0, 0, .85)); animation: fadeIn .2s both; cursor: pointer; }
+.tier-ov.out { animation: winOut .35s both; }
+.tier-rays { position: absolute; left: 50%; top: 45%; width: 1800px; height: 1800px; margin: -900px 0 0 -900px; pointer-events: none;
+  background: repeating-conic-gradient(var(--ray, rgba(255, 210, 63, .22)) 0 8deg, transparent 8deg 16deg);
+  -webkit-mask: radial-gradient(circle, #000 0, transparent 55%); mask: radial-gradient(circle, #000 0, transparent 55%); animation: spinRays 9s linear infinite; }
+.tier-box { position: relative; text-align: center; }
+.tier-t { font-family: var(--f-title); font-size: clamp(40px, 9vw, 92px); line-height: 1; color: #fff; text-transform: uppercase;
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink), 0 0 40px var(--glow, #ffd23f); }
+.tier-t.pop { animation: tierPop .55s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes tierPop { from { transform: scale(.2) rotate(-12deg); opacity: 0; } }
+.tier-n { font-size: clamp(48px, 11vw, 120px) !important; line-height: 1.1; color: var(--c-gold); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 7px 0 var(--ink), 0 0 30px rgba(255, 200, 60, .7); }
+.tier-x { font-family: var(--f-title); font-size: 24px; color: #fff; text-shadow: 0 3px 0 var(--ink); }
+.tier-tap { margin-top: 18px; font-family: var(--f-title); font-size: 14px; color: #ddd; opacity: .7; }
+.tier-ov.t1 { --glow: #ffd23f; } .tier-ov.t2 { --glow: #ff9d1f; --ray: rgba(255, 157, 31, .26); }
+.tier-ov.t3 { --glow: #ff4f9a; --ray: rgba(255, 79, 154, .28); } .tier-ov.t4 { --glow: #4fe0ff; --ray: rgba(79, 224, 255, .3); }
+.tier-ov.t2 .tier-t { color: #ffd23f; } .tier-ov.t3 .tier-t { color: #ff8ac0; } .tier-ov.t4 .tier-t { color: #8af0ff; animation: tierPop .55s cubic-bezier(.2, 1.8, .4, 1), shake .4s .5s 3; }
+@keyframes shake { 25% { transform: translate(-4px, 2px) rotate(-1deg); } 75% { transform: translate(4px, -2px) rotate(1deg); } }
+
+/* =====================================================================
+   Machine « Les Chats des Toits » : rouleaux nuit, afficheurs, suspense, bonus
+   ===================================================================== */
+.palace { --gap: 7px; }
+.palace .reel { background: linear-gradient(180deg, #0c1238 0%, #1a2266 50%, #0c1238 100%) !important; border-color: var(--ink) !important; position: relative; }
+.palace .reel::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0, 0, 0, .55), transparent 22%, transparent 78%, rgba(0, 0, 0, .55)); }
+.palace .sym svg { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .6)) !important; }
+.sl-grid { gap: var(--gap) !important; position: relative; }
+.sl-grid.has-wins .reel .sym:not(.win) { opacity: .35; filter: saturate(.4); transition: opacity .2s; }
+.palace .reel.stopped .strip { animation: reelBounce .28s ease-out; }
+@keyframes reelBounce { 40% { translate: 0 6px; } }
+/* Suspense : rouleau qui brille, fond qui s'assombrit */
+.palace .reel.antic { box-shadow: 0 0 0 3px #ff5ca8, 0 0 30px 8px rgba(255, 92, 168, .8); animation: anticPulse .35s ease-in-out infinite alternate; }
+@keyframes anticPulse { to { box-shadow: 0 0 0 3px #ffd23f, 0 0 40px 14px rgba(255, 210, 63, .8); } }
+.palace .reel.has-scatter .sym-pelote { animation: scatPulse .5s ease-in-out infinite alternate; }
+@keyframes scatPulse { to { transform: scale(1.15); filter: drop-shadow(0 0 10px #ff5ca8); } }
+.palace.tense .sl-window { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .45), 0 4px 0 var(--ink), 0 0 50px 10px rgba(255, 92, 168, .5) !important; }
+.palace.tense .sl-grid .reel:not(.antic):not(.spinning) { filter: brightness(.6); }
+/* Wilds collés : calque fixe, petit « clac » à chaque nouveau */
+.sl-sticky { position: absolute; left: 10px; top: 10px; pointer-events: none; z-index: 2; }
+.sl-sticky .sym { position: absolute; width: var(--sym); height: var(--sym); border-radius: 10px; background: radial-gradient(circle, rgba(180, 120, 255, .55), rgba(90, 40, 180, .35) 70%) !important; box-shadow: inset 0 0 0 3px #c9a8ff, 0 0 18px rgba(180, 120, 255, .8) !important; }
+.sl-sticky.clack .sym:last-child { animation: clack .35s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes clack { from { transform: scale(1.5); opacity: 0; } }
+.sl-lines { z-index: 3; }
+.sl-lines .wl { stroke-width: 8 !important; stroke: var(--c) !important; paint-order: stroke; filter: drop-shadow(0 0 0 #000) drop-shadow(0 0 6px var(--c)) !important; }
+/* Montant gagné : pastille lisible au centre */
+.sl-win { z-index: 4; font-size: 40px !important; padding: 4px 18px; border-radius: 16px; background: rgba(14, 10, 18, .82); border: 3px solid var(--ink); white-space: nowrap; }
+.sl-win.under { color: #c9d3d8 !important; font-size: 26px !important; }
+.sl-win.line { opacity: 1; transform: translate(-50%, -50%); top: auto; bottom: 6px; font-size: 20px !important; color: #fff !important; text-shadow: 0 2px 0 var(--ink) !important; animation: none; }
+/* Afficheurs MISE / GAIN */
+.sl-leds { display: flex; gap: 10px; justify-content: center; margin: 10px 0 2px; }
+.sl-led { min-width: 130px; padding: 2px 12px 4px; border-radius: 12px; border: 3px solid var(--ink); text-align: center;
+  background: radial-gradient(circle, rgba(255, 255, 255, .05) 1px, transparent 1.5px) 0 0 / 5px 5px, #0a0610; box-shadow: inset 0 3px 8px #000, 0 3px 0 var(--ink); }
+.sl-led small { display: block; font-family: var(--f-title); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #8a93a8; }
+.sl-led b { font-family: var(--f-num); font-weight: 400; font-size: 24px; color: #ff9d1f; text-shadow: 0 0 8px rgba(255, 157, 31, .8); }
+.sl-led.win b { color: #4fe08a; text-shadow: 0 0 8px rgba(79, 224, 138, .8); }
+/* Bandeau des tours gratuits */
+.fs-banner { display: flex; gap: 16px; align-items: center; justify-content: center; }
+.fs-banner span { font-size: 16px; opacity: .95; }
+/* Bonus : la lune rougit, le ciel s'embrase */
+.palace.bonus .palace-sky .moon { background: radial-gradient(circle at 35% 35%, #ffd0d0, #ff5c5c 60%, #b81c2c); box-shadow: 0 0 0 3px var(--ink), 0 0 40px 14px rgba(255, 80, 80, .7); }
+.palace.bonus { background: linear-gradient(180deg, rgba(255, 255, 255, .18), transparent 18%), linear-gradient(180deg, #8a2ac8, #5a1a9c 60%, #3a0e70) !important; }
+#slots .table.cabinet:has(.palace.bonus) .felt::before { filter: hue-rotate(-60deg) saturate(1.4); }
+/* Écrans d'entrée / fin du bonus */
+.sl-intro { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; cursor: pointer;
+  background: radial-gradient(circle, rgba(154, 92, 255, .92), rgba(40, 10, 80, .95)); animation: introIn .4s cubic-bezier(.2, 1.6, .4, 1); text-align: center; }
+@keyframes introIn { from { transform: scale(.6); opacity: 0; } }
+.sl-intro.out { background: radial-gradient(circle, rgba(255, 157, 31, .92), rgba(90, 30, 10, .95)); }
+.sli-k { font-family: var(--f-title); font-size: 24px; color: #fff; text-shadow: 0 3px 0 var(--ink); }
+.sli-big { font-family: var(--f-num); font-size: 86px; line-height: 1; color: #ffd23f; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); animation: tierPop .5s cubic-bezier(.2, 1.8, .4, 1); }
+.sl-intro.small .sli-big { font-size: 70px; }
+.sli-t { font-family: var(--f-title); font-size: 28px; color: #fff; text-transform: uppercase; text-shadow: 0 3px 0 var(--ink); }
+.sli-s { font-size: 15px; color: #fff; margin-top: 6px; }
+.sli-tap { font-family: var(--f-title); font-size: 13px; color: #fff; opacity: .7; margin-top: 10px; animation: breathe 1.4s infinite; }
+/* Bouton Stop pendant le tour */
+.btn.stop { background: var(--c-red) !important; min-width: 160px; }
+@media (max-width: 760px) {
+  .sl-led { min-width: 0; flex: 1; }
+  .sl-led b { font-size: 18px; }
+  .sl-win { font-size: 28px !important; }
+  .sli-big { font-size: 60px; }
+}
+
+/* =====================================================================
+   La table tient à l'écran : cartes à la taille de l'écran, messages en surimpression
+   ===================================================================== */
+@media (min-width: 761px) {
+  body { --card-h: clamp(62px, calc((100vh - var(--dock-h) - 380px) / 2.7), 118px); --card-w: calc(var(--card-h) * .69); }
+  .felt > .msg { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 7; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+  .felt > .msg:empty { display: none; }
+  #uth .results { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); width: 230px; z-index: 6; }
+  #uth .results:not(:empty) { padding: 8px; border-radius: 14px; border: 3px solid var(--ink); background: rgba(14, 10, 18, .85); }
+  .palace { --sym: clamp(62px, min(10vw, calc((100vh - var(--dock-h) - 400px) / 3)), 124px) !important; }
+  .jcard, .jslot { width: 78px; height: 108px; }
+  body.has-dock { --dock-h: 126px; }
+  .jc-name { font-size: 10px !important; }
+}
+@media (max-height: 860px) and (min-width: 761px) { body.has-dock { --dock-h: 120px; } .jcard, .jslot { width: 74px; height: 102px; } }
+
+/* Écran de table gagnée : la jauge déborde */
+.win-ov.over .win-bar { box-shadow: inset 0 3px 6px #000, 0 0 24px 6px rgba(255, 210, 63, .7); animation: barBurst .5s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes barBurst { 40% { transform: scaleY(1.6) scaleX(1.04); } }
+.win-lines[hidden] { display: none !important; }
+
+/* Faillite : jetons qui tombent, titre qui tremble */
+.intro.ruin .intro-n.lose { font-size: 54px; color: var(--c-red) !important; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-shadow: 0 5px 0 var(--ink) !important; animation: shake .35s 3; }
+.ruin-chips { position: relative; height: 54px; }
+.ruin-chips i { position: absolute; top: 0; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--ink);
+  background: radial-gradient(circle, #b0141f 0 40%, #fff 41% 46%, #b0141f 47% 62%, transparent 63%), repeating-conic-gradient(#b0141f 0 22.5deg, #fff 22.5deg 45deg);
+  animation: chipFall 1.1s cubic-bezier(.5, 0, .8, .5) both; }
+.ruin-chips i:nth-child(1) { left: 10%; animation-delay: .05s; } .ruin-chips i:nth-child(2) { left: 23%; animation-delay: .25s; }
+.ruin-chips i:nth-child(3) { left: 36%; animation-delay: .1s; } .ruin-chips i:nth-child(4) { left: 49%; animation-delay: .35s; }
+.ruin-chips i:nth-child(5) { left: 62%; animation-delay: .15s; } .ruin-chips i:nth-child(6) { left: 75%; animation-delay: .3s; } .ruin-chips i:nth-child(7) { left: 88%; animation-delay: .2s; }
+@keyframes chipFall { from { transform: translateY(-120px) rotate(0); opacity: 0; } 70% { opacity: 1; } to { transform: translateY(20px) rotate(260deg); opacity: .25; } }
+.over-stats { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important; }
+.over-stats div { background: var(--slate-3) !important; border: 2px solid var(--ink) !important; border-radius: 12px !important; }
+
+/* Onglet du jeu où une main est en cours */
+.tab.busy::after { content: ''; position: absolute; top: 2px; right: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--c-red); border: 2px solid var(--ink); animation: breathe 1s infinite; }
+.tab { position: relative; }
+.pop-after { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--slate-3); border: 2px solid var(--ink); font-size: 14px; }
+.pop-after b { color: var(--c-gold); font-family: var(--f-num); font-weight: 400; }
+@media (min-width: 761px) {
+  .palace { --sym: clamp(60px, min(10vw, calc((100vh - var(--dock-h) - 450px) / 3)), 124px) !important; }
+  .table.cabinet .felt { padding-top: 46px; padding-bottom: 18px; }
+  .sl-leds { margin: 6px 0 0; }
+  .sl-led b { font-size: 20px; }
+}

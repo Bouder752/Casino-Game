@@ -89,6 +89,7 @@ const BlackjackEngine = (() => {
     start(H, gs, { bet }) {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
       if (bet > H.maxBet('bj')) return { error: `Mise maximale : ${H.maxBet('bj')}.` };
+      if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
       const note = ensureShoe(H, gs);
       const rules = H.query('bj.rules', { bjPay: C.bjPay, charlie: 0 });
@@ -168,7 +169,7 @@ const BlackjackEngine = (() => {
         } else if (dBJ) { h.result = 'Perdu'; h.cls = 'lose'; }
         else if (p > 21) { h.result = 'Bust'; h.cls = 'lose'; }
         else if (isCharlie(r, h)) { b = h.bet * 2; h.result = 'Charlie — Gagné'; h.cls = 'win'; }
-        else if (d > 21 || p > d) { b = h.bet * 2; h.result = d > 21 ? 'Croupier bust — Gagné' : 'Gagné'; h.cls = 'win'; }
+        else if (d > 21 || p > d) { b = h.bet * 2; h.result = d > 21 ? 'Le croupier saute — Gagné' : 'Gagné'; h.cls = 'win'; }
         else if (p === d) { b = h.bet; h.result = 'Égalité'; h.cls = 'push'; }
         else { h.result = 'Perdu'; h.cls = 'lose'; }
         h.net = Math.round((b - h.bet) * 100) / 100;

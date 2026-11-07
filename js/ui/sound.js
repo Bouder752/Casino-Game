@@ -51,6 +51,13 @@ const Sfx = (() => {
     lose: () => { tone(220, 0.3, { type: 'sawtooth', vol: 0.07, slide: 0.6 }); tone(165, 0.35, { type: 'sine', vol: 0.15, at: 0.12, slide: 0.7 }); },
     push: () => tone(440, 0.18, { type: 'triangle', vol: 0.12 }),
     tick: () => tone(1800, 0.025, { type: 'square', vol: 0.05 }),
+    // Arrêt d'un rouleau : la note monte d'un rouleau à l'autre
+    stopn: (k = 0) => { noise(0.07, { vol: 0.28, freq: 700 }); tone(196 * Math.pow(2, k * 2 / 12), 0.12, { type: 'triangle', vol: 0.18 }); },
+    // Pelote posée : carillon qui monte
+    scatter: (k = 0) => [0, 4, 7, 12].forEach((s, i) => tone(660 * Math.pow(2, (s + k * 3) / 12), 0.18, { type: 'sine', vol: 0.12, at: i * 0.05 })),
+    // Suspense : un son qui monte pendant qu'un rouleau tourne plus longtemps
+    antic: () => { tone(220, 1.6, { type: 'sawtooth', vol: 0.04, slide: 3 }); tone(330, 1.6, { type: 'triangle', vol: 0.05, slide: 3 }); },
+    tier: (k = 0) => { [0, 4, 7, 12, 16].forEach((s, i) => tone(523 * Math.pow(2, (s + k * 5) / 12), 0.25, { type: 'square', vol: 0.07, at: i * 0.06 })); SOUNDS.coins(); },
     reelstop: () => { noise(0.08, { vol: 0.3, freq: 600 }); tone(140, 0.1, { vol: 0.2 }); },
     coins: () => { for (let i = 0; i < 6; i++) tone(2000 + RNG.fx.next() * 1600, 0.08, { type: 'triangle', vol: 0.07, at: i * 0.05 }); },
     buy: () => { tone(1318, 0.09, { type: 'square', vol: 0.06 }); tone(1760, 0.25, { type: 'square', vol: 0.06, at: 0.08 }); SOUNDS.coins(); },

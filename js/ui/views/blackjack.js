@@ -69,7 +69,7 @@ App.register((() => {
     anim = true;
     const res = App.host.startPlay('bj', { bet: bet.value });
     if (res.error) { anim = false; Sfx.play('error'); return msg(res.error, 'warn'); }
-    App.syncBalance();
+    App.syncStake(res);
     bet.setEnabled(false);
     msg(res.round.notes.join(' '));
     round = res.round;

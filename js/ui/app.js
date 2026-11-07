@@ -14,9 +14,10 @@ const App = (() => {
   const fire = (type, data) => (handlers[type] || []).forEach(f => f(data));
 
   // ---------- Compteur de jetons qui défile ----------
-  function syncBalance(immediate = false) {
+  // value : montant à afficher à la place du solde réel (mise prélevée, gain pas encore révélé)
+  function syncBalance(immediate = false, value = null) {
     const el = $('balance');
-    const target = host ? host.chips() : 0;
+    const target = value != null ? value : host ? host.chips() : 0;
     const from = shown, id = ++tweenId;
     if (immediate || Math.abs(target - from) < 0.01) { shown = target; el.textContent = Util.fmt(target); fire('balance', target); return; }
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
@@ -93,7 +94,9 @@ const App = (() => {
         const [x, y] = FX.from(felt);
         FX.burst(x, y, Math.round(8 + Math.min(40, st.net / Math.max(1, st.staked) * 8)), st.net >= st.staked * 2 ? 'coin' : 'chip');
       }
-      if (isBig(st)) bigWin();
+      const ratio = st.net / Math.max(1, st.staked);
+      if (ratio >= 10) await winTiers(st.net, st.staked);
+      else if (isBig(st)) bigWin();
       syncBalance();
       await Util.sleep(steps.length ? 500 : 150);
     } finally {
@@ -112,6 +115,43 @@ const App = (() => {
     FX.rain();
     Sfx.play('boom');
     setTimeout(() => document.body.classList.remove('bigwin'), 900);
+  }
+  // Gros gains par paliers (multiple de la mise) : plein écran, compteur qui accélère, titre qui change
+  const TIERS = [{ x: 10, t: 'Gros gain', c: 't1' }, { x: 25, t: 'Énorme gain', c: 't2' }, { x: 50, t: 'Gain épique', c: 't3' }, { x: 100, t: 'Légendaire !', c: 't4' }];
+  function winTiers(net, stake) {
+    return new Promise(res => {
+      const ov = Util.el('div', 'tier-ov');
+      ov.innerHTML = `<div class="tier-rays"></div><div class="tier-box"><div class="tier-t"></div><div class="tier-n num">0</div><div class="tier-x"></div><div class="tier-tap">Touchez pour passer</div></div>`;
+      document.body.appendChild(ov);
+      const T = ov.querySelector('.tier-t'), N = ov.querySelector('.tier-n'), X = ov.querySelector('.tier-x');
+      const reached = TIERS.filter(t => net / stake >= t.x);
+      const dur = Util.dur(1400 + reached.length * 900);
+      const t0 = performance.now();
+      let tier = -1, done = false, raf = 0;
+      const setTier = i => {
+        if (i === tier) return; tier = i;
+        T.textContent = reached[i].t; ov.className = 'tier-ov ' + reached[i].c;
+        T.classList.remove('pop'); void T.offsetWidth; T.classList.add('pop');
+        Sfx.play('tier', i); FX.rain(30 + i * 30);
+      };
+      const finish = () => {
+        if (done) return; done = true; cancelAnimationFrame(raf);
+        setTier(reached.length - 1); N.textContent = Util.fmt(net); X.textContent = `× ${Math.round(net / stake)} la mise`;
+        Sfx.play('boom');
+        setTimeout(() => { ov.classList.add('out'); setTimeout(() => { ov.remove(); res(); }, 350); }, Util.dur(1300));
+      };
+      const step = t => {
+        const k = Math.min(1, (t - t0) / dur), e = k * k; // accélère
+        const v = net * e;
+        N.textContent = Util.fmt(Math.round(v));
+        X.textContent = `× ${Math.max(1, Math.round(v / stake))} la mise`;
+        let i = 0; reached.forEach((r, j) => { if (v / stake >= r.x * 0.999 || j === 0) i = j; });
+        setTier(i);
+        if (k < 1) raf = requestAnimationFrame(step); else finish();
+      };
+      ov.onclick = finish;
+      raf = requestAnimationFrame(step);
+    });
   }
   function pop(s) {
     if (!s.src) return;
@@ -157,6 +197,8 @@ const App = (() => {
   return {
     get host() { return host; },
     attach, on, fire, syncBalance, showSettlement, defer,
+    // Après une mise : on montre la mise prélevée, jamais le résultat avant la fin de l'animation
+    syncStake(res) { const st = res && res.settlement; syncBalance(false, st && host ? host.chips() - st.net - st.staked : null); },
     register: v => (views[v.id] = v),
     view: id => views[id],
     views: () => Object.values(views),

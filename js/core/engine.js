@@ -159,6 +159,8 @@ const Engine = (() => {
       return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
     H.maxBetRatio = (etage = state.etage || 1) => CONFIG.progression.miseMaxRatio * Math.pow(CONFIG.progression.miseMaxDecroissance || 1, Math.max(0, Math.min(etage, CONFIG.progression.etagesPourGagner) - 1));
+    // Mise minimale : une petite part du palier (impossible de « farmer » à 1 jeton)
+    H.minBet = () => (isRun && state.table && state.table.minBet ? state.table.minBet : CONFIG.progression.miseMin);
     H.excludedRanks = () => H.emit('deck.exclude', { ranks: [] }).ranks;
     H.query = (name, ctx) => H.emit(name, ctx);
 
@@ -195,7 +197,7 @@ const Engine = (() => {
     H.active = () => active;
     H.busy = () => !!active;
     H.canStart = () => {
-      if (active) return 'Un coup est déjà en cours.';
+      if (active) return `Termine d'abord ta main en cours (${Games.get(active.id).name}).`;
       if (!isRun) return null;
       if (state.phase !== 'play') return 'Aucune table en cours.';
       return null;
@@ -281,7 +283,8 @@ const Engine = (() => {
       const mult = steps.filter(s => s.kind === 'mult').reduce((a, s) => a * s.value, 1);
       const flats = steps.filter(s => s.kind === 'flat').reduce((a, s) => a + s.value, 0);
       const gainF = e.gain > 0 ? round2(e.gain * (1 + add) * mult) : e.gain;
-      const net = round2(gainF + flats);
+      // Jetons entiers : un jeton ne se coupe pas en centimes (arrondi au jeton le plus proche)
+      const net = isRun ? Math.round(gainF + flats) : round2(gainF + flats);
       attribute(steps, e.gain, add, mult);
       H.give(Math.max(0, round2(e.staked + net + (play.prepaid || 0))));
       if (e.outcome === 'win') state.stats.wins++; else if (e.outcome === 'loss') state.stats.losses++;
@@ -333,9 +336,9 @@ const Engine = (() => {
       notify('change');
     }
     function checkBankrupt() {
-      if (!isRun || active || state.chips >= CONFIG.progression.miseMin) return false;
+      if (!isRun || active || state.chips >= H.minBet()) return false;
       const e = H.emit('onBankrupt', { saved: false });
-      if (e.saved && state.chips >= CONFIG.progression.miseMin) { notify('change'); return false; }
+      if (e.saved && state.chips >= H.minBet()) { notify('change'); return false; }
       gameOver('Faillite : plus assez de jetons pour miser.');
       return true;
     }
@@ -360,12 +363,15 @@ const Engine = (() => {
     H.sellValue = j => Math.floor((j.paid != null ? j.paid : H.scale(JOKERS[j.id].price)) * CONFIG.shop.sellRatio);
     H.loanOptions = () => CONFIG.loans.options.map(o => ({ ...o, amount: H.scale(o.amount) }));
     // Infos d'une table de l'étage courant (pour l'écran de choix)
+    // Palier réel d'une table : le palier prévu, ou au moins +X % de la bankroll actuelle
+    // (une grosse avance ne fait jamais gagner une table, ni un boss, sans jouer)
+    H.tableTarget = type => Math.max(H.objective(state.etage, type), nice(Math.max(1, H.bankroll()) * P.croissanceMin));
     H.tableInfo = type => ({
-      type, target: H.objective(state.etage, type), reward: Math.round(P.recompenseTable[type] * H.objective(state.etage, type)),
+      type, target: state.tableType === type ? H.tableTarget(type) : H.objective(state.etage, type), reward: Math.round(P.recompenseTable[type] * H.objective(state.etage, type)),
       boss: type === 'boss' ? state.bossId : null, tag: state.tagOffers[type] || null,
       status: state.etageLog[type] || (state.tableType === type ? 'current' : 'upcoming'),
       // mise max de base (sans jokers ni tags), réduite par le Directeur Pressé
-      maxBet: Math.max(5, Math.round(H.objective(state.etage, type) * H.maxBetRatio()
+      maxBet: Math.max(5, Math.round((state.tableType === type ? H.tableTarget(type) : H.objective(state.etage, type)) * H.maxBetRatio()
         * (type === 'boss' && state.bossId === 'presse' ? CONFIG.bosses.presse.maxBet : 1))),
     });
     function newEtage() {
@@ -378,9 +384,10 @@ const Engine = (() => {
       if (state.phase !== 'choose') return { error: 'Choisis d\'abord ta table.' };
       state.starter = null; // joker de départ non choisi : tant pis
       const t = state.table = {
-        type: state.tableType, etage: state.etage, target: H.objective(state.etage, state.tableType), gains: 0,
+        type: state.tableType, etage: state.etage, target: H.tableTarget(state.tableType), gains: 0,
         boss: state.tableType === 'boss' ? state.bossId : null, start: H.bankroll(),
       };
+      t.minBet = Math.max(P.miseMin, Math.round(t.target * P.miseMinRatio));
       state.charges = [];
       state.phase = 'play';
       H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', P.relancesParTable);

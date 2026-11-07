@@ -57,6 +57,7 @@ class BetControl {
     this.maxFn = max;
     this.base = initial;
     this.enabled = true;
+    this.compact = compact;
     this.onChange = null;
     container.classList.add('betctl');
     container.innerHTML = `
@@ -198,8 +199,23 @@ function settleSpot(spot, outcome, payout = 0) {
 
 // Affiche les actions proposées par un moteur de jeu ({ id, label, primary… })
 function engineActions(container, actions, onAct) {
-  setActions(container, actions.map(a => [a.label, () => onAct(a.id),
+  clearTimeout(container._auto);
+  setActions(container, actions.map(a => [a.label, () => { clearTimeout(container._auto); return onAct(a.id); },
     { cls: a.primary ? 'primary' : a.danger ? 'danger' : a.ghost ? 'ghost' : '', disabled: a.disabled }]));
+  // Relance proposée après un tirage raté : sans réponse, on accepte tout seul au bout de quelques secondes
+  const ids = actions.map(a => a.id);
+  if (ids.includes('accept') && ids.includes('reroll') && ids.length === 2) {
+    const b = [...container.querySelectorAll('button')].find(x => x.textContent === actions.find(a => a.id === 'accept').label);
+    if (!b) return;
+    let n = 4;
+    const tick = () => {
+      if (!b.isConnected) return;
+      if (n <= 0) { b.click(); return; }
+      b.textContent = `Accepter (${n--})`;
+      container._auto = setTimeout(tick, Util.dur(1000) * Math.max(1, Settings.speed) / Settings.speed);
+    };
+    tick();
+  }
 }
 // Limite de mise : plafond de la manche et jetons disponibles
 // (sans partie en cours : pas de limite, pour ne pas ramener la mise par défaut à 0)

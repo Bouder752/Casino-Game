@@ -17,11 +17,11 @@ App.register((() => {
   function update() {
     if (!App.host) return;
     const q = E.quote(App.host, target(), mode), t = target();
-    els.targetVal.textContent = t.toFixed(2);
-    els.chance.textContent = q.chance.toFixed(2) + ' %';
-    els.mult.textContent = '×' + q.mult.toFixed(4);
-    els.profit.textContent = Util.fmt(Util.round2(bet.value * q.mult - bet.value));
-    els.rule.textContent = mode === 'under' ? `Gagné si le résultat < ${t.toFixed(2)}` : `Gagné si le résultat ≥ ${t.toFixed(2)}`;
+    els.targetVal.textContent = String(t);
+    els.chance.textContent = Util.fmt(Math.round(q.chance * 10) / 10) + ' %';
+    els.mult.textContent = '×' + Util.fmt(Math.round(q.mult * 100) / 100);
+    els.profit.textContent = Util.fmt(Math.round(bet.value * q.mult - bet.value));
+    els.rule.textContent = mode === 'under' ? `Gagné si le dé fait moins de ${t}` : `Gagné si le dé fait ${t} ou plus`;
     els.under.classList.toggle('active', mode === 'under');
     els.over.classList.toggle('active', mode === 'over');
     els.track.style.setProperty('--t', t + '%');
@@ -68,7 +68,7 @@ App.register((() => {
       msg('');
       const res = App.host.startPlay('dice', { bet: bet.value, target: target(), mode });
       if (res.error) { Sfx.play('error'); return msg(res.error, 'warn'); }
-      App.syncBalance();
+      App.syncStake(res);
       busy = true; bet.setEnabled(false); els.slider.disabled = true;
       setActions(els.actions, []);
       await after(res);

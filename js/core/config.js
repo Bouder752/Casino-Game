@@ -17,7 +17,9 @@ const CONFIG = {
     croissanceParTable: 0.05, // puis chaque table un peu plus (×2 au boss final)
     miseMaxRatio: 0.25,        // mise max = 25 % du palier visé à l'étage 1…
     miseMaxDecroissance: 0.85, // …puis ×0,88 par étage (≈ 10 % du palier à l'étage 8) : il faut des multiplicateurs
-    miseMin: 1,                // en dessous, c'est la faillite
+    miseMin: 1,
+    miseMinRatio: 0.03,        // mise minimale = 3 % du palier (en dessous, c'est la faillite)
+    croissanceMin: 1.25,       // une table demande toujours au moins +25 % de ta bankroll de départ
     relancesParTable: 3,       // refaire un tirage raté sans miser à nouveau
     relancesParMise: 1,        // relances utilisables sur une même mise
     jokerDeDepart: 3,          // choix entre 3 jokers communs en début de partie
@@ -167,7 +169,7 @@ const CONFIG = {
         { id: 'chatnoir', w: 5, pay: [72, 270, 900] },
       ],
       wild: { id: 'palace', w: 4, reels: [1, 2, 3], mults: [{ m: 2, w: 3 }, { m: 3, w: 1 }] },
-      scatter: { id: 'pelote', w: 7, reels: [0, 2, 4], spins: 10, min: 3 },
+      scatter: { id: 'pelote', w: 5, reels: [0, 1, 2, 3, 4], spins: 10, min: 3, pay: [2, 10, 50], retrigger: 5, maxSpins: 30 }, // une Pelote max par rouleau
       diamant: { id: 'diamant', w: 6, pay: [180, 600, 2000] },   // ajouté par la Machine dorée
     },
   },

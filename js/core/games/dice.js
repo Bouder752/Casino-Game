@@ -20,6 +20,7 @@ const DiceEngine = (() => {
     start(H, gs, { bet, target, mode }) {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
       if (bet > H.maxBet('dice')) return { error: `Mise maximale : ${H.maxBet('dice')}.` };
+      if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       target = Math.max(C.minTarget, Math.min(C.maxTarget, Math.round(target)));
       if (!H.stake(bet)) return { error: 'Solde insuffisant.' };
       const r = { bet, target, mode, rolls: [], ...quote(H, target, mode) };

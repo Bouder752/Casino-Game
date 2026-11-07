@@ -30,7 +30,8 @@ const JOKER_DEFS = [
   { id: 'septieme', name: 'Le Septième Ciel', icon: '7️⃣', tags: ['Tous les jeux'], desc: () => `Chaque 7 tiré (carte, dé, roulette, machine) rapporte ${pct(J.septieme.stake)} de ta mise.`,
     onCardDrawn(e, me) { if (e.card.rank === 7) e.play.flat(me, e.play.stake * J.septieme.stake, '7 tiré'); },
     onDraw(e, me) {
-      const n = e.kind === 'symbol' ? (e.value === 'sept' ? 1 : 0) : countSevens(e.value);
+      // au Dice, seule la partie entière compte (pas les décimales)
+      const n = e.kind === 'symbol' ? (e.value === 'sept' ? 1 : 0) : countSevens(e.game === 'dice' ? Math.floor(+e.value) : e.value);
       if (n) e.play.flat(me, e.play.stake * J.septieme.stake * n, n > 1 ? `${n} × 7 tirés` : '7 tiré');
     } },
   { id: 'molle', name: 'La Main Molle', icon: '🧤', tags: ['Blackjack'], desc: () => `Blackjack : tes mains perdues sont remboursées à ${pct(J.molle.refund)}.`,
