@@ -398,3 +398,18 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
   .offer-desc { font-size: 12px; }
   .shop-leave { right: 10px; bottom: 10px; }
 }
+@media (max-width: 760px) {
+  .felt > .msg { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 7; white-space: nowrap; max-width: 94%; overflow: hidden; text-overflow: ellipsis; font-size: 12px !important; }
+  .felt > .msg:empty { display: none; }
+  .felt { padding-bottom: 30px !important; }
+  #uth .felt { gap: 2px; }
+  #uth .zone-title { margin: 0; }
+  .dice-board { padding: 2px 16px !important; }
+  .dice-result { font-size: 48px !important; }
+  .dice-stats { gap: 6px !important; }
+  .dice-stats div { padding: 4px !important; }
+  .dice-mode .btn { min-height: 40px; }
+  body.has-dock { --dock-h: 88px; }
+  .jcard, .jslot { width: 52px; height: 74px; }
+}
+@media (max-width: 760px) { #roulette .rail { position: sticky; bottom: calc(var(--dock-h) + 6px); z-index: 8; } }
