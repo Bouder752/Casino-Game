@@ -1,4 +1,4 @@
-// Vue Machine à sous « Le Palace des Chats » : rouleaux animés, lignes gagnantes,
+// Vue Machine à sous « Les Chats des Toits » : rouleaux animés, lignes gagnantes,
 // tours gratuits avec wilds collants. Le résultat vient entièrement du moteur.
 App.register((() => {
   const $ = id => document.getElementById(id);
@@ -36,8 +36,8 @@ App.register((() => {
     const wild = App.host ? App.host.query('slots.wild', { wild: null, ratio: 1, sources: [] }) : { wild: null };
     els.pay.innerHTML = `<p class="hint">Gains pour 3 · 4 · 5 symboles alignés de gauche à droite, avec la mise actuelle (${Util.fmt(bet.value)}).</p>
       <table class="paytable">${symbols().slice().reverse().map(s => row(s.id, s.pay)).join('')}</table>
-      <div class="pt-special"><div class="pt-sym">${SlotArt.svg('palace')}</div><p><b>Palace (Wild)</b> — rouleaux 2 à 4, remplace tous les symboles sauf le Bonus et multiplie le gain de la ligne par ×2 ou ×3.</p></div>
-      <div class="pt-special"><div class="pt-sym">${SlotArt.svg('pelote')}</div><p><b>Pelote d'or</b> — rouleaux 1, 3 et 5. ${C.scatter.min} pelotes = <b>${C.scatter.spins} tours gratuits</b> : chaque Wild qui apparaît reste collé jusqu'à la fin.</p></div>
+      <div class="pt-special"><div class="pt-sym">${SlotArt.svg('palace')}</div><p><b>Carton (Wild)</b> — rouleaux 2 à 4, remplace tous les symboles sauf le Bonus et multiplie le gain de la ligne par ×2 ou ×3.</p></div>
+      <div class="pt-special"><div class="pt-sym">${SlotArt.svg('pelote')}</div><p><b>Pelote (Bonus)</b> — rouleaux 1, 3 et 5. ${C.scatter.min} pelotes = <b>${C.scatter.spins} tours gratuits</b> : chaque Wild qui apparaît reste collé jusqu'à la fin.</p></div>
       ${wild.wild ? `<p class="wild-note">🍒 Triple Cerise : les cerises remplacent n'importe quel symbole (ligne complétée payée × ${String(wild.ratio).replace('.', ',')}).</p>` : ''}`;
   }
 
@@ -97,7 +97,7 @@ App.register((() => {
       // Tours gratuits
       spins[0].grid.forEach((col, x) => col.forEach((c, y) => { if (c.id === C.wild.id) sticky[x + ':' + y] = true; }));
       els.fs.hidden = false;
-      els.fs.innerHTML = `🧶 ${C.scatter.min} Pelotes d'or ! <b>${spins.length - 1} tours gratuits</b>`;
+      els.fs.innerHTML = `🧶 ${C.scatter.min} Pelotes ! <b>${spins.length - 1} tours gratuits</b>`;
       els.fs.className = 'fs-banner pop';
       Sfx.play('fanfare');
       await Util.sleep(1300);

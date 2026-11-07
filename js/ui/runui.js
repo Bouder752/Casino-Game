@@ -83,6 +83,7 @@ const UI = (() => {
     const row = el('div', 'pop-actions');
     buttons.forEach(([label, fn, c = '', dis]) => {
       const b = el('button', 'btn small ' + c, label);
+      if (label.includes('<')) b.innerHTML = label;
       b.disabled = !!dis;
       b.onclick = e => { e.stopPropagation(); Sfx.play('click'); fn(); closePopover(); };
       row.appendChild(b);
@@ -121,7 +122,7 @@ const UI = (() => {
     const sym = d.kind === 'joker' ? RAR_SYM[d.rarity] : '';
     e.innerHTML = `<div class="jc-frame"><div class="jc-art">${art}</div><div class="jc-name">${sym ? `<i>${sym}</i> ` : ''}${d.name}</div></div>` +
       (id === 'jackpot' ? `<div class="jc-badge">×${META.jackpot.toFixed(1)}</div>` : '') +
-      (price !== undefined ? `<div class="jc-price ${typeof price === 'number' && !H().canAfford(price) ? 'cant' : ''}">${typeof price === 'number' ? '<span class="coin-s"></span>' : ''}${price}</div>` : '');
+      (price !== undefined ? `<div class="jc-price ${typeof price === 'number' && !H().canAfford(price) ? 'cant' : ''}">${typeof price === 'number' ? '<span class="wallet-chip s"></span>' : ''}${price}</div>` : '');
     e.setAttribute('aria-label', `${d.name} : ${d.desc(H())}`);
     if (disabled) e.classList.add('sold');
     if (onClick) e.onclick = ev => { ev.stopPropagation(); if (e._dragged) return; onClick(e); };
@@ -404,6 +405,49 @@ const UI = (() => {
     }
   }
 
+  // ---------- Table gagnée : écran de célébration avant le Comptoir ----------
+  function celebrate(next) {
+    const sum = isRun() && S().summary;
+    if (!sum) return next();
+    document.querySelector('.win-ov')?.remove();
+    const boss = sum.type === 'boss' ? BOSSES[sum.boss] : null;
+    const title = sum.victory ? 'Victoire !' : boss ? 'Boss vaincu !' : 'Palier atteint !';
+    const ov = el('div', 'win-ov' + (boss ? ' boss' : ''));
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', title);
+    ov.innerHTML = `<div class="win-rays"></div>
+      <div class="win-box">
+        <div class="win-kicker">Étage ${sum.etage} · ${TABLE_NAME[sum.type]}${boss ? ` · ☠ ${boss.name}` : ''}</div>
+        <div class="win-chip"><div class="logo-chip-face"><b>${sum.type === 'boss' ? '☠' : '✓'}</b></div></div>
+        <h2 class="win-title">${title}</h2>
+        <div class="win-bank"><span>Bankroll</span><b class="num" id="win-bank">0</b><i>/ ${Util.fmt(sum.target)}</i></div>
+        <div class="win-bar"><i id="win-fill"></i></div>
+        <div class="win-lines">${sum.lines.filter(l => l.value || l.bad).map((l, i) => `<div class="wl ${l.value < 0 || l.bad ? 'bad' : ''}" style="animation-delay:${1.1 + i * 0.35}s"><span>${l.label}</span>${l.value ? `<b class="num">${Util.signed(l.value)}</b>` : ''}</div>`).join('')}</div>
+        <button class="btn primary big win-go">Au Comptoir ➜</button>
+      </div>`;
+    document.body.appendChild(ov);
+    Sfx.play('bigwin');
+    FX.confetti(160);
+    setTimeout(() => FX.rain(45), 250);
+    // la bankroll et la jauge se remplissent jusqu'au palier
+    const end = sum.target, t0 = performance.now(), dur = 900;
+    const tick = t => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      const b = ov.querySelector('#win-bank'); if (!b) return;
+      b.textContent = Util.fmt(Math.round(end * e));
+      ov.querySelector('#win-fill').style.width = e * 100 + '%';
+      if (k < 1) requestAnimationFrame(tick); else { b.classList.add('done'); Sfx.play('coins'); }
+    };
+    requestAnimationFrame(tick);
+    const btn = ov.querySelector('.win-go');
+    let gone = false;
+    const go = () => { if (gone) return; gone = true; Sfx.play('click'); ov.classList.add('out'); document.removeEventListener('keydown', key, true); setTimeout(() => ov.remove(), 300); next(); };
+    const key = e => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!btn.disabled) go(); } };
+    btn.disabled = true;
+    setTimeout(() => { btn.disabled = false; btn.focus(); }, 900);
+    btn.onclick = go;
+    document.addEventListener('keydown', key, true);
+  }
+
   // ---------- Shop ----------
   function renderShop() {
     const st = S();
@@ -432,8 +476,8 @@ const UI = (() => {
             <div>Bankroll à atteindre : <b>${Util.fmt(nextInfo.target)}</b> · mise max ${Util.fmt(nextInfo.maxBet)}</div>
             ${nextInfo.boss ? `<div class="boss-warn">☠ ${BOSSES[nextInfo.boss].name} : ${BOSSES[nextInfo.boss].desc()}</div>` : ''}
           </div>
-          <button class="btn" id="shop-reroll">🔄 Relancer le shop (${st.shop.rerollCost})</button>
-          <button class="btn" id="shop-slot" ${H().slotPrice() ? '' : 'disabled'}>➕ Emplacement de joker ${H().slotPrice() ? `(${H().slotPrice()})` : '(max)'}</button>
+          <button class="btn" id="shop-reroll">🔄 Relancer le shop · <span class="wallet-chip s"></span> ${st.shop.rerollCost}</button>
+          <button class="btn" id="shop-slot" ${H().slotPrice() ? '' : 'disabled'}>➕ Emplacement de joker ${H().slotPrice() ? `· <span class="wallet-chip s"></span> ${H().slotPrice()}` : '(max)'}</button>
           <div class="loans">
             <div class="shop-row-title">💳 Le Prêteur</div>
             ${debt ? `<p>Dette en cours : <b>${Util.fmt(debt.left)}</b> — échéance de ${Util.fmt(Math.min(debt.per, debt.left))} prélevée à chaque table gagnée.${debt.missed ? ` ⚖️ ${debt.missed} échéance(s) manquée(s).` : ''}</p>`
@@ -455,7 +499,7 @@ const UI = (() => {
       const box = $(o.kind === 'joker' ? 'shop-jokers' : o.kind === 'consumable' ? 'shop-cons' : 'shop-items');
       box.appendChild(itemCard(o.id, {
         price: o.sold ? 'vendu' : o.price, disabled: o.sold,
-        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id), [[`Acheter (${o.price})`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
+        onClick: node => { if (!o.sold) popover(node, sheetHtml(o.id), [[`Acheter · <span class="wallet-chip s"></span> ${o.price} jetons`, () => buy(i), 'primary', !H().canAfford(o.price)]]); },
       }));
     });
     renderJokers($('shop-owned-jokers'));
@@ -642,8 +686,8 @@ const UI = (() => {
   });
   App.on('table', () => renderRunBar());
   App.on('choose', () => { closeModal(); renderRunBar(); renderChoose(); screen('choose'); });
-  App.on('shop', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); Sfx.play('win'); FX.confetti(); });
-  App.on('victory', () => { closeModal(); renderRunBar(); renderShop(); screen('shop'); victoryModal(); FX.confetti(220); FX.rain(90); });
+  App.on('shop', () => { closeModal(); celebrate(() => { renderRunBar(); renderShop(); screen('shop'); }); });
+  App.on('victory', () => { closeModal(); celebrate(() => { renderRunBar(); renderShop(); screen('shop'); victoryModal(); FX.confetti(220); FX.rain(90); }); });
   App.on('over', () => {
     const st = S();
     Sfx.play('gameover');
@@ -715,6 +759,7 @@ const UI = (() => {
       if (!$('modal').hidden && escAction) { e.preventDefault(); return escAction(); }
       return;
     }
+    if (document.querySelector('.win-ov')) return;
     if (!$('modal').hidden) return; // une fenêtre ouverte garde la main (Entrée = bouton focalisé)
     const scr = document.body.dataset.screen;
     if (k === 'j' && isRun()) { $('dock-toggle').click(); return; }

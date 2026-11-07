@@ -1,5 +1,5 @@
-// Moteur Machine à sous « Le Palace des Chats » : 5×3, 20 lignes.
-// Wild Palace (rouleaux 2-4) avec multiplicateur ×2/×3, Pelote d'or (rouleaux 1, 3, 5) :
+// Moteur Machine à sous « Les Chats des Toits » : 5×3, 20 lignes.
+// Wild Carton (id « palace », rouleaux 2-4) avec multiplicateur ×2/×3, Pelote (rouleaux 1, 3, 5) :
 // 3 pelotes = tours gratuits pendant lesquels les wilds restent collés.
 // Les variations passent par les requêtes slots.symbols et slots.wild.
 const SlotsEngine = (() => {

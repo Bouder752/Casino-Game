@@ -13,7 +13,7 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 - La petite et la grande table peuvent être **passées** contre un **tag** (Soldes, Turbo, Investisseur, Collectionneur, Paquet cadeau, Double ou rien). Le boss, lui, ne se passe pas et impose une règle : Croupier Avare, Directeur Pressé, Dame en Noir, Videur, Gardien Endormi, Gourmand.
 - Plus assez de jetons pour miser : perdu. Boss de l'étage 8 vaincu : **victoire**, puis mode infini (paliers ×1,7 par étage).
 - **Le Comptoir** : 3 jokers + 2 consommables (tirage pondéré par rareté, jamais un joker déjà possédé), packs, améliorations, relance du shop à prix croissant, revente à 50 %, emplacements de joker supplémentaires et **le Prêteur** (les jetons prêtés évitent la faillite, mais la dette est déduite de la bankroll : un prêt ne fait pas gagner une table).
-- 5 jeux : **Ultimate Texas Hold'em** (avec probabilités en direct), **Blackjack** (assurance), **Roulette** (avec joueurs IA), **Le Palace des Chats** (machine 5×3, 20 lignes, Wilds ×2/×3 collants pendant 10 tours gratuits déclenchés par 3 Pelotes d'or) et **Dice**. Un **mode libre** permet de jouer sans objectif.
+- 5 jeux : **Ultimate Texas Hold'em** (avec probabilités en direct), **Blackjack** (assurance), **Roulette** (avec joueurs IA), **Les Chats des Toits** (machine 5×3, 20 lignes, style cartoon sur les toits de Paris la nuit : wild Carton ×2/×3 collant pendant 10 tours gratuits déclenchés par 3 Pelotes) et **Dice**. Un **mode libre** permet de jouer sans objectif.
 - **Interface** : une seule barre en haut (étage, jauge jetons → palier, mise max, relances, boss ; touchez un badge pour son détail) ; la mise et les boutons d'action sur le rebord de la table ; les règles derrière le bouton « ? » du tapis ; les probabilités du Hold'em repliées dans une pastille ; les jokers dans une rangée en bas d'écran (glisser-déposer pour changer l'ordre, fiche au survol ou à l'appui long avec l'effet, le prix de revente et ce que le joker a rapporté) ; aperçu des synergies au Comptoir, prix en rouge quand ils sont trop chers, bouton « Quitter le shop » toujours au même endroit avec confirmation ; « Annuler » après la vente d'un joker ; vitesse d'animation 1×/2×/4× dans les options ; mise en scène des gros coups ; bilan de fin de partie (meilleur gain, joker MVP, seed) ; **collection** des jokers découverts et des boss battus.
 - **Direction artistique** Art déco (Monte-Carlo) : Limelight pour les titres, Cinzel pour les chiffres (à chasse fixe), Cormorant Garamond pour le texte ; vert bouteille, or, crème et bordeaux ; bordures dorées fines et ornements géométriques ; une couleur et un symbole par rareté (● commun gris, ◆ rare bleu, ★ légendaire or). Chaque joker a sa propre illustration.
 - Chaque gain affiche son **détail** : mise → rendu brut → bonus en % → multiplicateurs → bonus fixes, joker par joker.
@@ -24,6 +24,8 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 - **Moins d'infos à l'écran** : plus de panneaux latéraux ni de bandeau de conseils ; les jeux sont dans une colonne de jetons à gauche (une rangée sur téléphone), la table prend toute la place.
 - **Modèle de partie** : paliers de bankroll de plus en plus hauts, mise max proportionnelle au palier, défaite uniquement à la faillite (voir plus haut).
 - **Habillage** : salle de casino (moquette, lumières floues, vignette), tables inclinées en perspective avec rebord en cuir et rail en bois, jetons en relief (cylindres), boutons « physiques » qui s'enfoncent, jauge de bankroll animée, afficheur à LED pour le Dice, roulette inclinée dans son cylindre, rouleaux ombrés de la machine, menu avec cartes en éventail 3D et jeton qui tourne, fenêtres qui basculent en 3D.
+- **Table gagnée** : écran « Palier atteint ! » (ou « Boss vaincu ! ») avec rayons, jeton qui tourne, jauge qui se remplit, récompenses une à une et confettis, avant d'entrer au Comptoir.
+- **Prix** : tous les prix (jokers, relance, emplacements) portent le même jeton rouge que ton solde.
 - **Particules** (`js/ui/fx.js`, canvas) : gerbe de pièces et jetons à chaque gain, pluie de jetons sur les gros coups, confettis à chaque table gagnée et à la victoire. Purement décoratif (hasard de `RNG.fx`), désactivé si le système demande moins d'animations.
 
 ## Après les tests joueurs (5 profils)
@@ -74,7 +76,7 @@ js/ui/              interface
   fx.js             particules (pièces, jetons, confettis) sur un canvas
   views/*.js        une vue par jeu (affichage et animations seulement)
   runui.js          menu, barre du haut, choix de table, shop, fenêtres
-  jokerArt.js       illustrations des jokers · slotArt.js : symboles de la machine
+  jokerArt.js       illustrations des jokers · slotArt.js : symboles cartoon de la machine
   cards.js, sound.js, cosmetics.js, util.js, main.js
 tools/              simulate.js, test-engine.js
 ```

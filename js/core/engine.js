@@ -423,7 +423,7 @@ const Engine = (() => {
         } else { state.etage++; newEtage(); }
       } else state.tableType = NEXT[t.type];
       H.saveMeta();
-      state.summary = { type: t.type, etage: t.etage, lines, victory };
+      state.summary = { type: t.type, etage: t.etage, lines, victory, target: t.target, boss: t.boss };
       state.table = null;
       state.charges = [];
       state.shop = genShop(CONFIG.shop.reroll.base);

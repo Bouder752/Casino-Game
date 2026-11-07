@@ -129,7 +129,7 @@ const CONFIG = {
     },
     dice: { edge: 99, minTarget: 10, maxTarget: 95 },   // 10 % de chance minimum (×9,9 max)
     roulette: { straight: 36, even: 2, dozen: 3, ai: { count: 3, min: 5, max: 50, step: 5 } },
-    // Machine « Le Palace des Chats » : 5 rouleaux × 3 rangées, 20 lignes.
+    // Machine « Les Chats des Toits » : 5 rouleaux × 3 rangées, 20 lignes.
     // pay = multiples de la mise par ligne (mise / 20) pour 3, 4 et 5 symboles alignés.
     slots: {
       reels: 5, rows: 3,
