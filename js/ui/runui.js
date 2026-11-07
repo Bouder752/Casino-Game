@@ -329,7 +329,7 @@ const UI = (() => {
 
   const TABLE_NAME = { petite: 'Petite table', grande: 'Grande table', boss: 'Table du Boss' };
   const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  const F = () => CONFIG.progression.etagesPourGagner;
+  const F = () => (App.host && App.host.finalEtage ? App.host.finalEtage() : CONFIG.progression.etagesPourGagner);
   const etageText = st => `Étage ${st.etage}${st.etage <= F() ? ' / ' + F() : ' · infini'}`;
 
   // ---------- Barre du haut : étage, bankroll → palier, mise max, badges ----------
@@ -628,10 +628,65 @@ const UI = (() => {
   }
 
   // ---------- Menu, cosmétiques, aide ----------
+  // ---- Défi du jour : seed commune, 3 étages, carnet de tampons qui ne revient jamais à zéro ----
+  const dayKey = (d = new Date()) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const weekKey = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return dayKey(x); };
+  const stampsThisWeek = () => { const w = weekKey(); return (META.stamps || []).filter(k => weekKey(new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6))) === w).length; };
+  function checkCarnet() {
+    const w = weekKey();
+    if (stampsThisWeek() >= 5 && !(META.stampRewards || {})[w]) {
+      (META.stampRewards = META.stampRewards || {})[w] = true;
+      const name = Cosmetics.grantExclusive();
+      saveMeta();
+      toast(name ? `📒 Carnet complet cette semaine : « ${name} » débloqué !` : '📒 Carnet complet : +3 ✦ prestige !');
+    }
+  }
+  // ---- Quêtes : les prochains jokers à débloquer, avec leur progression ----
+  function questList(n = 3) {
+    const p = META.progress || {};
+    return UNLOCKS.filter(u => !(META.jokersUnlocked || []).includes(u.id)).slice(0, n)
+      .map(u => ({ u, v: Math.min(u.goal, p[u.key] || 0) }));
+  }
+  const questHtml = ({ u, v }) => `<div class="quest"><div class="q-art">${JokerArt.svg(u.id)}</div><div class="q-body"><b>🔒 ${JOKERS[u.id].name}</b><span>${u.quest}</span><div class="q-bar"><i style="width:${v / u.goal * 100}%"></i></div><small>${v} / ${u.goal}</small></div></div>`;
+  let stakePick = 0;
   function renderMenu() {
+    checkCarnet();
     $('m-continue').hidden = !Engine.hasSave();
     $('m-prestige').textContent = `✦ ${META.prestige}`;
-    $('m-stats').innerHTML = `Meilleur étage : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b>`;
+    const unlocked = JOKER_DEFS.filter(d => !UNLOCK_OF[d.id] || (META.jokersUnlocked || []).includes(d.id)).length;
+    $('m-stats').innerHTML = `Meilleur étage : <b>${META.best}</b> · Parties : <b>${META.runs}</b> · Victoires : <b>${META.wins}</b> · Jokers débloqués : <b>${unlocked}</b> / ${JOKER_DEFS.length}`;
+    // niveau de difficulté (après une première victoire)
+    const max = META.maxStake || 0;
+    stakePick = Math.min(stakePick, max);
+    $('m-stake').hidden = max <= 0;
+    $('m-stake').innerHTML = `<span>Difficulté :</span>${STAKES.slice(0, max + 1).map((s, i) => `<button class="stake ${i === stakePick ? 'on' : ''}" data-stake="${i}" title="${s.n} : ${s.d}" aria-label="${s.n} : ${s.d}" aria-pressed="${i === stakePick}" style="--sc:${s.c}"></button>`).join('')}<em>${STAKES[stakePick].n}</em>`;
+    $('m-stake').querySelectorAll('[data-stake]').forEach(b => (b.onclick = () => { stakePick = +b.dataset.stake; Sfx.play('chip'); renderMenu(); }));
+    // défi du jour
+    const today = (META.daily || {})[dayKey()];
+    $('m-daily-info').textContent = `· carnet ${Math.min(5, stampsThisWeek())}/5${today ? ` · record du jour : étage ${today.won ? '3 ✓' : today.best}` : ''}`;
+    // quêtes
+    const qs = questList();
+    $('m-quests').innerHTML = qs.length ? `<div class="mq-t">Jokers à débloquer</div>${qs.map(questHtml).join('')}` : '<div class="mq-t">Tous les jokers sont débloqués !</div>';
+  }
+  function recordsModal() {
+    const R = META.records || {}, p = META.progress || {};
+    const days = Object.entries(META.daily || {}).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7);
+    const fmtDay = k => `${k.slice(6)}/${k.slice(4, 6)}`;
+    modal(`<h2>🏅 Records</h2>
+      <div class="over-stats">
+        <div><span>Meilleur étage</span><b class="num">${META.best || 0}</b></div>
+        <div><span>Victoires</span><b class="num">${META.wins || 0}</b></div>
+        <div><span>Plus gros gain</span><b class="num">${Util.fmt(R.bestNet || 0)}</b></div>
+        <div><span>Meilleur × mise</span><b class="num">×${Util.fmt(R.bestRatio || 0)}</b></div>
+        <div><span>Plus gros multi</span><b class="num">×${Util.fmt(R.bestMult || 0)}</b></div>
+        <div><span>Victoires d'affilée</span><b class="num">${R.bestStreak || 0}</b></div>
+        <div><span>Bonus de la machine</span><b class="num">${R.bonus || 0}</b></div>
+        <div><span>Sept tirés</span><b class="num">${p.sevens || 0}</b></div>
+        <div><span>Difficulté max</span><b class="num">${STAKES[META.maxStake || 0].n}</b></div>
+      </div>
+      <h3>Défi du jour</h3>
+      <p>Carnet de la semaine : <b>${Math.min(5, stampsThisWeek())} / 5</b> tampons (un tampon dès que tu bats le premier boss ; le carnet ne revient jamais à zéro, et 5 tampons dans la semaine débloquent un cosmétique exclusif).</p>
+      ${days.length ? `<div class="daily-list">${days.map(([k, d]) => `<div><span>${fmtDay(k)}</span><b>${d.won ? '🏆 Gagné' : `étage ${d.best}`}</b></div>`).join('')}</div>` : '<p class="hint">Pas encore de défi joué.</p>'}`, [['Fermer', () => {}, 'primary']], 'wide');
   }
   function renderCosmetics() {
     const root = $('cosmetics');
@@ -684,7 +739,13 @@ const UI = (() => {
     else if (ph === 'shop' || ph === 'victory') { renderShop(); screen('shop'); if (ph === 'victory') victoryModal(); }
     else enterGame();
   }
-  function startRun(seed) { App.attach(Engine.newRun({ seed, meta: META })); showPhase(); if (!Settings.tutorialDone) tutorial(); }
+  function startRun(seed, opts = {}) { App.attach(Engine.newRun({ seed, meta: META, stake: opts.daily ? 0 : stakePick, ...opts })); showPhase(); if (!Settings.tutorialDone) tutorial(); }
+  function startDaily() {
+    const k = dayKey();
+    const go = () => { Engine.clearSave(); startRun(`JOUR-${k}`, { express: true, daily: k }); toast(`📅 Défi du ${k.slice(6)}/${k.slice(4, 6)} : 3 étages, la même partie pour tout le monde.`); };
+    if (Engine.hasSave()) return modal('<h2>Défi du jour ?</h2><p>La partie en cours sera abandonnée.</p>', [['Garder ma partie', () => {}], ['Jouer le défi', go, 'primary']], '', { esc: 0 });
+    go();
+  }
   // Tutoriel de première partie : 3 bulles, pas un mur de texte
   function tutorial(step = 0) {
     const P = CONFIG.progression;
@@ -702,6 +763,13 @@ const UI = (() => {
     if (!h) { toast('Aucune partie à reprendre.'); return renderMenu(); }
     App.attach(h);
     showPhase();
+    // une main était en cours quand le jeu a été fermé : elle a été terminée prudemment
+    if (h.state.pending) {
+      const r = h.resumePending();
+      App.syncBalance(true);
+      if (r) toast(`⏸ Ta main en cours a été terminée pour toi (choix prudents) : ${Util.signed(r.net)} jetons.`);
+      renderRunBar();
+    }
   }
   function freeMode() { App.attach(Engine.free({ meta: META })); enterGame(); }
   // Bilan de partie : étage, tables, meilleur gain, joker MVP, seed
@@ -718,12 +786,14 @@ const UI = (() => {
         <div><span>Meilleur gain</span><b class="num">${bp ? '+' + Util.fmt(Math.round(bp.net)) : '—'}</b>${bp ? `<small>${GAME_NAME[bp.game] || ''}</small>` : ''}</div>
       </div>
       ${mvp ? `<div class="mvp"><div class="mvp-card">${itemCard(mvp[0]).outerHTML}</div><div><span>Joker MVP</span><b>${JOKERS[mvp[0]].name}</b><small>a rapporté ${Util.fmt(Math.round(mvp[1]))} jetons</small></div></div>` : ''}
-      <p class="seed-line">🌱 Seed : <b>${st.seed}</b></p>`;
+      <p class="seed-line">🌱 Seed : <b>${st.seed}</b>${st.express ? ' · Défi du jour (Express)' : ''}${st.stake ? ` · ${STAKES[st.stake].n}` : ''}</p>
+      ${(st.newUnlocks || []).length ? `<div class="unl"><b>🔓 Débloqué pendant cette partie :</b> ${st.newUnlocks.map(id => `${JOKERS[id].icon} ${JOKERS[id].name}`).join(', ')}</div>` : ''}
+      ${questList(1).length ? `<div class="next-q"><span>Prochain joker à débloquer</span>${questHtml(questList(1)[0])}</div>` : ''}`;
   }
   function victoryModal() {
     const st = S();
     Sfx.play('fanfare');
-    modal(`<div class="intro"><div class="intro-n">🏆 Victoire !</div><p>Tu as fait sauter la banque du Boubouz'ino : ${CONFIG.progression.etagesPourGagner} étages vaincus.</p>
+    modal(`<div class="intro"><div class="intro-n">🏆 Victoire !</div><p>${st.express ? 'Défi du jour réussi : 3 étages vaincus !' : `Tu as fait sauter la banque du Boubouz'ino : ${CONFIG.progression.etagesPourGagner} étages vaincus.${st.stake < STAKES.length - 1 && !st.express ? ` Niveau débloqué : <b>${STAKES[Math.min(STAKES.length - 1, (st.stake || 0) + 1)].n}</b>.` : ''}`}</p>
       ${recap(st)}<p>✦ +${CONFIG.prestige.perBoss + CONFIG.prestige.victory} prestige</p></div>`,
     [['Continuer en mode infini', () => H().continueInfinite(), 'primary'], ['Terminer la partie', () => { Engine.clearSave(); App.attach(null); renderMenu(); screen('menu'); }]], 'intro-box');
   }
@@ -757,6 +827,8 @@ const UI = (() => {
     const beaten = BOSS_DEFS.filter(b => C.bosses[b.id]);
     const card = d => {
       const c = C.jokers[d.id];
+      const lock = UNLOCK_OF[d.id] && !(META.jokersUnlocked || []).includes(d.id) ? UNLOCK_OF[d.id] : null;
+      if (lock) return `<div class="col-item locked">${questHtml({ u: lock, v: Math.min(lock.goal, (META.progress || {})[lock.key] || 0) })}</div>`;
       if (!c || !c.seen) return `<div class="col-item locked"><div class="jcard r-${d.rarity}"><div class="jc-frame"><div class="jc-art locked-art">?</div><div class="jc-name">${RAR_SYM[d.rarity]} ???</div></div></div><small>Non découvert</small></div>`;
       return `<div class="col-item">${itemCard(d.id).outerHTML}<small>${c.owned ? `possédé ${c.owned}× · ${c.wins} victoire(s)<br>${Util.fmt(Math.round(c.earned))} jetons rapportés` : 'vu au Comptoir'}</small></div>`;
     };
@@ -808,6 +880,8 @@ const UI = (() => {
     go();
   };
   $('m-new').onclick = newGame;
+  $('m-daily').onclick = () => { Sfx.play('click'); startDaily(); };
+  $('m-records').onclick = () => { Sfx.play('click'); recordsModal(); };
   $('m-seed').onkeydown = e => { if (e.key === 'Enter') newGame(); };
   $('m-continue').onclick = () => { Sfx.play('click'); resume(); };
   $('m-free').onclick = () => { Sfx.play('click'); freeMode(); };

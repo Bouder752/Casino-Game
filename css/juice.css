@@ -626,3 +626,43 @@ html.cb .rl-cell.diamond-red { background: #d81b6099 !important; }
   .menu-buttons #m-new, .menu-buttons .seed-input, .menu-buttons #m-continue { grid-column: 1 / -1; }
   .menu-buttons .btn.big { min-height: 48px; font-size: 16px; }
 }
+
+/* =====================================================================
+   Méta-progression : défi du jour, niveaux de difficulté, quêtes, records
+   ===================================================================== */
+.daily-btn { background: var(--c-purple) !important; color: #fff !important; text-shadow: 0 2px 0 rgba(0, 0, 0, .4) !important; }
+.daily-btn small { font-family: var(--f-text); font-size: 13px; text-transform: none; letter-spacing: 0; opacity: .95; }
+.stake-pick { display: flex; align-items: center; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 6px 10px; border-radius: 14px; background: var(--slate-3); border: 3px solid var(--ink); }
+.stake-pick span { font-family: var(--f-title); font-size: 14px; }
+.stake-pick em { font-style: normal; font-family: var(--f-title); font-size: 14px; color: var(--c-gold); min-width: 110px; }
+.stake { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--ink); cursor: pointer;
+  background: radial-gradient(circle, var(--sc) 0 45%, #fff 46% 52%, var(--sc) 53% 66%, transparent 67%), repeating-conic-gradient(var(--sc) 0 30deg, #fff 30deg 60deg); box-shadow: 0 3px 0 var(--ink); }
+.stake.on { transform: translateY(-4px) scale(1.15); box-shadow: 0 3px 0 var(--ink), 0 0 12px var(--sc); }
+.menu-quests { width: min(560px, 100%); margin: 10px auto 0; display: flex; flex-direction: column; gap: 6px; }
+.mq-t { font-family: var(--f-title); font-size: 15px; text-align: left; }
+.quest { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 14px; border: 3px solid var(--ink); background: var(--slate-2); text-align: left; }
+.q-art { width: 48px; height: 42px; flex: none; border-radius: 8px; overflow: hidden; border: 2px solid var(--ink); filter: grayscale(.85) brightness(.7); }
+.q-art svg { width: 100%; height: 100%; display: block; }
+.q-body { flex: 1; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+.q-body b { font-family: var(--f-title); font-weight: 400; font-size: 14px; grid-column: 1 / -1; }
+.q-body span { font-size: 13px; color: #d6dee3; grid-column: 1 / -1; }
+.q-bar { height: 8px; border-radius: 99px; background: var(--slate-3); border: 2px solid var(--ink); overflow: hidden; }
+.q-bar i { display: block; height: 100%; background: var(--c-green); }
+.q-body small { font-family: var(--f-num); font-size: 12px; }
+.col-item.locked .quest { height: 100%; }
+.unl { margin: 8px 0; padding: 8px 12px; border-radius: 12px; background: rgba(47, 191, 113, .2); border: 2px solid var(--c-green); }
+.next-q { margin-top: 10px; text-align: left; }
+.next-q > span { font-family: var(--f-title); font-size: 13px; display: block; margin-bottom: 4px; }
+.daily-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 6px; }
+.daily-list div { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 10px; background: var(--slate-3); border: 2px solid var(--ink); }
+@media (max-height: 820px) and (min-width: 761px) {
+  .menu-quests { margin-top: 6px; } .quest { padding: 3px 8px; } .q-art { width: 38px; height: 32px; }
+  .menu-buttons .daily-btn { grid-column: 1 / -1; }
+}
+#m-records { background: var(--slate-hi) !important; }
+.menu-buttons .stake-pick { grid-column: 1 / -1; }
+@media (min-width: 1000px) {
+  .menu { display: grid !important; max-width: 1000px !important; width: 100%; grid-template-columns: minmax(0, 540px) 360px; grid-template-areas: "logo quests" "buttons quests" "stats stats"; gap: 14px 34px !important; justify-content: center; justify-items: center; align-items: start; }
+  .menu-logo { grid-area: logo; } .menu-buttons { grid-area: buttons; margin: 0 auto; } .menu-stats { grid-area: stats; }
+  .menu-quests { grid-area: quests; align-self: center; margin: 0; }
+}
