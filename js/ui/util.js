@@ -114,6 +114,9 @@ class BetControl {
     const m = this.maxFn();
     // la mise ne peut pas dépasser ce qu'on a : on la ramène au maximum possible
     if (this.value > m && Number.isFinite(m) && this.enabled) this.value = Math.max(0, m);
+    // jamais une mise à 0 tant qu'on peut encore miser le minimum
+    const lo = App.host && App.host.minBet ? App.host.minBet() : 1;
+    if (this.enabled && !this.compact && this.value < lo && m >= lo) this.value = lo;
     this.amountEl.textContent = Util.fmt(this.value);
     this.maxEl.textContent = Number.isFinite(m) ? `max ${Util.fmt(m)}` : '';
     // un jeton plus gros que la mise possible est grisé

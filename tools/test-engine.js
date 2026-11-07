@@ -15,7 +15,7 @@ const newTable = (H, realTarget = false) => { H.state.phase = 'choose'; H.choose
 api.Games.register({ id: 'test', name: 'Test', start: (H, gs, p) => (H.stake(p.bet) ? { round: { ...p, done: true } } : { error: 'solde' }),
   actions: () => [], act() {}, resolve: (H, gs, r) => ({ staked: r.bet, back: r.back, info: r.info || {}, draws: r.draws || [] }) });
 const play = (H, bet, back, extra = {}) => H.startPlay('test', { bet, back, ...extra }).settlement;
-const winTable = H => play(H, 1, 1 + Math.max(0, H.state.table.target - H.bankroll()));
+const winTable = H => play(H, 1, 2 + Math.max(0, H.state.table.target - H.bankroll()));
 
 // 1. Déterminisme
 ok(JSON.stringify(Sim.playRun('SEED-X')) === JSON.stringify(Sim.playRun('SEED-X')), 'même seed → même partie');
@@ -238,7 +238,9 @@ ok(rr.round.rolls.length <= 1 + (P.relancesParMise || 99), `une seule relance pa
 H = Engine.newRun({ seed: 'MIN', meta: meta(), persist: false }); H.chooseTable();
 ok(H.minBet() === Math.round(H.state.table.target * P.miseMinRatio) && !!H.startPlay('dice', { bet: 1, target: 50, mode: 'under' }).error, `mise minimale ${H.minBet()} : une mise de 1 est refusée`);
 H = Engine.newRun({ seed: 'BIG', meta: meta(), persist: false }); H.state.chips = 100000; H.chooseTable();
-ok(H.state.phase === 'play' && H.state.table.target >= 100000 * P.croissanceMin * 0.95, `grosse avance : la table demande quand même +25 % (palier ${H.state.table.target})`);
+ok(H.state.phase === 'play' && H.state.table.mustWin, 'grosse avance : la table ne se gagne jamais sans jouer');
+play(H, 10, 0); ok(H.state.phase === 'play', 'une perte ne valide pas la table');
+play(H, 10, 20); ok(H.state.phase === 'shop', 'une mise gagnée valide la table (la grosse avance est récompensée)');
 const sev = Engine.newRun({ seed: 'SEV', meta: meta(), persist: false }); sev.chooseTable(); sev.addJoker('septieme');
 const realDice = api.Games.get('dice');
 api.Games.register({ ...api.Games.get('test'), id: 'dice' });

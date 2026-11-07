@@ -81,13 +81,22 @@ const SlotsEngine = (() => {
   function spinAll(H, r) {
     const lineBet = r.bet / C.lines.length;
     let base = grid(H, r.symbols);
+    // Événement surprise : le chat noir saute sur les rouleaux et y laisse des Cartons
+    if (!r.buy && H.rng.chance(C.feature.chance)) {
+      const n = H.rng.range(C.feature.min, C.feature.max);
+      for (let k = 0; k < n; k++) {
+        const x = H.rng.pick(C.wild.reels), y = H.rng.int(C.rows);
+        if (base[x][y].id !== C.scatter.id) base[x][y] = { id: C.wild.id, m: 1, feature: true }; // Cartons simples (sans ×)
+      }
+      r.feature = true;
+    }
     if (r.buy) {
       // une seule Pelote par rouleau : on retire celles déjà tombées, puis on en pose 3
       base = base.map(col => col.map(c => (c.id === C.scatter.id ? { id: r.symbols[0].id } : c)));
       forceScatters(H, base);
     }
     const ev = evaluate(base, r.symbols, r.wild, lineBet);
-    const spins = [{ grid: base, ...ev, free: false }];
+    const spins = [{ grid: base, ...ev, free: false, feature: !!r.feature }];
     if (ev.scatters >= C.scatter.min) {
       const sticky = {};
       const stick = g => g.forEach((col, x) => col.forEach((c, y) => { if (c.id === C.wild.id) sticky[x + ':' + y] = { id: c.id, m: c.m }; }));
@@ -97,6 +106,8 @@ const SlotsEngine = (() => {
       while (left > 0 && played < C.scatter.maxSpins) {
         left--; played++;
         const g = grid(H, r.symbols, sticky);
+        // au plus tard au 6e tour gratuit, au moins un Carton est collé
+        if (played === 6 && !Object.keys(sticky).length) { const x = H.rng.pick(C.wild.reels), y = H.rng.int(C.rows); if (g[x][y].id !== C.scatter.id) g[x][y] = { id: C.wild.id, m: 2 }; }
         stick(g);
         const ev2 = evaluate(g, r.symbols, r.wild, lineBet);
         const retrigger = ev2.scatters >= C.scatter.min ? Math.min(C.scatter.retrigger, C.scatter.maxSpins - played - left) : 0;

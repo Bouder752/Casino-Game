@@ -301,10 +301,10 @@ const Engine = (() => {
       const flats = steps.filter(s => s.kind === 'flat').reduce((a, s) => a + s.value, 0);
       const gainF = e.gain > 0 ? round2(e.gain * (1 + add) * mult) : e.gain;
       // Jetons entiers : un jeton ne se coupe pas en centimes (arrondi au jeton le plus proche)
-      const net = isRun ? Math.round(gainF + flats) : round2(gainF + flats);
+      const net = Math.round(gainF + flats);
       attribute(steps, e.gain, add, mult);
       H.give(Math.max(0, round2(e.staked + net + (play.prepaid || 0))));
-      if (e.outcome === 'win') state.stats.wins++; else if (e.outcome === 'loss') state.stats.losses++;
+      if (e.outcome === 'win') { state.stats.wins++; if (state.table) state.table.wins = (state.table.wins || 0) + 1; } else if (e.outcome === 'loss') state.stats.losses++;
       if (net > state.stats.best) { state.stats.best = net; state.stats.bestPlay = { game: id, net, staked: e.staked }; }
       active = null;
       // Seules les mises gagnantes font avancer l'objectif (un bonus sur une perte ne compte pas)
@@ -347,7 +347,8 @@ const Engine = (() => {
     function afterPlay() {
       if (!isRun) { save(); return; }
       if (state.phase !== 'play') return;
-      if (H.bankroll() >= state.table.target) return tableWon();
+      const t = state.table;
+      if (H.bankroll() >= t.target && (!t.mustWin || t.wins > 0)) return tableWon();
       if (checkBankrupt()) return;
       save();
       notify('change');
@@ -383,7 +384,7 @@ const Engine = (() => {
     // Infos d'une table de l'étage courant (pour l'écran de choix)
     // Palier réel d'une table : le palier prévu, ou au moins +X % de la bankroll actuelle
     // (une grosse avance ne fait jamais gagner une table, ni un boss, sans jouer)
-    H.tableTarget = type => Math.max(H.objective(state.etage, type), nice(Math.max(1, H.bankroll()) * P.croissanceMin));
+    H.tableTarget = type => H.objective(state.etage, type);
     H.tableInfo = type => ({
       type, target: state.tableType === type ? H.tableTarget(type) : H.objective(state.etage, type), reward: Math.round(P.recompenseTable[type] * H.objective(state.etage, type)),
       boss: type === 'boss' ? state.bossId : null, tag: state.tagOffers[type] || null,
@@ -416,7 +417,8 @@ const Engine = (() => {
       if (t.noRerolls) state.charges = [];
       notify('table');
       // Bankroll déjà au palier : table gagnée d'office
-      if (H.bankroll() >= t.target) { tableWon(); return { ok: true, instant: true }; }
+      // Bankroll déjà au palier : la table se valide en gagnant une seule mise (jamais d'office)
+      t.mustWin = H.bankroll() >= t.target; t.wins = 0;
       if (!checkBankrupt()) save();
       return { ok: true };
     };

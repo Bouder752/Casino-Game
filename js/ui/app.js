@@ -90,12 +90,13 @@ const App = (() => {
       }
       if (st.net !== 0) floatGain(st.net);
       if (st.net > 0) {
-        const felt = document.querySelector('.game:not([hidden]) .felt');
+        // la gerbe part du panneau de commande à la machine (pour ne pas cacher les symboles gagnants)
+        const felt = document.querySelector('.game:not([hidden]) .sl-deck') || document.querySelector('.game:not([hidden]) .felt');
         const [x, y] = FX.from(felt);
         FX.burst(x, y, Math.round(8 + Math.min(40, st.net / Math.max(1, st.staked) * 8)), st.net >= st.staked * 2 ? 'coin' : 'chip');
       }
       const ratio = st.net / Math.max(1, st.staked);
-      if (ratio >= 10) await winTiers(st.net, st.staked);
+      if (ratio >= 5) await winTiers(st.net, st.staked);
       else if (isBig(st)) bigWin();
       syncBalance();
       await Util.sleep(steps.length ? 500 : 150);
@@ -117,7 +118,7 @@ const App = (() => {
     setTimeout(() => document.body.classList.remove('bigwin'), 900);
   }
   // Gros gains par paliers (multiple de la mise) : plein écran, compteur qui accélère, titre qui change
-  const TIERS = [{ x: 10, t: 'Gros gain', c: 't1' }, { x: 25, t: 'Énorme gain', c: 't2' }, { x: 50, t: 'Gain épique', c: 't3' }, { x: 100, t: 'Légendaire !', c: 't4' }];
+  const TIERS = [{ x: 5, t: 'Joli gain', c: 't0' }, { x: 10, t: 'Gros gain', c: 't1' }, { x: 25, t: 'Énorme gain', c: 't2' }, { x: 50, t: 'Gain épique', c: 't3' }, { x: 100, t: 'Légendaire !', c: 't4' }];
   function winTiers(net, stake) {
     return new Promise(res => {
       const ov = Util.el('div', 'tier-ov');

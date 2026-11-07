@@ -183,9 +183,10 @@ const CONFIG = {
         { id: 'chatnoir', w: 5, pay: [72, 270, 900] },
       ],
       wild: { id: 'palace', w: 4, reels: [1, 2, 3], mults: [{ m: 2, w: 3 }, { m: 3, w: 1 }] },
-      scatter: { id: 'pelote', w: 5, reels: [0, 1, 2, 3, 4], spins: 10, min: 3, pay: [2, 10, 50], retrigger: 5, maxSpins: 30 }, // une Pelote max par rouleau
+      scatter: { id: 'pelote', w: 4.6, reels: [0, 1, 2, 3, 4], spins: 10, min: 3, pay: [1, 5, 20], retrigger: 5, maxSpins: 30 }, // une Pelote max par rouleau
       diamant: { id: 'diamant', w: 6, pay: [180, 600, 2000] },   // ajouté par la Machine dorée
-      buy: { cost: 75, capMult: 2 },   // achat du bonus : 75 × la mise par tour (≈ 97 % de retour), au plus 2 × la mise max
+      buy: { cost: 85, capMult: 2 },   // achat du bonus : 85 × la mise par tour (≈ 96 % de retour), au plus 2 × la mise max
+      feature: { chance: 0.02, min: 2, max: 2 },  // le chat noir sème 2 Cartons simples (≈ 1 tour sur 50)
     },
   },
 };

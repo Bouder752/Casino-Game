@@ -368,7 +368,7 @@ const UI = (() => {
     $('hud-fill').style.width = pct + '%';
     bar.classList.toggle('danger', bank < t.target * 0.25);
     bar.classList.toggle('near', pct >= 80);
-    $('hud-goal').innerHTML = `<span>Palier</span><b class="num">${Util.fmt(t.target)}</b>`;
+    $('hud-goal').innerHTML = t.mustWin && !t.wins ? `<span>Palier atteint</span><b class="num">Gagne 1 mise</b>` : `<span>Palier</span><b class="num">${Util.fmt(t.target)}</b>`;
     bar.title = `Bankroll ${Util.fmt(Math.floor(bank * 100) / 100)} / ${Util.fmt(t.target)}${debt ? ` (jetons − dette de ${Util.fmt(debt)})` : ''}`;
   }
   const badge = (cls, html, info) => `<button class="hbadge ${cls}" data-info="${info.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">${html}</button>`;
@@ -487,7 +487,7 @@ const UI = (() => {
     requestAnimationFrame(tick);
     const btn = ov.querySelector('.win-go');
     let gone = false;
-    const go = () => { if (gone) return; gone = true; Sfx.play('click'); ov.classList.add('out'); document.removeEventListener('keydown', key, true); setTimeout(() => ov.remove(), 300); next(); };
+    const go = () => { if (gone) return; gone = true; Sfx.play('click'); FX.clear(); ov.classList.add('out'); document.removeEventListener('keydown', key, true); setTimeout(() => ov.remove(), 300); next(); };
     const key = e => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!btn.disabled) go(); } };
     btn.disabled = true;
     setTimeout(() => { btn.disabled = false; btn.focus(); }, 900);
@@ -532,7 +532,7 @@ const UI = (() => {
       const card = itemCard(o.id, { big: o.kind === 'joker', disabled: o.sold, onClick: node => popover(node, sheetHtml(o.id) + (o.sold ? '' : after(o.price)), o.sold ? [] : [[`Acheter · <span class="wallet-chip s"></span> ${Util.fmt(o.price)}`, () => buy(i, node), 'primary', !H().canAfford(o.price)]]) });
       const wrap = el('div', 'offer ' + o.kind + (o.sold ? ' sold' : ''));
       wrap.appendChild(card);
-      if (o.kind === 'joker') wrap.appendChild(el('p', 'offer-desc', CATALOG[o.id].desc(H())));
+      wrap.appendChild(el('p', 'offer-desc' + (o.kind === 'joker' ? '' : ' small'), CATALOG[o.id].desc(H())));
       const b = el('button', 'btn small ' + (H().canAfford(o.price) ? 'primary' : ''), '');
       b.setAttribute('aria-label', o.sold ? `${CATALOG[o.id].name} : vendu` : `Acheter ${CATALOG[o.id].name}, ${o.price} jetons`);
       b.innerHTML = o.sold ? 'Vendu' : `<span class="wallet-chip s"></span> ${Util.fmt(o.price)}`;
@@ -611,9 +611,17 @@ const UI = (() => {
       wrap.style.animationDelay = `${k * 0.12}s`;
       wrap.appendChild(itemCard(id, { big: true }));
       wrap.appendChild(el('p', '', JOKERS[id].desc(H())));
+      const g = (JOKERS[id].tags || []).find(t => ['Blackjack', 'Roulette', 'Dice', "Hold'em", 'Machine'].includes(t));
+      wrap.appendChild(el('p', 'best-on', g ? `Meilleur au ${g}` : 'Marche partout'));
       const b = el('button', 'btn primary', 'Prendre');
       b.setAttribute('aria-label', `Prendre ${JOKERS[id].name}`);
-      b.onclick = () => { if (report(H().pickStarter(id))) { Sfx.play('joker'); closeModal(); renderRunBar(); toast(`${JOKERS[id].icon} ${JOKERS[id].name} rejoint ta main !`); } };
+      b.onclick = () => {
+        if (!report(H().pickStarter(id))) return;
+        Sfx.play('joker'); closeModal(); renderRunBar(); toast(`${JOKERS[id].icon} ${JOKERS[id].name} rejoint ta main !`);
+        // on ouvre directement le jeu où ce joker brille
+        const GID = { Blackjack: 'bj', Roulette: 'roulette', Dice: 'dice', "Hold'em": 'uth', Machine: 'slots' };
+        if (g) showTab(GID[g]);
+      };
       wrap.appendChild(b);
       row.appendChild(wrap);
     });
@@ -686,7 +694,7 @@ const UI = (() => {
       `<div class="tuto"><div class="tuto-n">3 / 3</div><h2>Les jokers</h2><p>Entre les tables, achète des <b>jokers</b> au Comptoir : ils boostent tes gains. Ils apparaissent en bas de l'écran ; touche-les pour voir ce qu'ils font.<br>Raté un tirage ? Une <b>relance</b> te donne une 2ᵉ chance.</p></div>`,
     ];
     modal(steps[step], step < steps.length - 1
-      ? [['Passer', () => { Settings.set('tutorialDone', true); setTimeout(starterModal, 50); }], ['Suivant ➜', () => { setTimeout(() => tutorial(step + 1), 0); }, 'primary']]
+      ? [['Passer le tutoriel', () => { Settings.set('tutorialDone', true); setTimeout(starterModal, 50); }, 'link'], ['Suivant ➜', () => { setTimeout(() => tutorial(step + 1), 0); }, 'primary']]
       : [['C\'est parti !', () => { Settings.set('tutorialDone', true); setTimeout(starterModal, 50); }, 'primary']], 'tuto-box', { esc: 0 });
   }
   function resume() {
@@ -730,10 +738,12 @@ const UI = (() => {
       <div class="opt"><span>Texte agrandi</span><div class="seg">${toggle('bigText')}</div></div>
       <div class="opt"><span>Couleurs pour daltoniens (bleu / orange)</span><div class="seg">${toggle('colorblind')}</div></div>
       <div class="opt"><span>Confirmer avant de quitter le shop</span><div class="seg">${toggle('confirmShop')}</div></div>
+      <div class="opt"><span>Tutoriel</span><div class="seg"><button class="btn small" id="opt-tuto">Revoir</button></div></div>
       <div class="opt"><span>Effets visuels</span><div class="seg">${[['full', 'Complets'], ['reduced', 'Réduits'], ['none', 'Aucun']].map(([v, l]) => `<button class="btn small ${Settings.fx === v ? 'primary' : ''}" data-fx="${v}" aria-pressed="${Settings.fx === v}">${l}</button>`).join('')}</div></div>
       <div class="opt"><span>Accepter tout seul une perte (relance proposée quelques secondes)</span><div class="seg">${toggle('autoAccept')}</div></div>
       <p class="hint">Raccourcis : Espace ou Entrée = action principale · 1 à 5 = changer de jeu · T tirer · S rester · D doubler · P séparer · C check · R relance · A accepter · J replier les jokers · Échap = fermer.</p>`, [['Fermer', () => {}, 'primary']]);
     box.querySelectorAll('[data-opt]').forEach(b => (b.onclick = () => { Settings.set(b.dataset.opt, b.dataset.val === '1'); Sfx.play('click'); settingsModal(); }));
+    box.querySelector('#opt-tuto').onclick = () => { Sfx.play('click'); closeModal(); if (isRun()) setTimeout(() => tutorial(0), 50); else toast('Le tutoriel s\'affichera au début de ta prochaine partie.'); Settings.set('tutorialDone', false); };
     box.querySelectorAll('[data-fx]').forEach(b => (b.onclick = () => { Settings.set('fx', b.dataset.fx); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-speed]').forEach(b => (b.onclick = () => { Settings.setSpeed(+b.dataset.speed); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-snd]').forEach(b => (b.onclick = () => { if (Sfx.settings.on !== (b.dataset.snd === '1')) Sfx.toggle(); $('sound').textContent = Sfx.settings.on ? '🔊' : '🔇'; Sfx.play('click'); settingsModal(); }));

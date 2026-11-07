@@ -15,10 +15,12 @@ App.register((() => {
   const bet = new BetControl($('sl-bet'), { label: 'Mise', initial: 20, max: betLimit('slots') });
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
   const symbols = () => (App.host ? E.symbols(App.host) : C.symbols);
-  const pool = () => [...symbols(), C.wild, C.scatter];
-  const fxSym = () => RNG.fx.weighted(pool()).id; // remplissage purement décoratif
+  const pool = x => [...symbols(), ...(C.wild.reels.includes(x) ? [C.wild] : []), ...(C.scatter.reels.includes(x) ? [C.scatter] : [])];
+  // remplissage purement décoratif, mais honnête : jamais un symbole impossible sur ce rouleau
+  const fxSym = x => RNG.fx.weighted(pool(x)).id;
   const ROWS = C.rows;
   const NAME = id => SlotArt.NAMES[id] || id;
+  const R = v => Util.fmt(Math.round(v)); // jetons entiers à l'affichage
   let quick = false;         // arrêt rapide demandé
   let skip = false;          // passer la présentation des lignes
 
@@ -83,7 +85,7 @@ App.register((() => {
       const antic = seen >= C.scatter.min - 1 && x > 0;
       if (antic) extra += Util.dur(1200);
       const scat = col.some(c => c.id === C.scatter.id);
-      const dur = Util.dur(700 + x * 220) + extra;
+      const dur = Util.dur(turbo ? 300 + x * 90 : 700 + x * 220) + extra;
       seen += scat ? 1 : 0;
       return { dur, antic, scatter: scat };
     });
@@ -92,7 +94,7 @@ App.register((() => {
     const stops = reels.map((R, x) => new Promise(res => {
       const seq = [...R.cells];
       const n = 12 + x * 4 + (plan[x].antic ? 14 : 0);
-      for (let k = 0; k < n; k++) seq.push({ id: fxSym() });
+      for (let k = 0; k < n; k++) seq.push({ id: fxSym(x) });
       g[x].forEach(c => seq.push(c));
       R.strip.getAnimations().forEach(a => a.cancel());
       R.strip.style.transform = '';
@@ -140,7 +142,7 @@ App.register((() => {
 
   // Lignes gagnantes : toutes ensemble, puis une par une avec leur montant
   async function showWins(spin, stake, label = 'Gain') {
-    if (!spin.wins.length) { led(spin.total ? spin.total : null, label); return; }
+    if (!spin.wins.length) { led(spin.total ? Math.round(spin.total) : null, label); return; }
     const W = els.grid.clientWidth, Hh = els.grid.clientHeight;
     els.lines.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
     const cw = W / C.reels, ch = Hh / ROWS;
@@ -163,8 +165,8 @@ App.register((() => {
     mark(spin.wins.flatMap(w => w.cells));
     const under = spin.total < stake;
     Sfx.play(under ? 'push' : spin.total >= stake * 5 ? 'bigwin' : 'win');
-    led(spin.total, label);
-    els.win.textContent = under ? `${Util.fmt(spin.total)} récupérés` : `+${Util.fmt(spin.total)}`;
+    led(Math.round(spin.total), label);
+    els.win.textContent = under ? `${R(spin.total)} récupérés` : `+${R(spin.total)}`;
     els.win.className = 'sl-win show' + (under ? ' under' : '');
     await Util.sleep(700);
     if (spin.wins.length > 1 && !quick && !skip) {
@@ -173,13 +175,13 @@ App.register((() => {
         els.lines.innerHTML = lineSvg(w, i);
         mark(w.cells);
         els.win.className = 'sl-win line';
-        els.win.textContent = w.scatter ? `${w.count} Pelotes · ${Util.fmt(w.win)}` : `${w.count}× ${NAME(w.symbol)}${w.mult > 1 ? ` ×${w.mult}` : ''} · ${Util.fmt(w.win)}`;
+        els.win.textContent = w.scatter ? `${w.count} Pelotes · ${R(w.win)}` : `${w.count}× ${NAME(w.symbol)}${w.mult > 1 ? ` ×${w.mult}` : ''} · ${R(w.win)}`;
         Sfx.play('chip');
         await Util.sleep(520);
       }
       els.lines.innerHTML = spin.wins.map(lineSvg).join('');
       mark(spin.wins.flatMap(w => w.cells));
-      els.win.textContent = under ? `${Util.fmt(spin.total)} récupérés` : `+${Util.fmt(spin.total)}`;
+      els.win.textContent = under ? `${R(spin.total)} récupérés` : `+${R(spin.total)}`;
       els.win.className = 'sl-win show' + (under ? ' under' : '');
       await Util.sleep(400);
     }
@@ -216,8 +218,18 @@ App.register((() => {
     drawSticky({});
     led(null);
     await spinTo(spins[0].grid);
+    if (spins[0].feature) {
+      // le chat noir est passé : on montre les Cartons qu'il a semés
+      els.palace.classList.add('cat-pass');
+      Sfx.play('joker');
+      els.win.textContent = '😼 Le chat noir sème des Cartons !';
+      els.win.className = 'sl-win line show-feature';
+      await Util.sleep(1100);
+      els.palace.classList.remove('cat-pass');
+    }
     await showWins(spins[0], r.bet);
-    if (spins.length <= 1) return;
+    if (spins.length <= 1) { if (spins[0].total >= r.bet * 10) auto = 0; return; }
+    auto = 0; // un bonus arrête les tours automatiques
     // ---- Tours gratuits ----
     const stick = g => g.forEach((col, x) => col.forEach((c, y) => { if (c.id === C.wild.id && !sticky[x + ':' + y]) sticky[x + ':' + y] = { id: c.id, m: c.m }; }));
     stick(spins[0].grid);
@@ -228,7 +240,7 @@ App.register((() => {
     els.fs.hidden = false;
     drawSticky(sticky);
     for (let k = 1; k < spins.length; k++) {
-      els.fs.innerHTML = `Tour gratuit <b>${k} / ${total}</b><span>Gain du bonus <b>${Util.fmt(Math.round(acc * 100) / 100)}</b></span>`;
+      els.fs.innerHTML = `Tour gratuit <b>${k} / ${total}</b><span>Gain du bonus <b>${Util.fmt(Math.round(acc))}</b></span>`;
       els.win.className = 'sl-win';
       await spinTo(spins[k].grid, sticky);
       const before = Object.keys(sticky).length;
@@ -236,7 +248,7 @@ App.register((() => {
       if (Object.keys(sticky).length > before) { Sfx.play('joker'); drawSticky(sticky); els.sticky.classList.remove('clack'); void els.sticky.offsetWidth; els.sticky.classList.add('clack'); }
       await showWins(spins[k], r.bet, 'Gain bonus');
       acc += spins[k].total;
-      led(Math.round(acc * 100) / 100, 'Gain bonus');
+      led(Math.round(acc), 'Gain bonus');
       if (spins[k].retrigger) {
         Sfx.play('fanfare');
         await splash(`<div class="sli-big">+${spins[k].retrigger}</div><div class="sli-t">tours gratuits</div>`, 1400, 'in small');
@@ -244,9 +256,12 @@ App.register((() => {
     }
     acc = Math.round(acc * 100) / 100;
     els.fs.hidden = true;
-    const p = splash(`<div class="sli-k">Bonus terminé</div><div class="sli-big" id="sl-total">0</div><div class="sli-t">${(acc / r.bet).toFixed(1).replace('.', ',')} × la mise</div>`, 3000, 'out');
-    await countUp($('sl-total'), acc, 1600);
-    Sfx.play(acc >= r.bet ? 'bigwin' : 'push');
+    const paid = r.stake || r.bet;
+    const ratio = acc / paid;
+    const verdict = r.buy ? `${ratio.toFixed(1).replace('.', ',')} × le prix payé (${Util.fmt(paid)})` : `${(acc / r.bet).toFixed(1).replace('.', ',')} × la mise`;
+    const p = splash(`<div class="sli-k">${r.buy && acc < paid ? 'Bonus terminé… pas rentable cette fois' : 'Bonus terminé'}</div><div class="sli-big" id="sl-total">0</div><div class="sli-t">${verdict}</div>`, 3000, 'out' + (acc < paid ? ' meh' : ''));
+    await countUp($('sl-total'), Math.round(acc), 1600);
+    Sfx.play(acc >= paid ? 'bigwin' : 'push');
     await p;
     els.palace.classList.remove('bonus');
     drawSticky({});
@@ -261,12 +276,12 @@ App.register((() => {
       setActions(els.actions, []);
     }
     if (!res.settlement) {
-      msg(r.total > 0 ? `${Util.fmt(r.total)} récupérés sur ${Util.fmt(r.bet)} : une relance est possible.` : 'Rien cette fois… une relance est possible.', 'warn');
+      msg(r.total > 0 ? `${Util.fmt(Math.round(r.total))} récupérés sur ${Util.fmt(r.stake || r.bet)} : une relance est possible.` : 'Rien cette fois… une relance est possible.', 'warn');
       return engineActions(els.actions, App.host.actions(), act);
     }
     const st = res.settlement;
     if (st.net > 0) msg(`+${Util.fmt(st.net)} jetons !`, 'win');
-    else if (st.net < 0) { msg(r.total > 0 ? `${Util.fmt(r.total)} récupérés sur ${Util.fmt(r.bet)}` : 'Rien cette fois…', 'lose'); if (!r.total) Sfx.play('lose'); }
+    else if (st.net < 0) { msg(r.total > 0 ? `${Util.fmt(Math.round(r.total))} récupérés sur ${Util.fmt(r.stake || r.bet)}` : 'Rien cette fois…', 'lose'); if (!r.total) Sfx.play('lose'); }
     else msg('Mise rendue', 'push');
     await App.showSettlement(st);
     els.fs.hidden = true;
@@ -293,7 +308,19 @@ App.register((() => {
       await after(res, id === 'reroll');
     });
   }
-  function idle() { setActions(els.actions, [['Lancer', () => spin(), { cls: 'primary big' }]]); setBusy(false); }
+  function idle() {
+    setActions(els.actions, [['Lancer', () => spin(), { cls: 'primary big' }]]); setBusy(false);
+    // tours automatiques : on enchaîne tant qu'il en reste (arrêt sur un bonus ou un gros gain)
+    if (auto > 0) { auto--; paintAuto(); setTimeout(() => { if (auto >= 0 && document.querySelector('#slots:not([hidden])') && !App.host.busy()) spin(); }, Util.dur(350)); }
+  }
+  let auto = 0;
+  const autoBtn = document.getElementById('sl-auto'), turboBtn = document.getElementById('sl-turbo');
+  const paintAuto = () => { autoBtn.classList.toggle('on', auto > 0); autoBtn.querySelector('b').textContent = auto > 0 ? auto : '10'; };
+  autoBtn.onclick = () => { Sfx.play('click'); auto = auto > 0 ? 0 : 10; paintAuto(); if (auto > 0 && !App.host.busy()) { auto--; paintAuto(); spin(); } };
+  let turbo = Storage.get('boubouzino.turbo', false);
+  const paintTurbo = () => { turboBtn.classList.toggle('on', turbo); turboBtn.setAttribute('aria-pressed', String(turbo)); };
+  turboBtn.onclick = () => { turbo = !turbo; Storage.set('boubouzino.turbo', turbo); paintTurbo(); Sfx.play('click'); };
+  paintTurbo();
   function setBusy(b) { els.buy.disabled = b; els.minus.disabled = b; els.plus.disabled = b; els.palace.classList.toggle('playing', b); }
 
   // ---- Panneau de commande : mise −/+ par paliers, achat du bonus, solde ----

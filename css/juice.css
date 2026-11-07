@@ -569,3 +569,60 @@ html[data-fx="none"] .lights, html[data-fx="none"] .jcard, html[data-fx="none"] 
 html.cb .rl-cell.red span, html.cb .rl-h.red, html.cb .rl-result.red { background: #d81b60 !important; }
 html.cb .rl-cell.red span { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 3px, transparent 3px 7px) !important; }
 html.cb .rl-cell.diamond-red { background: #d81b6099 !important; }
+
+/* ---- Machine : retours du streameur ---- */
+.sl-felt { overflow-x: clip; }
+.palace.bonus .sl-logo { visibility: hidden; }
+.palace .fs-banner { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 5; white-space: nowrap; }
+.sl-buy { width: 104px !important; height: 104px !important; background: radial-gradient(circle at 40% 30%, #ffc2e4, #ff3d9a 50%, #b0106a) !important;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, .6), inset 0 -5px 0 rgba(0, 0, 0, .25), 0 5px 0 var(--ink), 0 0 30px 6px rgba(255, 61, 154, .55) !important; animation: buyGlow 2s ease-in-out infinite; }
+@keyframes buyGlow { 50% { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .6), inset 0 -5px 0 rgba(0, 0, 0, .25), 0 5px 0 var(--ink), 0 0 44px 12px rgba(255, 61, 154, .8); } }
+.sl-buy b { font-size: 22px !important; }
+.sl-side { display: flex; align-items: center; gap: 8px; }
+.sl-mini { display: flex; flex-direction: column; gap: 6px; }
+.sl-auto, .sl-turbo { width: 50px; height: 44px; border-radius: 12px; border: 3px solid var(--ink); background: var(--slate-hi); color: #fff; font-family: var(--f-title); cursor: pointer; box-shadow: 0 3px 0 var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.sl-auto small { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.sl-auto b { font-size: 16px; font-weight: 400; }
+.sl-turbo { font-size: 20px; }
+.sl-auto.on { background: var(--c-blue); box-shadow: 0 3px 0 var(--ink), 0 0 14px rgba(31, 143, 255, .8); }
+.sl-turbo.on { background: var(--c-gold); color: #3a2400; }
+.sl-auto:active, .sl-turbo:active { transform: translateY(3px); box-shadow: none; }
+/* Le chat noir traverse la machine */
+.palace.cat-pass .sl-frame::after { content: '🐈‍⬛'; position: absolute; top: 40%; left: -20%; font-size: 64px; z-index: 6; animation: catRun 1.1s ease-in-out forwards; filter: drop-shadow(0 4px 0 var(--ink)); }
+@keyframes catRun { to { left: 110%; transform: translateY(-30px); } }
+.sl-win.show-feature { opacity: 1 !important; color: #fff !important; font-size: 22px !important; }
+.offer-desc.small { font-size: 11.5px; min-height: 0; }
+.tier-ov.t0 { --glow: #4fe08a; --ray: rgba(79, 224, 138, .2); }
+.tier-ov.t0 .tier-t { color: #7dffb0; }
+.btn.link { background: transparent !important; box-shadow: none !important; border-color: transparent !important; font-size: 13px !important; text-decoration: underline; opacity: .8; }
+/* Choix du joker de départ sur téléphone : les 3 cartes visibles d'un coup */
+@media (max-width: 760px) {
+  .starter-cards { flex-wrap: nowrap !important; gap: 6px !important; }
+  .starter-cards .pack-choice { flex: 1; min-width: 0; }
+  .starter-cards .jcard.big { width: 100% !important; height: auto !important; aspect-ratio: 150 / 212; }
+  .starter-cards .pack-choice p { font-size: 11.5px; min-height: 64px; }
+  .starter-cards .btn { width: 100%; padding: 4px !important; font-size: 13px !important; }
+  .sl-buy { width: 84px !important; height: 84px !important; }
+  .sl-auto, .sl-turbo { width: 44px; height: 40px; }
+  .shop { padding-bottom: 130px !important; }
+}
+.shop { padding-bottom: 110px !important; }
+
+/* ---- Retours du panel (interface) ---- */
+/* Messages en haut, sous la barre : ils ne cachent plus la mise */
+.toasts { top: 76px !important; bottom: auto !important; }
+/* Noms des jokers lisibles */
+.jc-name { font-size: 11px !important; }
+.jcard.big .jc-name { font-size: 13px !important; }
+@media (max-width: 760px) { .jc-name { font-size: 10px !important; } }
+.best-on { margin: 2px 0 6px !important; font-family: var(--f-title); font-size: 13px !important; color: var(--c-gold); }
+/* Menu qui tient sur un écran de 768 px */
+@media (max-height: 820px) and (min-width: 761px) {
+  .menu { padding-top: 6px !important; }
+  .menu-stage { height: 120px !important; transform: scale(.8); margin-bottom: -10px !important; }
+  .menu-logo h1 { font-size: 60px !important; margin: 0 !important; }
+  .tagline { margin: 2px 0 10px !important; }
+  .menu-buttons { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px !important; max-width: 560px; }
+  .menu-buttons #m-new, .menu-buttons .seed-input, .menu-buttons #m-continue { grid-column: 1 / -1; }
+  .menu-buttons .btn.big { min-height: 48px; font-size: 16px; }
+}

@@ -111,6 +111,8 @@ const FX = (() => {
         add({ kind: 'confetti', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 700, drag: 0.985, r: 4 + R() * 4, rot: R() * 6, vr: (R() - 0.5) * 10, spin: R() * 6, vs: 6 + R() * 10, life: 3 + R(), color: CONF[Math.floor(R() * CONF.length)] });
       }
     },
+    // Arrête tout (ex. en entrant au Comptoir : rien ne doit cacher les cartes)
+    clear() { parts = []; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); },
     // Point de départ : le centre d'un élément
     from(el) {
       if (!el) return [innerWidth / 2, innerHeight / 2];
