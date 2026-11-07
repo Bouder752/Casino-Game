@@ -92,11 +92,18 @@ const UI = (() => {
     });
     if (buttons.length) p.appendChild(row);
     p.hidden = false;
+    // La fiche s'ouvre au-dessus de la carte (en dessous seulement s'il n'y a pas la place)
     const r = anchor.getBoundingClientRect();
-    const w = Math.min(320, window.innerWidth - 32);
+    const w = Math.min(340, window.innerWidth - 24);
     p.style.width = w + 'px';
-    p.style.left = Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2)) + 'px';
-    p.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    p.style.bottom = ''; p.style.right = '';
+    p.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+    const h = p.offsetHeight, top = Math.max(70, window.innerHeight * 0.05);
+    const above = r.top - h - 12 >= top;
+    p.style.top = Math.max(8, above ? r.top - h - 12 : Math.min(window.innerHeight - h - 8, r.bottom + 12)) + 'px';
+    p.classList.toggle('below', !above);
+    // petite flèche vers la carte
+    p.style.setProperty('--ax', `${Math.max(18, Math.min(w - 18, r.left + r.width / 2 - parseFloat(p.style.left)))}px`);
   }
   const closePopover = () => ($('popover').hidden = true);
   document.addEventListener('click', e => { if (!e.target.closest('#popover, .jcard')) closePopover(); });
@@ -305,7 +312,19 @@ const UI = (() => {
   const etageText = st => `Étage ${st.etage}${st.etage <= F() ? ' / ' + F() : ' · infini'}`;
 
   // ---------- Barre du haut : étage, bankroll → palier, mise max, badges ----------
+  // Boss « un seul jeu » : les autres onglets sont fermés (cadenas)
+  function paintLocks() {
+    const only = isRun() && S().phase === 'play' ? H().onlyGame() : null;
+    document.querySelectorAll('.tab').forEach(t => {
+      const locked = !!only && t.dataset.tab !== only;
+      t.classList.toggle('locked', locked);
+      t.disabled = locked;
+      t.title = locked ? `Fermé : ${BOSSES[S().table.boss].name} n'ouvre que le ${Games.get(only).name}` : '';
+    });
+    if (only && tab !== only) showTab(only);
+  }
   function renderRunBar() {
+    paintLocks();
     const run = isRun();
     $('reset').hidden = run || !App.host;
     $('hud').hidden = !App.host;

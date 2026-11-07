@@ -279,6 +279,82 @@ const JokerArt = (() => {
       ${eye(70, 92, 4, 0)}${eye(90, 92, 4, 0)}<path d="M68 104 Q80 114 92 104" fill="none" ${ink}/>
       <path d="M62 84 L74 88 M98 84 L86 88" ${ink}/>
       ${chip(30, 112, 12, G)}${chip(132, 108, 12, G)}${sparkle(130, 40, 7)}${sparkle(28, 44, 5)}${sparkle(116, 130, 4)}`,
+    // 🧳 Touriste : valise pleine d'autocollants, appareil photo
+    touriste: () => sun('#0f3a4a', '#bfeaff') + `
+      <rect x="40" y="54" width="80" height="58" rx="8" fill="#c98a3c" ${ink}/><path d="M66 54 V44 H94 V54" fill="none" ${ink} stroke-width="4"/>
+      <rect x="40" y="76" width="80" height="6" fill="#8a5a24"/>
+      <circle cx="58" cy="66" r="8" fill="#e8243c" ${ink} stroke-width="1.5"/><rect x="88" y="88" width="20" height="14" rx="3" fill="#4fc3ff" ${ink} stroke-width="1.5"/>
+      <path d="M72 92 L80 84 L88 92 L80 100Z" fill="#ffd23f" ${ink} stroke-width="1.5"/>
+      ${eye(70, 64, 3.5, 1)}${eye(84, 64, 3.5, 1)}<path d="M70 72 Q77 77 86 71" fill="none" ${ink}/>
+      <rect x="104" y="28" width="30" height="20" rx="4" fill="${K}" ${ink}/><circle cx="119" cy="38" r="6" fill="#4fc3ff" ${ink} stroke-width="1.5"/>${sparkle(30, 34, 6)}`,
+
+    // ☕ Habitué : tasse fumante avec un béret, toujours à la même table
+    habitue: () => sun('#2e1f14', '#ffd9a8') + `
+      <path d="M52 62 H108 L102 116 C100 124 60 124 58 116Z" fill="${CR}" ${ink}/><path d="M108 74 C124 74 124 98 104 98" fill="none" ${ink} stroke-width="4"/>
+      <ellipse cx="80" cy="62" rx="28" ry="6" fill="#6b3a1c" ${ink}/>
+      <path d="M68 50 C62 40 74 36 68 26 M82 50 C76 40 88 36 82 26 M96 50 C90 40 102 36 96 26" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+      <ellipse cx="80" cy="22" rx="20" ry="7" fill="${BX}" ${ink}/><circle cx="80" cy="14" r="3" fill="${BX}" ${ink}/>
+      ${eye(70, 86, 3.6, 0)}${eye(90, 86, 3.6, 0)}<path d="M70 98 Q80 104 90 98" fill="none" ${ink}/>${sparkle(130, 40, 5)}`,
+
+    // 🛒 Marchand : charrette pleine de cartes
+    marchand: () => sun('#1f3a1f', '#d4f5c0') + `
+      <path d="M30 60 H126 L116 100 H44Z" fill="#c98a3c" ${ink}/><circle cx="56" cy="110" r="10" fill="#6b3a1c" ${ink}/><circle cx="104" cy="110" r="10" fill="#6b3a1c" ${ink}/>
+      ${[0, 1, 2].map(i => `<g transform="translate(${50 + i * 22} ${34 - (i % 2) * 6}) rotate(${-12 + i * 12})"><rect width="22" height="30" rx="3" fill="${CR}" ${ink} stroke-width="1.6"/><text x="11" y="21" text-anchor="middle" font-size="14" fill="${i === 1 ? '#c4161c' : K}">${['♠', '♥', '♣'][i]}</text></g>`).join('')}
+      ${eye(70, 78, 3.5, 1)}${eye(90, 78, 3.5, 1)}<path d="M72 88 Q80 94 88 88" fill="none" ${ink}/>
+      <path d="M126 60 L140 44" ${ink} stroke-width="4"/>${sparkle(30, 34, 5)}`,
+
+    // 🎰 Collectionneur de 7 : un album rempli de 7
+    collect7: () => sun('#3a0f18', '#ffc0c8') + `
+      <rect x="34" y="30" width="92" height="84" rx="8" fill="#6b1e2e" ${ink}/><rect x="42" y="38" width="76" height="68" rx="4" fill="${CR}" ${ink} stroke-width="1.6"/>
+      ${[[50, 44], [74, 44], [98, 44], [50, 74], [74, 74], [98, 74]].map(([x, y], i) => `<text x="${x + 10}" y="${y + 24}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="24" fill="${i % 2 ? '#c4161c' : '#d4a017'}" stroke="${K}" stroke-width="1">7</text>`).join('')}
+      ${sparkle(132, 30, 7)}${sparkle(26, 110, 5)}`,
+
+    // 🟩 Tapis Vert : un jeton qui sprinte sur le tapis
+    tapis: () => sun('#0d3a2a', '#b9f5cf') + `
+      <path d="M14 112 L146 112 L132 128 L28 128Z" fill="#1c7a4a" ${ink}/>
+      ${chip(84, 74, 26, '#1f8a4c')}
+      ${eye(76, 70, 4, 2)}${eye(92, 70, 4, 2)}<path d="M76 84 Q86 90 96 82" fill="none" ${ink}/>
+      <path d="M22 60 H48 M14 74 H44 M22 88 H48" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+      <path d="M100 98 L112 112 M68 98 L58 112" ${ink} stroke-width="4"/>${sparkle(130, 34, 6)}`,
+
+    // 🖋️ Faussaire : plume qui recopie un ticket
+    faussaire: () => sun('#2a2140', '#e0d4ff') + `
+      <g transform="translate(36 46) rotate(-8)"><rect width="48" height="62" rx="4" fill="${CR}" ${ink}/><path d="M8 14 H40 M8 24 H34 M8 34 H40" stroke="${K}" stroke-width="2"/><circle cx="24" cy="48" r="7" fill="${G}" ${ink} stroke-width="1.5"/></g>
+      <g transform="translate(78 42) rotate(8)"><rect width="48" height="62" rx="4" fill="${CR}" ${ink} stroke-dasharray="4 3"/><path d="M8 14 H40 M8 24 H34" stroke="${K}" stroke-width="2" opacity=".5"/></g>
+      <path d="M118 20 C140 30 132 58 112 70 L104 74 L108 66 C116 50 120 36 118 20Z" fill="#f3e9d2" ${ink}/><path d="M104 74 L98 90" ${ink} stroke-width="3"/>
+      ${eye(52, 70, 3.2, 1)}${eye(64, 70, 3.2, 1)}<path d="M52 80 Q58 84 64 80" fill="none" ${ink}/>${sparkle(28, 30, 5)}`,
+
+    // 📒 Carnet de Dettes : un carnet avec des lunettes
+    carnet: () => sun('#2c2412', '#ffe9a8') + `
+      <rect x="44" y="26" width="72" height="92" rx="6" fill="#d4a017" ${ink}/><rect x="44" y="26" width="12" height="92" fill="#8a6418" ${ink}/>
+      <rect x="64" y="40" width="44" height="16" rx="3" fill="${CR}" ${ink} stroke-width="1.5"/><text x="86" y="52" text-anchor="middle" font-size="10" font-family="Georgia,serif" font-weight="700" fill="${K}">DETTES</text>
+      <circle cx="74" cy="78" r="10" fill="#fff" ${ink}/><circle cx="98" cy="78" r="10" fill="#fff" ${ink}/><path d="M84 78 H88" ${ink}/>
+      <circle cx="75" cy="79" r="3.5" fill="${K}"/><circle cx="99" cy="79" r="3.5" fill="${K}"/><path d="M76 100 Q86 94 96 100" fill="none" ${ink}/>${sparkle(130, 30, 6)}`,
+
+    // 🍾 Croupier Ivre : nœud papillon de travers, bouteille
+    ivre: () => sun('#20303c', '#d8f0ff') + `
+      <circle cx="72" cy="66" r="30" fill="#f2c19a" ${ink}/><path d="M42 58 C46 34 98 34 102 58 C88 50 56 50 42 58Z" fill="${K}"/>
+      <path d="M58 64 L68 68 M86 68 L76 64" ${ink}/><path d="M60 82 Q72 76 84 84" fill="none" ${ink}/>
+      <ellipse cx="62" cy="76" rx="5" ry="3" fill="#ff8fa3" opacity=".7"/><ellipse cx="84" cy="76" rx="5" ry="3" fill="#ff8fa3" opacity=".7"/>
+      <g transform="translate(72 104) rotate(14)"><path d="M0 0 L-14 -8 L-14 8Z M0 0 L14 -8 L14 8Z" fill="${BX}" ${ink}/></g>
+      <path d="M118 40 H126 V54 C134 60 134 70 134 76 V120 H110 V76 C110 70 110 60 118 54Z" fill="#2e7d32" ${ink}/><rect x="114" y="84" width="16" height="14" fill="${G2}" ${ink} stroke-width="1"/>
+      <circle cx="40" cy="36" r="4" fill="#fff" opacity=".6"/><circle cx="32" cy="48" r="3" fill="#fff" opacity=".5"/>`,
+
+    // ⚗️ Fusion : alambic qui fusionne des % en ×
+    fusion: () => sun('#1a1030', '#e0c8ff') + `
+      <path d="M64 30 H96 V54 L120 108 C124 118 118 124 108 124 H52 C42 124 36 118 40 108 L64 54Z" fill="#b48cff" opacity=".85" ${ink}/>
+      <path d="M48 96 H112 L120 108 C124 118 118 124 108 124 H52 C42 124 36 118 40 108Z" fill="#7a3ad8" ${ink}/>
+      <text x="58" y="88" font-family="Georgia,serif" font-weight="700" font-size="18" fill="#fff" stroke="${K}" stroke-width=".8">%</text>
+      <text x="88" y="118" font-family="Georgia,serif" font-weight="700" font-size="22" fill="${G2}" stroke="${K}" stroke-width=".8">×</text>
+      <circle cx="74" cy="70" r="4" fill="#fff" opacity=".6"/><circle cx="90" cy="60" r="3" fill="#fff" opacity=".6"/>
+      ${eye(72, 106, 3.4, 1)}${eye(88, 106, 3.4, 1)}${sparkle(130, 30, 7)}${sparkle(28, 40, 5)}`,
+
+    // 🔫 Roulette Russe : barillet et goutte de sueur
+    russe: () => sun('#3a0a1a', '#ffb3c6') + `
+      <circle cx="80" cy="74" r="38" fill="#8a8f99" ${ink}/>
+      ${[0, 60, 120, 180, 240, 300].map(a => { const x = 80 + 22 * Math.cos(a * Math.PI / 180), y = 74 + 22 * Math.sin(a * Math.PI / 180); return `<circle cx="${x}" cy="${y}" r="8" fill="${a === 0 ? '#d4a017' : K}" ${ink} stroke-width="1.5"/>`; }).join('')}
+      <circle cx="80" cy="74" r="7" fill="#5a5f69" ${ink} stroke-width="1.5"/>
+      <path d="M124 40 C120 52 128 56 124 64 C118 58 118 50 124 40Z" fill="#7fd0ff" ${ink} stroke-width="1.5"/>${sparkle(28, 30, 6)}`,
   };
 
   const cache = {};

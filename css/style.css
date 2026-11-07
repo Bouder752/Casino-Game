@@ -1277,7 +1277,7 @@ html.cb { --win: #4da3ff; --lose: #ff8a3d; }
   .uth-spots .spot { width: 54px; height: 54px; }
   .actions .btn { flex: 1 1 30%; min-height: 48px; padding: 8px; }
   /* fiche de joker en panneau fixe au-dessus de la rangée */
-  .popover { position: fixed; left: 12px !important; right: 12px; width: auto !important; top: auto !important; bottom: calc(var(--dock-h) + 12px); max-height: 60vh; overflow: auto; }
+  /* fiche positionnée par le script (au-dessus de la carte) */
   /* en-tête du mode libre sans débordement */
   .top { gap: 6px; padding: 6px 10px; }
   .brand { font-size: 17px; }
