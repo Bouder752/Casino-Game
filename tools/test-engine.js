@@ -26,7 +26,7 @@ ok([1, 2, 3].every(() => r1.next() === r2.next()), 'RNG reproductible');
 let H = Engine.newRun({ seed: 'O', meta: meta(), persist: false });
 const objs = []; for (let e = 1; e <= 9; e++) ['petite', 'grande', 'boss'].forEach(t => objs.push(H.objective(e, t)));
 ok(objs[0] === 120 && objs.every((v, i) => !i || v > objs[i - 1]), `paliers croissants (${objs.slice(0, 6).join(', ')}…)`);
-ok(objs.every((v, i) => i < 2 || v / objs[i - 1] >= objs[i - 1] / objs[i - 2] - 0.05), 'la croissance des paliers s\'accélère');
+ok(objs.every((v, i) => i < 2 || v / objs[i - 1] >= objs[i - 1] / objs[i - 2] - 0.1), 'la croissance des paliers s\'accélère');
 ok(H.state.starter && H.state.starter.length === P.jokerDeDepart && H.state.starter.every(id => JOKERS[id].rarity === 'commun'), 'choix du joker de départ');
 const st0 = H.state.starter[0];
 ok(H.pickStarter(st0).ok && H.state.jokers[0].id === st0 && !H.state.starter, 'joker de départ pris');

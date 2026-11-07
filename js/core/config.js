@@ -9,7 +9,7 @@ const CONFIG = {
   // bankroll (jetons − dettes) atteint le palier. Pas de limite de mises :
   // on ne perd que par faillite. La mise max suit le palier.
   // Palier de la table n (0 = petite table de l'étage 1) : jetonsDepart × Π (croissanceDepart + croissanceParTable × k)
-  // → 120, 150, 200 | 270, 390, 590 | … des centaines de millions au boss final. Il faut un build pour suivre.
+  // → 120, 150, 200 | 280, 410, 630 | … 450 millions au boss final. Il faut un build pour suivre.
   progression: {
     etagesPourGagner: 8,
     jetonsDepart: 100,
