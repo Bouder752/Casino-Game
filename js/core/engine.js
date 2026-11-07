@@ -27,6 +27,7 @@ const Engine = (() => {
     const m = Object.assign({
       prestige: 0, jackpot: 1, unlocked: ['felt-vert', 'back-bordeaux'], felt: 'felt-vert', back: 'back-bordeaux',
       best: 0, runs: 0, wins: 0, collection: null,
+      progress: {}, jokersUnlocked: [], maxStake: 0, records: {}, daily: {}, stamps: [], stampRewards: {},
     }, Storage.get(META_KEY, {}));
     if (!m.collection) m.collection = { jokers: {}, bosses: {} };
     return m;
@@ -63,6 +64,29 @@ const Engine = (() => {
     const isRun = state.mode === 'run';
 
     const H = { state, rng, meta, isRun };
+    // méta-progression : champs ajoutés au besoin (anciennes sauvegardes, simulation)
+    ['progress', 'records', 'daily', 'stampRewards'].forEach(k => { if (!meta[k]) meta[k] = {}; });
+    if (!meta.jokersUnlocked) meta.jokersUnlocked = [];
+    if (!meta.stamps) meta.stamps = [];
+    if (meta.maxStake == null) meta.maxStake = 0;
+    const stake = () => (isRun ? state.stake || 0 : 0);
+    H.finalEtage = () => (state.express ? CONFIG.progression.etagesExpress : CONFIG.progression.etagesPourGagner);
+    H.isUnlocked = id => meta.allJokers || !UNLOCK_OF[id] || meta.jokersUnlocked.includes(id);
+    // Progression : compteurs cumulés (add) ou records (max) ; débloque les jokers dont le défi est rempli
+    H.track = (key, v = 1, mode = 'add') => {
+      if (!isRun) return;
+      const p = meta.progress;
+      p[key] = mode === 'max' ? Math.max(p[key] || 0, v) : (p[key] || 0) + v;
+      UNLOCKS.forEach(u => {
+        if (u.key !== key || meta.jokersUnlocked.includes(u.id) || (p[key] || 0) < u.goal) return;
+        meta.jokersUnlocked.push(u.id);
+        (state.newUnlocks || (state.newUnlocks = [])).push(u.id);
+        notify('toast', { text: `🔓 Nouveau joker débloqué : ${JOKERS[u.id].icon} ${JOKERS[u.id].name} !` });
+        notify('sound', { name: 'fanfare' });
+      });
+      H.saveMeta();
+    };
+    const record = (key, v) => { if (isRun && v > (meta.records[key] || 0)) meta.records[key] = v; };
     const notify = (type, data = {}) => listeners.forEach(f => f(type, data));
     H.on = f => listeners.push(f);
     H.notify = notify;
@@ -108,6 +132,7 @@ const Engine = (() => {
       state.statuses.slice().forEach(s => push(STATUSES[s.id], s, 'status'));
       const boss = currentBoss();
       if (boss) push(boss, { uid: 'boss' }, 'boss');
+      if (stake() >= 8) push(STAKE_MOD, { uid: 'stake' }, 'status');
       state.jokers.forEach((j, i) => {
         const def = resolveJoker(i);
         if (!def || disabled(boss, def, i)) return;
@@ -158,7 +183,8 @@ const Engine = (() => {
       const m = Math.max(5, Math.round(e.value));
       return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
-    H.maxBetRatio = (etage = state.etage || 1) => CONFIG.progression.miseMaxRatio * Math.pow(CONFIG.progression.miseMaxDecroissance || 1, Math.max(0, Math.min(etage, CONFIG.progression.etagesPourGagner) - 1));
+    H.maxBetRatio = (etage = state.etage || 1) => CONFIG.progression.miseMaxRatio * (stake() >= 6 ? 0.85 : 1)
+      * Math.pow(CONFIG.progression.miseMaxDecroissance || 1, Math.max(0, Math.min(etage, CONFIG.progression.etagesPourGagner) - 1));
     // Mise minimale : une petite part du palier (impossible de « farmer » à 1 jeton)
     H.minBet = () => (isRun && state.table && state.table.minBet ? state.table.minBet : CONFIG.progression.miseMin);
     H.excludedRanks = () => H.emit('deck.exclude', { ranks: [] }).ranks;
@@ -305,6 +331,21 @@ const Engine = (() => {
       attribute(steps, e.gain, add, mult);
       H.give(Math.max(0, round2(e.staked + net + (play.prepaid || 0))));
       if (e.outcome === 'win') { state.stats.wins++; if (state.table) state.table.wins = (state.table.wins || 0) + 1; } else if (e.outcome === 'loss') state.stats.losses++;
+      if (isRun) {
+        // progression et records
+        state.stats.streak = e.outcome === 'win' ? (state.stats.streak || 0) + 1 : e.outcome === 'loss' ? 0 : state.stats.streak || 0;
+        H.track('bestStreak', state.stats.streak, 'max');
+        if (e.outcome === 'win' && id === 'bj') H.track('bjWins');
+        const sev = (r.draws || []).reduce((a, d) => a + (d.kind === 'card' ? (d.card.rank === 7 ? 1 : 0) : d.kind === 'symbol' ? (d.value === 'sept' ? 1 : 0) : (String(id === 'dice' ? Math.floor(+d.value) : d.value).match(/7/g) || []).length), 0);
+        if (sev) H.track('sevens', sev);
+        const gp = state.stats.gamesPlayed || (state.stats.gamesPlayed = []);
+        if (!gp.includes(id)) { gp.push(id); if (gp.length >= 5) H.track('allGames', 1, 'max'); }
+        if (state.table) { const tg = state.table.games || (state.table.games = []); if (!tg.includes(id)) tg.push(id); state.table.plays = (state.table.plays || 0) + 1; }
+        record('bestStreak', state.stats.streak);
+        if (net > 0) { record('bestNet', net); record('bestRatio', Math.round(net / Math.max(1, e.staked) * 10) / 10); }
+        record('bestMult', Math.round((1 + add) * mult * 100) / 100);
+        if (id === 'slots' && r.info && r.info.free > 0) meta.records.bonus = (meta.records.bonus || 0) + 1;
+      }
       if (net > state.stats.best) { state.stats.best = net; state.stats.bestPlay = { game: id, net, staked: e.staked }; }
       active = null;
       // Seules les mises gagnantes font avancer l'objectif (un bonus sur une perte ne compte pas)
@@ -358,7 +399,7 @@ const Engine = (() => {
       const e = H.emit('onBankrupt', { saved: false });
       if (e.saved && state.chips >= H.minBet()) { notify('change'); return false; }
       // Filet de sécurité : une seule fois par partie, aux premiers étages, le casino te renfloue
-      if (state.etage <= P.filet.etages && !state.rescued && state.table) {
+      if (state.etage <= P.filet.etages && !state.rescued && state.table && stake() < 7) {
         state.rescued = true;
         const v = Math.round(state.table.target * P.filet.part);
         H.give(v);
@@ -382,6 +423,7 @@ const Engine = (() => {
       const k = (etage - 1) * 3 + TYPE_INDEX[type];
       let t = P.jetonsDepart;
       for (let i = 0; i <= k; i++) t *= P.croissanceDepart + P.croissanceParTable * i;
+      if (stake() >= 5) t *= 1.25; else if (stake() >= 1) t *= 1.1;
       return nice(t);
     };
     // Les prix et montants de la config sont donnés pour un palier de référence (150) : ils suivent le palier visé
@@ -406,7 +448,8 @@ const Engine = (() => {
       const seen = state.bossSeen || (state.bossSeen = []);
       // pas de boss « un seul jeu » à l'étage 1 : on laisse le temps de construire son build
       const pool = BOSS_DEFS.filter(b => !b.final && !seen.includes(b.id) && !(state.etage === 1 && b.onlyGame));
-      state.bossId = state.etage === P.etagesPourGagner && !state.infinite ? 'patron' : (pool.length ? rng.pick(pool) : rng.pick(BOSS_DEFS.filter(b => !b.final))).id;
+      H.track('bestEtage', state.etage, 'max');
+      state.bossId = state.etage === H.finalEtage() && !state.infinite ? 'patron' : (pool.length ? rng.pick(pool) : rng.pick(BOSS_DEFS.filter(b => !b.final))).id;
       seen.push(state.bossId); if (seen.length >= BOSS_DEFS.length - 1) seen.length = 0;
       state.tagOffers = { petite: rng.pick(TAG_DEFS).id, grande: rng.pick(TAG_DEFS).id };
       state.etageLog = {};
@@ -422,7 +465,7 @@ const Engine = (() => {
       t.minBet = Math.max(P.miseMin, Math.round(t.target * P.miseMinRatio));
       state.charges = [];
       state.phase = 'play';
-      H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', P.relancesParTable);
+      H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', Math.max(0, P.relancesParTable - (stake() >= 2 ? 1 : 0)));
       H.emit('onRoundStart', { table: t, round: t });
       if (t.noRerolls) state.charges = [];
       notify('table');
@@ -434,7 +477,7 @@ const Engine = (() => {
     };
     // Joker de départ : choix entre quelques jokers communs
     H.offerStarter = () => {
-      const pool = JOKER_DEFS.filter(d => d.rarity === 'commun').map(d => d.id);
+      const pool = JOKER_DEFS.filter(d => d.rarity === 'commun' && H.isUnlocked(d.id)).map(d => d.id);
       state.starter = rng.shuffle(pool).slice(0, P.jokerDeDepart);
     };
     H.pickStarter = id => {
@@ -466,24 +509,37 @@ const Engine = (() => {
       const I = P.interets;
       const lines = [];
       const interest = Math.floor(Math.min(I.maxPalier * t.target, I.taux * state.chips));
-      const reward = Math.round(P.recompenseTable[t.type] * t.target);
+      const reward = Math.round(P.recompenseTable[t.type] * t.target * (stake() >= 4 ? 0.5 : 1));
       H.give(reward); lines.push({ label: { petite: 'Petite table gagnée', grande: 'Grande table gagnée', boss: 'Boss vaincu' }[t.type], value: reward });
       if (interest > 0) { H.give(interest); lines.push({ label: `Intérêts (${Math.round(I.taux * 100)} % de tes jetons)`, value: interest }); }
       const e = { lines, table: t, reward(me, v, label) { H.give(v); lines.push({ label, value: v, src: me.uid }); me.flash(`+${v}`); attribute([{ kind: 'flat', value: v, src: { uid: me.uid } }], 0, 0, 1); } };
       H.emit('onRoundEnd', e);
       processDebts(lines);
       state.stats.tablesWon++;
+      // progression : défis liés aux tables
+      const tg = t.games || [];
+      if (tg.length >= 3) H.track('tableMulti', 1, 'max');
+      if ((t.plays || 0) <= 2) H.track('fastTable', 1, 'max');
+      state.stats.mono = tg.length === 1 && state.stats.monoGame === tg[0] ? (state.stats.mono || 0) + 1 : tg.length === 1 ? 1 : 0;
+      state.stats.monoGame = tg.length === 1 ? tg[0] : null;
+      H.track('monoStreak', state.stats.mono, 'max');
+      if (t.type === 'boss') {
+        if (state.jokers.length === 1) H.track('bossSolo', 1, 'max');
+        H.track('bossKinds', Object.keys(coll().bosses).length + (coll().bosses[t.boss] ? 0 : 1), 'max');
+      }
       state.etageLog[t.type] = 'won';
       let victory = false;
       if (t.type === 'boss') {
         coll().bosses[t.boss] = (coll().bosses[t.boss] || 0) + 1;
         meta.prestige += CONFIG.prestige.perBoss;
         meta.best = Math.max(meta.best, state.etage);
-        if (state.etage === P.etagesPourGagner && !state.infinite) {
+        if (state.etage === H.finalEtage() && !state.infinite) {
           victory = true;
           meta.wins++;
+          if (!state.express) meta.maxStake = Math.max(meta.maxStake, Math.min(STAKES.length - 1, stake() + 1));
           state.jokers.forEach(j => collJoker(j.id).wins++);
-          meta.prestige += CONFIG.prestige.victory;
+          meta.prestige += state.express ? Math.ceil(CONFIG.prestige.victory / 2) : CONFIG.prestige.victory;
+          dailyResult(true);
         } else { state.etage++; newEtage(); }
       } else state.tableType = NEXT[t.type];
       H.saveMeta();
@@ -511,9 +567,19 @@ const Engine = (() => {
       state.phase = 'choose';
       save(); notify('choose');
     };
+    // Défi du jour : meilleur résultat du jour et tampon (dès qu'un boss est battu)
+    function dailyResult(won) {
+      if (!state.daily) return;
+      const d = meta.daily[state.daily] || (meta.daily[state.daily] = { best: 0, won: false });
+      const reached = won ? H.finalEtage() + 1 : state.etage;
+      d.best = Math.max(d.best, reached); d.won = d.won || won;
+      if (reached >= 2 && !meta.stamps.includes(state.daily)) meta.stamps.push(state.daily);
+    }
+    H.dailyResult = dailyResult;
     function gameOver(reason) {
       state.phase = 'over';
       state.reason = reason;
+      dailyResult(false);
       meta.best = Math.max(meta.best, state.etage - 1);
       H.saveMeta();
       if (persist) Storage.remove(SAVE_KEY);
@@ -526,6 +592,7 @@ const Engine = (() => {
       state.jokers.push({ uid: state.uid++, id, state: {}, stats: { earned: 0, triggers: 0 } });
       if (!state.stats.jokersOwned.includes(id)) state.stats.jokersOwned.push(id);
       const c = collJoker(id); c.owned++; c.seen = Math.max(c.seen, 1); H.saveMeta();
+      H.track('maxJokers', state.jokers.length, 'max');
       notify('change');
       return true;
     };
@@ -581,7 +648,7 @@ const Engine = (() => {
     // ---------------- Shop ----------------
     function rollJoker({ minRarity = null, exclude = [] } = {}) {
       const owned = new Set([...state.jokers.map(j => j.id), ...exclude]);
-      const pool = JOKER_DEFS.filter(d => !owned.has(d.id));
+      const pool = JOKER_DEFS.filter(d => !owned.has(d.id) && H.isUnlocked(d.id));
       if (!pool.length) return null;
       const w = CONFIG.shop.rarityWeights(state.etage);
       if (minRarity === 'rare') w.commun = 0;
@@ -597,7 +664,7 @@ const Engine = (() => {
       for (let i = 0; i < S.packs; i++) offers.push({ kind: 'pack', id: rng.pick(PACK_DEFS).id });
       const ups = UPGRADE_DEFS.filter(u => !state.upgrades.includes(u.id));
       for (let i = 0; i < S.upgrades && ups.length; i++) offers.push({ kind: 'upgrade', id: ups.splice(rng.int(ups.length), 1)[0].id });
-      offers.forEach(o => { o.price = H.scale(CATALOG[o.id].price); o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
+      offers.forEach(o => { o.price = Math.round(H.scale(CATALOG[o.id].price) * (stake() >= 3 ? 1.2 : 1)); o.sold = false; if (o.kind === 'joker') collJoker(o.id).seen++; });
       H.saveMeta();
       return { offers, rerolls, rerollCost: H.scale(CONFIG.shop.reroll.base + CONFIG.shop.reroll.step * rerolls) };
     }
@@ -628,7 +695,7 @@ const Engine = (() => {
       H.stake(o.price);
       o.sold = true;
       let pack = null;
-      if (o.kind === 'joker') { H.addJoker(o.id); state.jokers[state.jokers.length - 1].paid = o.price; }
+      if (o.kind === 'joker') { H.addJoker(o.id); state.jokers[state.jokers.length - 1].paid = o.price; H.track('jokersBought'); }
       else if (o.kind === 'consumable') state.consumables.push(o.id);
       else if (o.kind === 'upgrade') state.upgrades.push(o.id);
       else if (o.kind === 'pack') {
@@ -636,15 +703,15 @@ const Engine = (() => {
           pack = [];
           for (let k = 0; k < CONFIG.packs.petit.choices; k++) {
             const owned = new Set([...state.jokers.map(j => j.id), ...pack]);
-            const pool = JOKER_DEFS.filter(d => d.rarity === 'commun' && !owned.has(d.id));
+            const pool = JOKER_DEFS.filter(d => d.rarity === 'commun' && !owned.has(d.id) && H.isUnlocked(d.id));
             const id = pool.length ? rng.pick(pool).id : rollJoker({ exclude: pack });
             if (id) pack.push(id);
           }
         } else {
           const owned = new Set(state.jokers.map(j => j.id));
           const legend = rng.chance(CONFIG.packs.mystere.legendaryChance);
-          let pool = JOKER_DEFS.filter(d => d.rarity === (legend ? 'legendaire' : 'rare') && !owned.has(d.id));
-          if (!pool.length) pool = JOKER_DEFS.filter(d => d.rarity !== 'commun' && !owned.has(d.id));
+          let pool = JOKER_DEFS.filter(d => d.rarity === (legend ? 'legendaire' : 'rare') && !owned.has(d.id) && H.isUnlocked(d.id));
+          if (!pool.length) pool = JOKER_DEFS.filter(d => d.rarity !== 'commun' && !owned.has(d.id) && H.isUnlocked(d.id));
           pack = pool.length ? [rng.pick(pool).id] : [];
         }
         state.pendingPack = pack;
@@ -668,7 +735,7 @@ const Engine = (() => {
       if (def.capability && !H.canUseCapability(ctx, def.capability)) return { ok: false, text: 'Utilisable pendant une main de Blackjack ou de Hold\'em, au bon moment.' };
       if (id === 'bonus' && !arg) return { ok: true, needCard: true };
       const r = def.use(H, ctx, arg);
-      if (r.ok) { state.consumables.splice(i, 1); save(); notify('change'); }
+      if (r.ok) { state.consumables.splice(i, 1); H.track('consUsed'); save(); notify('change'); }
       return r;
     };
     H.sellConsumable = i => {
@@ -705,6 +772,7 @@ const Engine = (() => {
           lines.push({ label: `⚖️ Échéance impayée : pénalité +${pen} et l'huissier réduit la mise max`, value: 0, bad: true });
           H.addStatus('huissier');
         }
+        if (d.left <= 0) H.track('loansRepaid');
         return d.left > 0;
       });
       notify('chips');
@@ -714,10 +782,31 @@ const Engine = (() => {
     // Sauvegarde : aussi pendant un coup (la mise engagée est alors perdue si on recharge la page)
     function save() {
       if (!persist) return;
+      state.pending = active ? { id: active.id, round: active.round, play: { game: active.play.game, steps: active.play.steps, prepaid: active.play.prepaid || 0, rerolls: active.play.rerolls || 0 } } : null;
       if (isRun && state.phase !== 'over') Storage.set(SAVE_KEY, state);
       if (!isRun) Storage.set(FREE_KEY, { chips: state.chips, rng: state.rng, seed: state.seed });
     }
     H.save = save;
+    // Partie rechargée avec une main en cours : on la termine avec des choix prudents (rester, se coucher, accepter)
+    H.resumePending = () => {
+      const p = state.pending;
+      if (!p || active || !Games.get(p.id)) return null;
+      const play = { ...p.play };
+      play.flat = (me, v, label) => { if (v) play.steps.push(step('flat', me, v, label)); };
+      active = { id: p.id, round: p.round, play };
+      const SAFE = ['noinsure', 'stand', 'accept', 'check', 'fold'];
+      let guard = 0, res = null;
+      while (!active.round.done && guard++ < 40) {
+        const acts = H.actions().filter(a => !a.disabled);
+        const a = SAFE.map(id => acts.find(x => x.id === id)).find(Boolean) || acts[0];
+        if (!a) break;
+        Games.get(p.id).act(H, gameState(p.id), active.round, a.id);
+      }
+      res = finish();
+      state.pending = null;
+      save();
+      return res;
+    };
     H.resetFree = () => { if (!isRun) { state.chips = CONFIG.freeChips; save(); notify('chips'); } };
     H.newEtage = newEtage;
     return H;
@@ -725,9 +814,12 @@ const Engine = (() => {
 
   return {
     VERSION, SAVE_KEY, loadMeta,
-    newRun({ seed, meta, persist } = {}) {
+    // express : 3 étages (défi du jour) · daily : date du défi · stake : niveau de difficulté
+    newRun({ seed, meta, persist, express = false, daily = null, stake = 0 } = {}) {
       const s = (seed && String(seed).trim().toUpperCase()) || RNG.randomSeed();
-      const H = createHost(newRunState(s), { meta, persist });
+      const st = newRunState(s);
+      Object.assign(st, { express: !!express, daily, stake: Math.max(0, Math.min(stake, STAKES.length - 1)) });
+      const H = createHost(st, { meta, persist });
       H.meta.runs++; H.saveMeta();
       H.newEtage();
       H.offerStarter();

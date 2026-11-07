@@ -12,6 +12,7 @@ const CONFIG = {
   // → 120, 150, 200 | 280, 410, 630 | … 450 millions au boss final. Il faut un build pour suivre.
   progression: {
     etagesPourGagner: 8,
+    etagesExpress: 3,          // mode Express (défi du jour) : 3 étages
     jetonsDepart: 100,
     croissanceDepart: 1.2,     // la 1re table demande ×1,2
     croissanceParTable: 0.065, // puis chaque table un peu plus (×2,7 au boss final)

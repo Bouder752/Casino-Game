@@ -7,7 +7,8 @@
 //  (blackjack de base, Dice en dernier recours) ou opts.game pour un seul jeu.
 // =====================================================================
 const Sim = (() => {
-  const freshMeta = () => ({ prestige: 0, jackpot: 1, unlocked: [], felt: '', back: '', best: 0, runs: 0, wins: 0 });
+  // le bot joue comme un joueur expérimenté : tous les jokers sont débloqués
+  const freshMeta = () => ({ prestige: 0, jackpot: 1, unlocked: [], felt: '', back: '', best: 0, runs: 0, wins: 0, allJokers: true });
 
   // ---- Stratégies de jeu (décision pour l'action en cours) ----
   const decide = {

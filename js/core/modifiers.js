@@ -210,6 +210,44 @@ const JOKER_DEFS = [
 JOKER_DEFS.forEach(d => Object.assign(d, { kind: 'joker', rarity: J[d.id].rarity, price: J[d.id].price }));
 const JOKERS = Object.fromEntries(JOKER_DEFS.map(d => [d.id, d]));
 
+// ---------------- Jokers à débloquer (méta-progression) ----------------
+// On commence avec 20 jokers ; les 15 autres se débloquent par des défis, d'une partie à l'autre.
+// key = compteur de progression (meta.progress), goal = valeur à atteindre.
+const UNLOCKS = [
+  { id: 'touriste', quest: 'Gagne une table en jouant à 3 jeux différents', key: 'tableMulti', goal: 1 },
+  { id: 'tapis', quest: 'Gagne une table en 2 mises ou moins', key: 'fastTable', goal: 1 },
+  { id: 'parrain', quest: 'Aie 4 jokers en même temps', key: 'maxJokers', goal: 4 },
+  { id: 'marchand', quest: 'Achète 8 jokers au Comptoir (toutes parties confondues)', key: 'jokersBought', goal: 8 },
+  { id: 'habitue', quest: "Gagne 3 tables d'affilée en ne jouant qu'à un seul jeu", key: 'monoStreak', goal: 3 },
+  { id: 'faussaire', quest: 'Utilise 8 consommables (toutes parties confondues)', key: 'consUsed', goal: 8 },
+  { id: 'roue', quest: 'Joue aux 5 jeux dans la même partie', key: 'allGames', goal: 1 },
+  { id: 'midas', quest: "Gagne 6 mises d'affilée", key: 'bestStreak', goal: 6 },
+  { id: 'ivre', quest: 'Gagne 40 mains de Blackjack (toutes parties confondues)', key: 'bjWins', goal: 40 },
+  { id: 'collect7', quest: 'Tire 77 sept (cartes, dés, roulette, machine)', key: 'sevens', goal: 77 },
+  { id: 'carnet', quest: 'Rembourse entièrement un prêt', key: 'loansRepaid', goal: 1 },
+  { id: 'miroir', quest: 'Bats 3 boss différents', key: 'bossKinds', goal: 3 },
+  { id: 'fusion', quest: "Atteins l'étage 4", key: 'bestEtage', goal: 4 },
+  { id: 'russe', quest: "Bats un boss avec un seul joker en main", key: 'bossSolo', goal: 1 },
+  { id: 'jackpot', quest: "Atteins l'étage 6", key: 'bestEtage', goal: 6 },
+];
+const UNLOCK_OF = Object.fromEntries(UNLOCKS.map(u => [u.id, u]));
+
+// ---------------- Niveaux de difficulté (« mises ») ----------------
+// Chaque victoire débloque le niveau suivant ; les effets se cumulent.
+const STAKES = [
+  { n: 'Mise blanche', c: '#f3f3f3', d: 'Le jeu normal.' },
+  { n: 'Mise rouge', c: '#f0444f', d: 'Paliers +10 %.' },
+  { n: 'Mise verte', c: '#2fbf71', d: 'Une relance de moins par table.' },
+  { n: 'Mise noire', c: '#2b2b2e', d: 'Prix du Comptoir +20 %.' },
+  { n: 'Mise bleue', c: '#1f8fff', d: 'Récompenses de table divisées par 2.' },
+  { n: 'Mise violette', c: '#9a5cff', d: 'Paliers +25 % (au lieu de +10 %).' },
+  { n: 'Mise orange', c: '#ff9d1f', d: 'Mise max −15 %.' },
+  { n: 'Mise dorée', c: '#ffd23f', d: 'Plus de filet de sécurité.' },
+  { n: 'Mise de diamant', c: '#7fe7ff', d: 'Tous les gains −10 %.' },
+];
+const STAKE_MOD = { id: 'stake8', kind: 'status', name: 'Mise de diamant', icon: '💎',
+  onSettle(e, me) { if (e.outcome === 'win') e.mult(me, 0.9, 'mise de diamant'); } };
+
 // ---------------- Règles de la Roue Folle ----------------
 const R = CONFIG.rules;
 const RULE_DEFS = [

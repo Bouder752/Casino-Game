@@ -5,7 +5,7 @@ const { Engine, Sim, RNG, Deck, CONFIG, JOKERS } = api;
 const P = CONFIG.progression;
 let fails = 0, passes = 0;
 const ok = (cond, msg) => { if (cond) passes++; else { fails++; console.log('ÉCHEC :', msg); } };
-const meta = () => ({ prestige: 0, jackpot: 1, unlocked: [], best: 0, runs: 0, wins: 0 });
+const meta = () => ({ prestige: 0, jackpot: 1, unlocked: [], best: 0, runs: 0, wins: 0, allJokers: true });
 // Nouvelle partie avec la petite table ouverte
 // (objectif rendu inatteignable pour tester les effets sans finir la table)
 const run = (seed, realTarget = false) => { const H = Engine.newRun({ seed, meta: meta(), persist: false }); H.chooseTable(); if (!realTarget) H.state.table.target = 1e9; return H; };
@@ -257,6 +257,28 @@ ok(!mono.startPlay('bj', { bet: 10 }).error, 'le jeu imposé reste jouable');
 // 26. Hold'em : impossible de lancer une main sans pouvoir payer le Play ×1
 const u = Engine.newRun({ seed: 'UTH', meta: meta(), persist: false }); u.chooseTable(); u.state.chips = 25;
 ok(/Play ×1/.test(u.startPlay('uth', { ante: 10 }).error || '') && u.chips() === 25, 'Hold\'em : il faut Ante + Blind + Play ×1');
+
+// 27. Méta-progression : jokers verrouillés, défis, niveaux de difficulté, Express, reprise d'une main
+const m0 = { prestige: 0, jackpot: 1, unlocked: [], best: 0, runs: 0, wins: 0 };
+let M = Engine.newRun({ seed: 'META', meta: m0, persist: false });
+ok(api.UNLOCKS.length === 15 && JOKERS && !M.isUnlocked('fusion') && M.isUnlocked('porte'), '15 jokers à débloquer, 20 disponibles au départ');
+M.chooseTable(); M.state.chips = 100; M.state.table.target = 1e9;
+for (let k = 0; k < 6; k++) play(M, 5, 10);
+ok(m0.jokersUnlocked.includes('midas'), 'défi « 6 mises gagnées d\'affilée » → Roi Midas débloqué');
+M = Engine.newRun({ seed: 'ST', meta: meta(), persist: false, stake: 5 });
+const M0 = Engine.newRun({ seed: 'ST', meta: meta(), persist: false });
+ok(M.objective(1, 'petite') > M0.objective(1, 'petite') * 1.2, 'mise violette : paliers +25 %');
+M.chooseTable(); ok(M.state.charges.length === P.relancesParTable - 1, 'mise verte : une relance de moins');
+const E3 = Engine.newRun({ seed: 'EX', meta: meta(), persist: false, express: true });
+ok(E3.finalEtage() === P.etagesExpress, 'mode Express : 3 étages');
+E3.state.etage = 3; E3.state.tableType = 'boss'; E3.state.bossId = 'sobre'; E3.state.chips = 1e9; E3.chooseTable(); winTable(E3);
+ok(E3.state.phase === 'victory', 'Express : victoire après le boss de l\'étage 3');
+const pend = Engine.newRun({ seed: 'PEND', meta: meta(), persist: false }); pend.chooseTable(); pend.state.chips = 100;
+pend.startPlay('bj', { bet: 10 });
+const snap = JSON.parse(JSON.stringify(Object.assign(pend.state, { pending: { id: 'bj', round: pend.active() && pend.active().round, play: { game: 'bj', steps: [], prepaid: 0, rerolls: 0 } } })));
+const back = Engine.createHost(snap, { meta: meta(), persist: false });
+const st2 = back.state.pending && back.state.pending.round && !back.state.pending.round.done ? back.resumePending() : { net: 0 };
+ok(!back.busy() && st2 && typeof st2.net === 'number', 'main en cours reprise et terminée après rechargement');
 
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

@@ -7,6 +7,6 @@ module.exports = function loadCore() {
   const ctx = vm.createContext({ console, crypto: globalThis.crypto, Date, Math, JSON });
   // Les déclarations « const » de premier niveau sont partagées entre scripts d'un même contexte
   const src = require('./core-files').map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n;\n');
-  vm.runInContext(src + '\n;this.__api = { Engine, Games, Sim, RNG, CONFIG, JOKERS, JOKER_DEFS, CATALOG, Deck, BlackjackEngine };', ctx, { filename: 'core.js' });
+  vm.runInContext(src + '\n;this.__api = { Engine, Games, Sim, RNG, CONFIG, JOKERS, JOKER_DEFS, CATALOG, Deck, BlackjackEngine, UNLOCKS, STAKES };', ctx, { filename: 'core.js' });
   return ctx.__api;
 };
