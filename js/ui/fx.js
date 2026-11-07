@@ -5,7 +5,10 @@ const FX = (() => {
   const ctx = cv.getContext('2d');
   const R = () => RNG.fx.next();
   let parts = [], raf = 0, dpr = 1;
-  const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Réglage « Effets visuels » du jeu, en plus de la préférence du système
+  const level = () => (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'none' : (typeof Settings !== 'undefined' ? Settings.fx : 'full');
+  const reduced = () => level() === 'none';
+  const scale = n => Math.round(n * (level() === 'reduced' ? 0.3 : 1));
 
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -83,7 +86,7 @@ const FX = (() => {
     // Gerbe de pièces depuis un point (gain)
     burst(x, y, n = 18, kind = 'coin') {
       if (reduced()) return;
-      n = Math.min(n, 80);
+      n = scale(Math.min(n, 80));
       for (let i = 0; i < n; i++) {
         const a = -Math.PI / 2 + (R() - 0.5) * 1.9, v = 380 + R() * 520;
         add({ kind, x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 1500, drag: 0.995, r: 7 + R() * 6, rot: R() * 6, vr: (R() - 0.5) * 4, spin: R() * 6, vs: 8 + R() * 14, life: 1.6 + R() * 0.8, colors: CHIP[Math.floor(R() * CHIP.length)] });
@@ -91,7 +94,7 @@ const FX = (() => {
     },
     // Pluie de jetons et de pièces sur tout l'écran (gros coup)
     rain(n = 70) {
-      if (reduced()) return;
+      if (reduced() || level() === 'reduced') return;
       for (let i = 0; i < n; i++) {
         const kind = R() < 0.55 ? 'coin' : 'chip';
         add({ kind, x: R() * innerWidth, y: -20 - R() * innerHeight * 0.6, vx: (R() - 0.5) * 80, vy: 150 + R() * 250, g: 900, drag: 1, r: 9 + R() * 8, rot: R() * 6, vr: (R() - 0.5) * 3, spin: R() * 6, vs: 6 + R() * 10, life: 3.2, colors: CHIP[Math.floor(R() * CHIP.length)] });
@@ -100,6 +103,7 @@ const FX = (() => {
     // Confettis (table gagnée, victoire)
     confetti(n = 140) {
       if (reduced()) return;
+      n = scale(n);
       for (let i = 0; i < n; i++) {
         const side = i % 2 ? 1 : -1;
         const x = side < 0 ? -10 : innerWidth + 10, y = innerHeight * (0.55 + R() * 0.3);

@@ -534,3 +534,38 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
   .sl-buy b { font-size: 16px; }
   .sl-spin .btn { width: 80px; height: 80px; }
 }
+
+/* =====================================================================
+   Accessibilité (retours du panel)
+   ===================================================================== */
+.sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Boutons orange : texte foncé (contraste ≈ 9:1 au lieu de 2:1) */
+.btn.primary, .tab.active, .dock-toggle, #m-new, .hbadge.debt { color: #2a1400 !important; text-shadow: 0 1px 0 rgba(255, 255, 255, .35) !important; }
+.btn.primary { background: #ffa938 !important; }
+/* Petites étiquettes du HUD : 12 px minimum, contraste renforcé */
+.hud-floor small, .hbadge small, .hud-goal span, .betctl-label, .sl-cell small, .zone-title, .spot-label { font-size: 12px !important; letter-spacing: .5px !important; }
+.hud-floor small { color: #fff !important; }
+.hbadge small { color: #fff !important; }
+.tier-tap { margin-top: 16px; font-family: var(--f-title); font-size: 15px; color: #fff; background: rgba(0, 0, 0, .5); border: 2px solid #fff; border-radius: 10px; padding: 6px 14px; cursor: pointer; }
+/* Texte agrandi : tout le jeu est agrandi (plutôt que quelques textes) */
+html.big-text body { zoom: 1.15; }
+html.big-text .jc-name { font-size: 12px !important; }
+/* Effets visuels : réduits ou aucun (en plus de la préférence système) */
+html[data-fx="reduced"] .lights { animation-duration: 240s; }
+html[data-fx="reduced"] body.bigwin .table, html[data-fx="none"] body.bigwin .table { animation: none !important; }
+html[data-fx="reduced"] .rail .actions .btn.primary, html[data-fx="reduced"] #m-new, html[data-fx="reduced"] .win-go { animation: none !important; }
+html[data-fx="none"] *, html[data-fx="none"] *::before, html[data-fx="none"] *::after { animation-iteration-count: 1 !important; }
+html[data-fx="none"] .lights, html[data-fx="none"] .jcard, html[data-fx="none"] .menu-logo h1, html[data-fx="none"] .tier-rays, html[data-fx="none"] .win-rays { animation: none !important; }
+/* Cibles tactiles ≥ 40 px sur téléphone */
+@media (max-width: 760px) {
+  .felt-btn { width: 40px !important; height: 40px !important; }
+  .chip { width: 40px !important; height: 40px !important; }
+  .chip-op, .sl-step { min-width: 40px !important; height: 40px !important; }
+  #reset { width: 40px !important; height: 40px !important; }
+  .hbadge small { font-size: 10px !important; }
+}
+/* Roulette pour daltoniens : marqueurs plus grands, rouge magenta + hachures */
+.rl-cell.diamond-red span, .rl-cell.diamond-black span { font-size: 14px !important; }
+html.cb .rl-cell.red span, html.cb .rl-h.red, html.cb .rl-result.red { background: #d81b60 !important; }
+html.cb .rl-cell.red span { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 3px, transparent 3px 7px) !important; }
+html.cb .rl-cell.diamond-red { background: #d81b6099 !important; }

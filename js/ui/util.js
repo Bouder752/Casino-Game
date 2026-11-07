@@ -1,12 +1,13 @@
 // Réglages d'interface (vitesse d'animation 1x / 2x / 4x)
 // Réglages d'interface : vitesse, texte agrandi, couleurs pour daltoniens, confirmation du shop, rangée de jokers repliée
 const Settings = (() => {
-  const st = Object.assign({ speed: 1, bigText: false, colorblind: false, confirmShop: true, dockMin: false, tutorialDone: false }, Storage.get('boubouzino.settings', {}));
+  const st = Object.assign({ speed: 1, bigText: false, colorblind: false, confirmShop: true, dockMin: false, tutorialDone: false, fx: 'full', autoAccept: true }, Storage.get('boubouzino.settings', {}));
   const apply = () => {
     const r = document.documentElement;
     r.style.setProperty('--spd', String(1 / st.speed));
     r.classList.toggle('big-text', !!st.bigText);
     r.classList.toggle('cb', !!st.colorblind);
+    r.dataset.fx = st.fx || 'full';
     if (document.body) document.body.classList.toggle('dock-min', !!st.dockMin);
   };
   apply();
@@ -18,6 +19,8 @@ const Settings = (() => {
     get confirmShop() { return st.confirmShop; },
     get dockMin() { return st.dockMin; },
     get tutorialDone() { return st.tutorialDone; },
+    get fx() { return st.fx || 'full'; },
+    get autoAccept() { return st.autoAccept !== false; },
     setSpeed(v) { st.speed = v; save(); },
     set(key, v) { st[key] = v; save(); },
     apply,
@@ -204,10 +207,10 @@ function engineActions(container, actions, onAct) {
     { cls: a.primary ? 'primary' : a.danger ? 'danger' : a.ghost ? 'ghost' : '', disabled: a.disabled }]));
   // Relance proposée après un tirage raté : sans réponse, on accepte tout seul au bout de quelques secondes
   const ids = actions.map(a => a.id);
-  if (ids.includes('accept') && ids.includes('reroll') && ids.length === 2) {
+  if (Settings.autoAccept && ids.includes('accept') && ids.includes('reroll') && ids.length === 2) {
     const b = [...container.querySelectorAll('button')].find(x => x.textContent === actions.find(a => a.id === 'accept').label);
     if (!b) return;
-    let n = 4;
+    let n = 8;
     const tick = () => {
       if (!b.isConnected) return;
       if (n <= 0) { b.click(); return; }

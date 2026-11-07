@@ -121,8 +121,12 @@ const App = (() => {
   function winTiers(net, stake) {
     return new Promise(res => {
       const ov = Util.el('div', 'tier-ov');
-      ov.innerHTML = `<div class="tier-rays"></div><div class="tier-box"><div class="tier-t"></div><div class="tier-n num">0</div><div class="tier-x"></div><div class="tier-tap">Touchez pour passer</div></div>`;
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Gros gain');
+      ov.innerHTML = `<div class="tier-rays"></div><div class="tier-box"><div class="tier-t"></div><div class="tier-n num">0</div><div class="tier-x"></div><button class="tier-tap">Passer (Entrée)</button><div class="sr-only" aria-live="assertive">Gros gain : ${Util.fmt(net)} jetons, ${Math.round(net / stake)} fois la mise.</div></div>`;
       document.body.appendChild(ov);
+      setTimeout(() => ov.querySelector('.tier-tap').focus(), 30);
+      const key = e => { if (['Enter', ' ', 'Escape'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); finish(); } };
+      document.addEventListener('keydown', key, true);
       const T = ov.querySelector('.tier-t'), N = ov.querySelector('.tier-n'), X = ov.querySelector('.tier-x');
       const reached = TIERS.filter(t => net / stake >= t.x);
       const dur = Util.dur(1400 + reached.length * 900);
@@ -138,6 +142,7 @@ const App = (() => {
         if (done) return; done = true; cancelAnimationFrame(raf);
         setTier(reached.length - 1); N.textContent = Util.fmt(net); X.textContent = `× ${Math.round(net / stake)} la mise`;
         Sfx.play('boom');
+        document.removeEventListener('keydown', key, true);
         setTimeout(() => { ov.classList.add('out'); setTimeout(() => { ov.remove(); res(); }, 350); }, Util.dur(1300));
       };
       const step = t => {

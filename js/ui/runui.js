@@ -40,6 +40,8 @@ const UI = (() => {
     box.innerHTML = html;
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
+    const h2 = box.querySelector('h2, .intro-n');
+    if (h2) { h2.id = 'modal-title'; box.setAttribute('aria-labelledby', 'modal-title'); } else box.removeAttribute('aria-labelledby');
     escAction = null;
     if (buttons.length) {
       const row = el('div', 'modal-actions');
@@ -53,17 +55,36 @@ const UI = (() => {
       });
       box.appendChild(row);
     }
-    lastFocus = document.activeElement;
+    if ($('modal').hidden) lastFocus = document.activeElement;
     $('modal').hidden = false;
+    setInert(true);
     const first = box.querySelector('.modal-actions .btn.primary') || box.querySelector('button, input');
-    if (first) setTimeout(() => first.focus(), 30);
+    setTimeout(() => (first || box).focus(), 30);
+    if (!first) box.tabIndex = -1;
     return box;
   }
   const closeModal = () => {
     $('modal').hidden = true;
     escAction = null;
-    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+    setInert(false);
+    // focus rendu à l'élément d'origine, sinon à l'action principale visible
+    const back = lastFocus && document.contains(lastFocus) && lastFocus !== document.body && !lastFocus.closest('[hidden]') ? lastFocus
+      : document.querySelector('.screen:not([hidden]) .btn.primary:not([disabled]), .screen:not([hidden]) button:not([disabled])');
+    if (back && back.focus) back.focus();
   };
+  // Pendant une fenêtre, le reste de la page est inerte (clavier et lecteurs d'écran)
+  function setInert(on) {
+    ['.top', '.screen', '#dock', 'footer'].forEach(sel => document.querySelectorAll(sel).forEach(n => { if (on) n.setAttribute('inert', ''); else n.removeAttribute('inert'); }));
+  }
+  // Tab reste dans la fenêtre ouverte
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || $('modal').hidden) return;
+    const f = [...$('modal-box').querySelectorAll('button:not([disabled]), input, [tabindex="0"]')].filter(n => n.offsetParent !== null);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+  });
   // Toast, avec éventuellement un bouton (ex. « Annuler » après une vente)
   function toast(text, action) {
     const t = el('div', 'toast', text);
@@ -513,6 +534,7 @@ const UI = (() => {
       wrap.appendChild(card);
       if (o.kind === 'joker') wrap.appendChild(el('p', 'offer-desc', CATALOG[o.id].desc(H())));
       const b = el('button', 'btn small ' + (H().canAfford(o.price) ? 'primary' : ''), '');
+      b.setAttribute('aria-label', o.sold ? `${CATALOG[o.id].name} : vendu` : `Acheter ${CATALOG[o.id].name}, ${o.price} jetons`);
       b.innerHTML = o.sold ? 'Vendu' : `<span class="wallet-chip s"></span> ${Util.fmt(o.price)}`;
       b.disabled = o.sold || !H().canAfford(o.price);
       b.title = o.sold ? '' : `Acheter ${CATALOG[o.id].name}`;
@@ -590,6 +612,7 @@ const UI = (() => {
       wrap.appendChild(itemCard(id, { big: true }));
       wrap.appendChild(el('p', '', JOKERS[id].desc(H())));
       const b = el('button', 'btn primary', 'Prendre');
+      b.setAttribute('aria-label', `Prendre ${JOKERS[id].name}`);
       b.onclick = () => { if (report(H().pickStarter(id))) { Sfx.play('joker'); closeModal(); renderRunBar(); toast(`${JOKERS[id].icon} ${JOKERS[id].name} rejoint ta main !`); } };
       wrap.appendChild(b);
       row.appendChild(wrap);
@@ -698,7 +721,7 @@ const UI = (() => {
   }
 
   // ---------- Options ----------
-  const toggle = key => `<button class="btn small ${Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="1">Oui</button><button class="btn small ${!Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="0">Non</button>`;
+  const toggle = key => `<button class="btn small ${Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="1" aria-pressed="${!!Settings[key]}">Oui</button><button class="btn small ${!Settings[key] ? 'primary' : ''}" data-opt="${key}" data-val="0" aria-pressed="${!Settings[key]}">Non</button>`;
   function settingsModal() {
     const box = modal(`<h2>Options</h2>
       <div class="opt"><span>Vitesse des animations</span><div class="seg">${[1, 2, 4].map(v => `<button class="btn small ${Settings.speed === v ? 'primary' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div></div>
@@ -707,8 +730,11 @@ const UI = (() => {
       <div class="opt"><span>Texte agrandi</span><div class="seg">${toggle('bigText')}</div></div>
       <div class="opt"><span>Couleurs pour daltoniens (bleu / orange)</span><div class="seg">${toggle('colorblind')}</div></div>
       <div class="opt"><span>Confirmer avant de quitter le shop</span><div class="seg">${toggle('confirmShop')}</div></div>
+      <div class="opt"><span>Effets visuels</span><div class="seg">${[['full', 'Complets'], ['reduced', 'Réduits'], ['none', 'Aucun']].map(([v, l]) => `<button class="btn small ${Settings.fx === v ? 'primary' : ''}" data-fx="${v}" aria-pressed="${Settings.fx === v}">${l}</button>`).join('')}</div></div>
+      <div class="opt"><span>Accepter tout seul une perte (relance proposée quelques secondes)</span><div class="seg">${toggle('autoAccept')}</div></div>
       <p class="hint">Raccourcis : Espace ou Entrée = action principale · 1 à 5 = changer de jeu · T tirer · S rester · D doubler · P séparer · C check · R relance · A accepter · J replier les jokers · Échap = fermer.</p>`, [['Fermer', () => {}, 'primary']]);
     box.querySelectorAll('[data-opt]').forEach(b => (b.onclick = () => { Settings.set(b.dataset.opt, b.dataset.val === '1'); Sfx.play('click'); settingsModal(); }));
+    box.querySelectorAll('[data-fx]').forEach(b => (b.onclick = () => { Settings.set('fx', b.dataset.fx); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-speed]').forEach(b => (b.onclick = () => { Settings.setSpeed(+b.dataset.speed); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-snd]').forEach(b => (b.onclick = () => { if (Sfx.settings.on !== (b.dataset.snd === '1')) Sfx.toggle(); $('sound').textContent = Sfx.settings.on ? '🔊' : '🔇'; Sfx.play('click'); settingsModal(); }));
     box.querySelector('#opt-vol').oninput = e => Sfx.setVolume(+e.target.value);
@@ -818,9 +844,12 @@ const UI = (() => {
       if (!$('modal').hidden && escAction) { e.preventDefault(); return escAction(); }
       return;
     }
-    if (document.querySelector('.win-ov')) return;
+    if (document.querySelector('.win-ov, .tier-ov')) return;
     if (!$('modal').hidden) return; // une fenêtre ouverte garde la main (Entrée = bouton focalisé)
     const scr = document.body.dataset.screen;
+    // Entrée / Espace sur un élément focalisé : c'est lui qui agit, pas un raccourci
+    const focused = e.target && e.target.closest && e.target.closest('button, a, [tabindex], input, select, textarea');
+    if ((e.key === 'Enter' || e.key === ' ') && focused) return;
     if (k === 'j' && isRun()) { $('dock-toggle').click(); return; }
     if (scr === 'choose' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const b = document.querySelector('#choose [data-act=play]'); if (b) b.click(); return; }
     if (scr === 'shop' && e.key === 'Enter') { e.preventDefault(); $('shop-next').click(); return; }
