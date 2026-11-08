@@ -30,7 +30,7 @@ const MachineView = (() => {
 
     function cellEl(c, x, y) {
       const d = Util.el('div', `mx-cell sym-${c.id}`);
-      d.innerHTML = SlotArt.svg(c.id) + (c.m ? `<b class="mx-mult">×${c.m}</b>` : '');
+      d.innerHTML = SlotArt.svg(c.id, 'mx') + (c.m ? `<b class="mx-mult">×${c.m}</b>` : '');
       d.style.transform = T(x, y);
       d._p = [x, y];
       els.grid.appendChild(d);
@@ -81,7 +81,7 @@ const MachineView = (() => {
         w.style.setProperty('--x', x);
         els.reels.appendChild(w);
       }
-      w.innerHTML = `<div class="mxw-art">${SlotArt.svg('rapiere')}${SlotArt.svg('rapiere')}</div><b class="mxw-k">WILD</b><b class="mxw-m">×${m}</b>`;
+      w.innerHTML = `<div class="mxw-art">${SlotArt.svg('epee')}${SlotArt.svg('epee')}</div><b class="mxw-k">WILD</b><b class="mxw-m">×${m}</b>`;
       if (fresh) { w.classList.remove('in'); void w.offsetWidth; w.classList.add('in'); }
       return w;
     }
@@ -301,7 +301,7 @@ const MachineView = (() => {
     // ---------- Table des gains (avec la mise actuelle) ----------
     function paytable(bet, syms, wild) {
       const f = v => Util.fmt(Math.round(v * 100) / 100);
-      const sym = s => `<td class="pt-sym">${SlotArt.svg(s)}</td>`;
+      const sym = s => `<td class="pt-sym">${SlotArt.svg(s, 'mx')}</td>`;
       const cer = wild && wild.wild ? `<p class="wild-note">🍒 Triple Cerise : ${id === 'mousquetaires' ? `les cerises remplacent n'importe quel symbole (ligne complétée payée × ${String(wild.ratio).replace('.', ',')})` : `les gains de cerises sont ×${MC.cerisePay}`}.</p>` : '';
       if (id === 'confiserie') {
         return `<p class="hint"><b>Paie partout</b> : 8 symboles identiques ou plus, n'importe où sur la grille. Gains pour 8-9 · 10-11 · 12+ avec la mise actuelle (${Util.fmt(bet)}). Les gagnants explosent et de nouveaux bonbons tombent (cascades).</p>

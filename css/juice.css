@@ -722,7 +722,7 @@ html.cb .chip-25, html.cb .chipv.chip-25 { --c: #1e63d6; --e: #ffd23f; }
 .mx-grid { z-index: 2; }
 .mx-reels { z-index: 3; pointer-events: none; }
 .mx-cell { position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell); display: grid; place-items: center; will-change: transform; }
-.mx-cell svg { width: 84%; height: 84%; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45)); transition: opacity .2s; }
+.mx-cell svg { width: 94%; height: 94%; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .45)); transition: opacity .2s; }
 .mx-cell .mx-mult {
   position: absolute; font-family: 'Lilita One', Impact, sans-serif; font-size: calc(var(--cell) * .32); color: #fff;
   -webkit-text-stroke: 2px #2a1a10; paint-order: stroke fill; text-shadow: 0 3px 0 #2a1a10;
