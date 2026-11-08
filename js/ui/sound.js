@@ -1,7 +1,7 @@
 // Sons synthétisés en direct (Web Audio) — aucun fichier audio
 const Sfx = (() => {
   let ctx = null, master = null;
-  const settings = { on: true, volume: 0.6 };
+  const settings = { on: true, volume: 0.6, music: true };
   Object.assign(settings, Storage.get('boubouzino.sound', {}));
   const save = () => Storage.set('boubouzino.sound', settings);
 
@@ -41,6 +41,53 @@ const Sfx = (() => {
     src.connect(f); f.connect(g); g.connect(master);
     src.start(t);
   }
+  const Music = (() => {
+    let timer = null, step = 0, next = 0, bus = null, mode = 'normal';
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+    // Ré m7 – Sol 7 – Do maj7 – La 7 : une grille de jazz de casino
+    const CH = [[62, 65, 69, 72], [67, 71, 74, 77], [60, 64, 67, 71], [57, 61, 64, 67]];
+    function note(m, t, dur, type, vol) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.value = mtof(m);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + 0.05);
+    }
+    function hat(t, vol) {
+      const len = 0.03, b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * len), ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (RNG.fx.next() * 2 - 1) * (1 - i / d.length);
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = b; f.type = 'highpass'; f.frequency.value = 7000; g.gain.value = vol;
+      s.connect(f); f.connect(g); g.connect(bus); s.start(t);
+    }
+    function tick() {
+      if (!ctx) return;
+      const bonus = mode === 'bonus', bpm = bonus ? 124 : 90, e = 60 / bpm / 2;
+      while (next < ctx.currentTime + 0.25) {
+        const bar = Math.floor(step / 8) % 4, s8 = step % 8, ch = CH[bar];
+        if (s8 === 0) ch.forEach(m => note(m - 12, next, e * 7.5, 'sine', 0.035));            // nappe
+        if (s8 === 0 || s8 === 4) note(ch[0] - 24, next, e * 1.8, 'triangle', 0.12);           // basse
+        if (s8 === 3 || s8 === 6) ch.slice(1).forEach(m => note(m, next, e * 0.9, 'triangle', 0.025)); // accords
+        hat(next, s8 % 2 ? 0.02 : 0.035);
+        if (bonus) note(ch[s8 % 4] + 12, next, e * 0.8, 'square', 0.018);                      // arpège du bonus
+        step++; next += e;
+      }
+    }
+    return {
+      start() {
+        if (timer || !settings.music || !settings.on || !ac()) return;
+        if (!bus) { bus = ctx.createGain(); bus.gain.value = 0.55; bus.connect(master); }
+        next = ctx.currentTime + 0.1;
+        timer = setInterval(tick, 100);
+      },
+      stop() { clearInterval(timer); timer = null; },
+      mode(m) { mode = m || 'normal'; },
+    };
+  })();
+  // la musique démarre au premier geste (règle des navigateurs)
+  document.addEventListener('pointerdown', () => Music.start(), { once: true });
+  document.addEventListener('keydown', () => Music.start(), { once: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) Music.stop(); else if (ctx) Music.start(); });
+
   const SOUNDS = {
     click: () => tone(900, 0.05, { type: 'triangle', vol: 0.12 }),
     deal: () => noise(0.12, { vol: 0.35, freq: 2500 }),
@@ -76,7 +123,10 @@ const Sfx = (() => {
       if (!settings.on || !SOUNDS[name]) return;
       try { SOUNDS[name](arg); } catch (e) { /* audio indisponible */ }
     },
-    toggle() { settings.on = !settings.on; save(); return settings.on; },
+    toggle() { settings.on = !settings.on; save(); if (settings.on) Music.start(); else Music.stop(); return settings.on; },
     setVolume(v) { settings.volume = v; save(); if (master) master.gain.value = v; },
+    // Musique d'ambiance : boucle lounge synthétisée (90 BPM), plus rapide et plus riche pendant un bonus
+    music(mode) { Music.mode(mode); },
+    setMusic(on) { settings.music = on; save(); if (on) Music.start(); else Music.stop(); },
   };
 })();

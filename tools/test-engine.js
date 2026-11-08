@@ -280,5 +280,11 @@ const back = Engine.createHost(snap, { meta: meta(), persist: false });
 const st2 = back.state.pending && back.state.pending.round && !back.state.pending.round.done ? back.resumePending() : { net: 0 };
 ok(!back.busy() && st2 && typeof st2.net === 'number', 'main en cours reprise et terminée après rechargement');
 
+// 28. Sauvegarde pendant un tour de machine avec le joker Cerise (sources des wilds non sérialisées)
+const cw = Engine.newRun({ seed: 'CERW', meta: meta(), persist: false }); cw.chooseTable(); cw.state.chips = 500; cw.addJoker('cerise');
+const cwr = api.Games.get('slots').start(cw, {}, { bet: cw.minBet() }, { steps: [] }).round;
+const circ = !cwr.wildSources.length || /"host"/.test(JSON.stringify(cwr));
+ok(!circ, 'machine + Cerise : un tour en cours reste sauvegardable');
+
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

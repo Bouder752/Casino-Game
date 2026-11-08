@@ -17,6 +17,17 @@ Aucune installation : ouvrez `index.html` dans un navigateur.
 - 5 jeux : **Ultimate Texas Hold'em** (probabilités en direct), **Blackjack** (assurance), **Roulette** (joueurs IA), **Les Chats des Toits** (machine 5×3, 20 lignes, achat du bonus à 75 × la mise) et **Dice**. Un **mode libre** permet de jouer sans objectif.
 - Sons synthétisés, cosmétiques débloqués avec le prestige, collection, seed, interface jouable sur téléphone.
 
+## Panel « rejouabilité » (5 joueurs qui débattent entre eux)
+
+5 profils (fan de roguelikes, joueuse mobile occasionnelle, joueur daltonien qui joue au clavier, streameur casino, game designer spécialisé rétention) ont joué puis débattu de ce qui donne envie de relancer une partie. Ce qui en est sorti :
+
+- **Méta-progression** : 20 jokers au départ, 15 à débloquer par des défis visibles au menu (« Gagne 6 mises d'affilée », « Finis une table au Dice »…), 9 niveaux de difficulté (« mises ») débloqués par les victoires, écran Records (meilleur ×, plus gros gain, plus longue série, meilleure bankroll…).
+- **Sessions courtes** : défi du jour (seed commune, 3 étages, carnet de tampons de la semaine sans punition si on rate un jour), mode Express en 3 étages, une main en cours est terminée prudemment au rechargement au lieu d'être perdue.
+- **Premières parties qui pardonnent** : filet de sécurité une fois par partie aux étages 1-2 (+50 % du palier), aucun boss « un seul jeu » à l'étage 1, joker de départ « Meilleur au … » qui ouvre son jeu.
+- **Machine** : retour ≈ 95 %, Carton garanti pendant le bonus, chat noir qui sème des wilds en jeu de base, palier « Joli gain » dès ×5, tours auto (arrêt sur bonus, à −50 % du solde, ou touche Échap/A) et turbo, fin du bonus qui montre honnêtement le × du prix payé.
+- **Musique d'ambiance** synthétisée (petite grille jazzy à 90 BPM, plus rapide avec un arpège pendant le bonus), coupable dans les options, mise en pause quand l'onglet est caché.
+- **Accessibilité** : clavier sans piège (focus gardé dans les fenêtres), contrastes AA sur les boutons, réglage « Effets : complets / réduits / aucun », acceptation automatique désactivable, gains annoncés aux lecteurs d'écran, jetons marqués pour les daltoniens, roulette jouable au pouce (mises rapides Rouge/Noir/Pair/… au-dessus du pli), machine entière visible sur téléphone.
+
 ## Refonte « jeu de cartes » (après 5 testeurs exigeants)
 
 5 joueurs aux profils pointus ont testé le jeu (vétéran de Balatro, joueuse Hearthstone classée, speedrunner, streamer casino, game designer mobile). Changements principaux :

@@ -125,7 +125,7 @@ App.register((() => {
       }, res);
     }));
     let ticking = true;
-    (async () => { while (ticking) { Sfx.play('tick'); await Util.sleep(95); } })();
+    (async () => { while (ticking) { Sfx.play('tick'); await Util.sleep(260); } })();
     await Promise.all(stops);
     ticking = false;
     els.palace.classList.remove('tense');
@@ -236,6 +236,7 @@ App.register((() => {
     Sfx.play('fanfare');
     await splash(`<div class="sli-k">${spins[0].scatters} Pelotes !</div><div class="sli-big">${C.scatter.spins}</div><div class="sli-t">tours gratuits</div><div class="sli-s">Les Cartons restent collés jusqu'à la fin</div><div class="sli-tap">Touchez pour commencer</div>`, 2600, 'in');
     els.palace.classList.add('bonus');
+    Sfx.music('bonus');
     let acc = spins[0].total, total = spins.length - 1;
     els.fs.hidden = false;
     drawSticky(sticky);
@@ -264,6 +265,7 @@ App.register((() => {
     Sfx.play(acc >= paid ? 'bigwin' : 'push');
     await p;
     els.palace.classList.remove('bonus');
+    Sfx.music('normal');
     drawSticky({});
   }
 
@@ -311,12 +313,17 @@ App.register((() => {
   function idle() {
     setActions(els.actions, [['Lancer', () => spin(), { cls: 'primary big' }]]); setBusy(false);
     // tours automatiques : on enchaîne tant qu'il en reste (arrêt sur un bonus ou un gros gain)
-    if (auto > 0) { auto--; paintAuto(); setTimeout(() => { if (auto >= 0 && document.querySelector('#slots:not([hidden])') && !App.host.busy()) spin(); }, Util.dur(350)); }
+    // arrêt automatique si la bankroll a fondu de moitié depuis le début de la série
+    if (auto > 0 && App.host.chips() < autoStart * 0.5) { auto = 0; paintAuto(); announce('Tours automatiques arrêtés : la moitié des jetons est partie.'); }
+    if (auto > 0) { auto--; paintAuto(); announce(`Tours automatiques : encore ${auto + 1}.`); setTimeout(() => { if (auto >= 0 && document.querySelector('#slots:not([hidden])') && !App.host.busy()) spin(); }, Util.dur(350)); }
   }
-  let auto = 0;
+  let auto = 0, autoStart = 0;
+  const announce = t => { els.msg.setAttribute('aria-live', 'polite'); els.msg.textContent = t; };
+  // Échap ou la touche A arrêtent les tours automatiques à tout moment
+  document.addEventListener('keydown', e => { if (auto > 0 && (e.key === 'Escape' || e.key.toLowerCase() === 'a')) { auto = 0; paintAuto(); announce('Tours automatiques arrêtés.'); } });
   const autoBtn = document.getElementById('sl-auto'), turboBtn = document.getElementById('sl-turbo');
   const paintAuto = () => { autoBtn.classList.toggle('on', auto > 0); autoBtn.querySelector('b').textContent = auto > 0 ? auto : '10'; };
-  autoBtn.onclick = () => { Sfx.play('click'); auto = auto > 0 ? 0 : 10; paintAuto(); if (auto > 0 && !App.host.busy()) { auto--; paintAuto(); spin(); } };
+  autoBtn.onclick = () => { Sfx.play('click'); auto = auto > 0 ? 0 : 10; autoStart = App.host.chips(); paintAuto(); if (auto > 0 && !App.host.busy()) { auto--; paintAuto(); spin(); } };
   let turbo = Storage.get('boubouzino.turbo', false);
   const paintTurbo = () => { turboBtn.classList.toggle('on', turbo); turboBtn.setAttribute('aria-pressed', String(turbo)); };
   turboBtn.onclick = () => { turbo = !turbo; Storage.set('boubouzino.turbo', turbo); paintTurbo(); Sfx.play('click'); };

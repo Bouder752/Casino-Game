@@ -804,6 +804,7 @@ const UI = (() => {
     const box = modal(`<h2>Options</h2>
       <div class="opt"><span>Vitesse des animations</span><div class="seg">${[1, 2, 4].map(v => `<button class="btn small ${Settings.speed === v ? 'primary' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div></div>
       <div class="opt"><span>Son</span><div class="seg"><button class="btn small ${Sfx.settings.on ? 'primary' : ''}" data-snd="1">Activé</button><button class="btn small ${!Sfx.settings.on ? 'primary' : ''}" data-snd="0">Coupé</button></div></div>
+      <div class="opt"><span>Musique d'ambiance</span><div class="seg"><button class="btn small ${Sfx.settings.music ? 'primary' : ''}" data-mus="1" aria-pressed="${!!Sfx.settings.music}">Oui</button><button class="btn small ${!Sfx.settings.music ? 'primary' : ''}" data-mus="0" aria-pressed="${!Sfx.settings.music}">Non</button></div></div>
       <div class="opt"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${Sfx.settings.volume}" id="opt-vol" aria-label="Volume"></div>
       <div class="opt"><span>Texte agrandi</span><div class="seg">${toggle('bigText')}</div></div>
       <div class="opt"><span>Couleurs pour daltoniens (bleu / orange)</span><div class="seg">${toggle('colorblind')}</div></div>
@@ -814,6 +815,7 @@ const UI = (() => {
       <p class="hint">Raccourcis : Espace ou Entrée = action principale · 1 à 5 = changer de jeu · T tirer · S rester · D doubler · P séparer · C check · R relance · A accepter · J replier les jokers · Échap = fermer.</p>`, [['Fermer', () => {}, 'primary']]);
     box.querySelectorAll('[data-opt]').forEach(b => (b.onclick = () => { Settings.set(b.dataset.opt, b.dataset.val === '1'); Sfx.play('click'); settingsModal(); }));
     box.querySelector('#opt-tuto').onclick = () => { Sfx.play('click'); closeModal(); if (isRun()) setTimeout(() => tutorial(0), 50); else toast('Le tutoriel s\'affichera au début de ta prochaine partie.'); Settings.set('tutorialDone', false); };
+    box.querySelectorAll('[data-mus]').forEach(b => (b.onclick = () => { Sfx.setMusic(b.dataset.mus === '1'); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-fx]').forEach(b => (b.onclick = () => { Settings.set('fx', b.dataset.fx); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-speed]').forEach(b => (b.onclick = () => { Settings.setSpeed(+b.dataset.speed); Sfx.play('click'); settingsModal(); }));
     box.querySelectorAll('[data-snd]').forEach(b => (b.onclick = () => { if (Sfx.settings.on !== (b.dataset.snd === '1')) Sfx.toggle(); $('sound').textContent = Sfx.settings.on ? '🔊' : '🔇'; Sfx.play('click'); settingsModal(); }));

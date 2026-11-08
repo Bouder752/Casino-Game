@@ -534,6 +534,21 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
   .sl-buy b { font-size: 16px; }
   .sl-spin .btn { width: 80px; height: 80px; }
 }
+/* Téléphone : toute la machine (bouton Lancer compris) tient au-dessus de la barre des jokers */
+@media (max-width: 760px) {
+  .palace { --sym: max(48px, min(calc((100vw - 64px) / 5), calc((100dvh - var(--dock-h) - 400px) / 3))) !important; }
+  .sl-logo { margin-bottom: -14px; transform: scale(.72); transform-origin: 50% 70%; height: 44px; }
+  .sl-deck { margin-top: 6px; gap: 6px; }
+  .sl-cell { padding: 0 4px; }
+  .sl-cell small { font-size: 12px; }
+  .sl-deck .sl-buy { width: 64px; height: 64px; padding: 0; border-width: 3px; }
+  .sl-deck .sl-buy small { font-size: 9px; letter-spacing: 0; }
+  .sl-deck .sl-buy b { font-size: 14px; }
+  .sl-deck .sl-buy span { font-size: 11px; margin-top: 1px; }
+  .sl-deck .sl-spin .btn { width: 68px; height: 68px; }
+  .sl-felt { padding-top: 34px !important; }
+  .sl-deck .sl-mini { flex-direction: row; }
+}
 
 /* =====================================================================
    Accessibilité (retours du panel)
@@ -602,7 +617,8 @@ html.cb .rl-cell.diamond-red { background: #d81b6099 !important; }
   .starter-cards .jcard.big { width: 100% !important; height: auto !important; aspect-ratio: 150 / 212; }
   .starter-cards .pack-choice p { font-size: 11.5px; min-height: 64px; }
   .starter-cards .btn { width: 100%; padding: 4px !important; font-size: 13px !important; }
-  .sl-buy { width: 84px !important; height: 84px !important; }
+  .sl-deck .sl-buy { width: 66px !important; height: 66px !important; }
+  .sl-deck .sl-buy b { font-size: 15px !important; }
   .sl-auto, .sl-turbo { width: 44px; height: 40px; }
   .shop { padding-bottom: 130px !important; }
 }
@@ -666,3 +682,24 @@ html.cb .rl-cell.diamond-red { background: #d81b6099 !important; }
   .menu-logo { grid-area: logo; } .menu-buttons { grid-area: buttons; margin: 0 auto; } .menu-stats { grid-area: stats; }
   .menu-quests { grid-area: quests; align-self: center; margin: 0; }
 }
+
+/* Roulette : mises rapides sur téléphone (tout visible sans défiler) */
+.rl-quick, .rl-more { display: none !important; }
+@media (max-width: 760px) {
+  .rl-quick { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+  .rl-quick .rl-cell { min-height: 46px; font-size: 14px !important; border-radius: 10px; border: 2px solid rgba(255, 255, 255, .35); }
+  .rl-quick .diamond-red { background: #b3141f !important; } .rl-quick .diamond-black { background: #151515 !important; }
+  .rl-more { display: block !important; width: 100%; }
+  #roulette.rl-closed .rl-board-wrap { display: none; }
+  .rl-top { flex-direction: row !important; flex-wrap: nowrap !important; gap: 10px !important; justify-content: center; }
+  .rl-wheel-wrap { width: 150px !important; height: 150px !important; }
+  .rl-side { min-width: 0 !important; flex: 1; }
+  .rl-side .rl-ai { display: none; }
+  .rl-board .rl-cell { min-height: 44px; }
+  .rl-board.vertical { grid-template-rows: 44px repeat(12, 44px) 44px !important; }
+}
+/* Daltoniens : jetons 5 et 25 bien distincts (couleur + motif) */
+html.cb .chip-5, html.cb .chipv.chip-5 { --c: #d81b60; }
+html.cb .chip-25, html.cb .chipv.chip-25 { --c: #1e63d6; --e: #ffd23f; }
+/* Le jeton posé ne cache plus le libellé des cases extérieures */
+.rl-cell.out .rl-chip { left: auto !important; right: 3px; margin: -15px 0 0 !important; width: 26px !important; height: 26px !important; }

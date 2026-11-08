@@ -52,6 +52,12 @@ App.register((() => {
     ['d1', 'd2', 'd3'].forEach((k, i) => g.appendChild(cell(k, E.OUTSIDE[k].label, 'out', `grid-row:4;grid-column:${2 + i * 4}/span 4`)));
     ['low', 'even', 'red', 'black', 'odd', 'high'].forEach((k, i) => g.appendChild(cell(k, k === 'red' ? '♦ Rouge' : k === 'black' ? '♠ Noir' : E.OUTSIDE[k].label, 'out ' + (k === 'red' || k === 'black' ? 'diamond-' + k : ''), `grid-row:5;grid-column:${2 + i * 2}/span 2`)));
     layout();
+    // Téléphone : les mises courantes en gros boutons (un seul toucher pour « Rouge »), les numéros repliés
+    const q = document.getElementById('rl-quick');
+    ['red', 'black', 'even', 'odd', 'low', 'high', 'd1', 'd2', 'd3'].forEach(k => q.appendChild(cell(k, k === 'red' ? '♦ Rouge' : k === 'black' ? '♠ Noir' : E.OUTSIDE[k].label, 'out quick ' + (k === 'red' || k === 'black' ? 'diamond-' + k : ''), '')));
+    const more = document.getElementById('rl-more');
+    more.onclick = () => { const open = !document.getElementById('roulette').classList.toggle('rl-closed'); more.setAttribute('aria-expanded', String(open)); more.textContent = open ? 'Masquer les numéros ▴' : 'Mises sur les numéros ▾'; };
+    document.getElementById('roulette').classList.add('rl-closed');
   })();
   // Placement des cases : horizontal (écran large) ou vertical (téléphone)
   function layout() {
@@ -81,7 +87,7 @@ App.register((() => {
   const total = () => Util.round2(Object.values(bets).reduce((a, b) => a + b, 0));
   const chipCls = v => 'chip-' + (v >= 100 ? 100 : v >= 25 ? 25 : v >= 5 ? 5 : 1);
   function renderBets() {
-    els.board.querySelectorAll('.rl-cell').forEach(c => {
+    document.querySelectorAll('#roulette .rl-cell').forEach(c => {
       const v = bets[c.dataset.key];
       let m = c.querySelector('.rl-chip');
       if (v) {
@@ -132,7 +138,7 @@ App.register((() => {
     els.ballTrack.classList.remove('spinning');
     els.result.textContent = n;
     els.result.className = 'rl-result show ' + E.color(n);
-    els.board.querySelectorAll('.rl-cell').forEach(c => {
+    document.querySelectorAll('#roulette .rl-cell').forEach(c => {
       const k = c.dataset.key;
       c.classList.toggle('hit', k === 'n' + n || (k[0] !== 'n' && E.OUTSIDE[k].test(n)));
     });

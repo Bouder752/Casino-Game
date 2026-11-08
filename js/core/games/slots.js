@@ -145,7 +145,9 @@ const SlotsEngine = (() => {
       }
       if (!H.stake(stake)) return { error: 'Solde insuffisant.' };
       const wild = H.query('slots.wild', { wild: null, ratio: 1, sources: [] });
-      const r = { bet, stake, buy, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio }, wildSources: wild.sources };
+      const r = { bet, stake, buy, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio } };
+      // les sources (jokers) ne sont pas sauvegardées : elles pointent vers le moteur
+      Object.defineProperty(r, 'wildSources', { value: wild.sources, enumerable: false });
       spinAll(H, r);
       return { round: r };
     },
@@ -155,7 +157,7 @@ const SlotsEngine = (() => {
       if (id === 'reroll' && H.useCharge('slots')) spinAll(H, r);
     },
     resolve(H, gs, r) {
-      if (r.spins.some(s => s.wildUsed)) r.wildSources.forEach(me => me.flash('Joker !'));
+      if (r.spins.some(s => s.wildUsed)) (r.wildSources || []).forEach(me => me.flash('Joker !'));
       const sevens = r.spins.reduce((a, s) => a + s.sevens, 0);
       return {
         staked: r.stake || r.bet, back: r.total,
