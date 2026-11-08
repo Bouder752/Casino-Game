@@ -95,7 +95,8 @@ const Machines = (() => {
   }
 
   // =====================================================================
-  // Chats Mousquetaires : lignes, duels « En garde ! » (rouleaux wild multiplicateurs)
+  // Chats Mousquetaires : lignes, duels « En garde ! » sur les 5 rouleaux (rouleaux wild multiplicateurs,
+  // qui se multiplient entre eux sur une ligne)
   // =====================================================================
   const MQ = MC.mousquetaires;
   function mqGrid(H, r, duels, free, forceScatters) {
@@ -105,7 +106,7 @@ const Machines = (() => {
       const col = Array.from({ length: MQ.rows }, () => ({ id: H.rng.weighted(r.symbols).id }));
       // Sceau : au plus un par rouleau (rouleaux 1, 3 et 5)
       if (MQ.scatter.reels.includes(x) && (scatReels ? scatReels.includes(x) : H.rng.chance(MQ.scatter.chance))) col[H.rng.int(MQ.rows)] = { id: MQ.scatter.id };
-      // En garde ! : au plus un par rouleau (rouleaux 2 à 4), jamais sur un rouleau déjà en duel
+      // En garde ! : au plus un par rouleau, sur les 5 rouleaux
       if (MQ.duel.reels.includes(x) && !duels[x] && H.rng.chance(free ? MQ.fsDuel : MQ.duel.chance)) {
         const y = H.rng.int(MQ.rows);
         if (col[y].id !== MQ.scatter.id) col[y] = { id: MQ.duel.id };
@@ -122,23 +123,25 @@ const Machines = (() => {
     let total = 0, sevens = 0, wildUsed = false;
     MQ.lines.forEach((line, li) => {
       const seq = line.map((row, x) => (wildReels[x] ? { id: 'wild', m: wildReels[x] } : g[x][row]));
-      const target = seq[0].id;
+      // symbole payé : le premier qui n'est pas wild (un rouleau en duel peut ouvrir la ligne)
+      const first = seq.find(c => c.id !== 'wild');
+      const target = first ? first.id : r.symbols.reduce((a, s) => (s.pay[2] > a.pay[2] ? s : a)).id;
       if (!PAY[target]) return;
-      let count = 0, mult = 0, usedJoker = false;
+      let count = 0, mult = 1, usedJoker = false;
       for (const c of seq) {
         if (c.id === target) count++;
-        else if (c.id === 'wild') { count++; mult += c.m; }
+        else if (c.id === 'wild') { count++; mult *= c.m; }  // les multiplicateurs des duels se multiplient
         else if (jokerWild && c.id === jokerWild) { count++; usedJoker = true; }
         else break;
       }
       if (count < 3) return;
-      const x = PAY[target][count - 3] * MQ.scale * Math.max(1, mult) * (usedJoker ? r.wild.ratio : 1);
+      const x = PAY[target][count - 3] * MQ.scale * mult * (usedJoker ? r.wild.ratio : 1);
       const win = r2(lineBet * x);
       if (win <= 0) return;
       total += win;
       if (usedJoker) wildUsed = true;
       if (target === 'sept') sevens += count;
-      wins.push({ line: li, symbol: target, count, mult: Math.max(1, mult), win, cells: line.slice(0, count).map((row, x) => [x, row]) });
+      wins.push({ line: li, symbol: target, count, mult, win, cells: line.slice(0, count).map((row, x) => [x, row]) });
     });
     return { wins, total: r2(total), sevens, wildUsed };
   }
@@ -158,13 +161,11 @@ const Machines = (() => {
     const first = mqSpin(H, r, false, {}, r.buy ? MQ.scatter.min : 0);
     const spins = [first];
     if (first.scatters >= MQ.scatter.min) {
-      // Duel à l'aube : chaque rouleau en duel reste wild (avec son ×) jusqu'à la fin
-      const sticky = {};
+      // Duel à l'aube : les duels tombent bien plus souvent (ils ne restent pas d'un tour à l'autre)
       let left = MQ.scatter.spins, played = 0;
       while (left > 0 && played < MQ.scatter.maxSpins) {
         left--; played++;
-        const s = mqSpin(H, r, true, sticky);
-        s.duels.forEach(d => { sticky[d.x] = d.m; });
+        const s = mqSpin(H, r, true, {});
         s.retrigger = s.scatters >= MQ.scatter.min ? Math.max(0, Math.min(MQ.scatter.retrigger, MQ.scatter.maxSpins - played - left)) : 0;
         left += s.retrigger;
         spins.push(s);
@@ -258,5 +259,5 @@ const Machines = (() => {
   const RUN = { confiserie: cfRun, mousquetaires: mqRun, chaudron: chRun };
   // Nombre de tours gratuits annoncé à l'entrée du bonus
   const award = (id, first) => (id === 'chaudron' ? first.award : MC[id].scatter.spins);
-  return { symbols, run: (id, H, r) => RUN[id](H, r), award, clusters, collapse };
+  return { symbols, run: (id, H, r) => RUN[id](H, r), award, clusters, collapse, mqEval };
 })();

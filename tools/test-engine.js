@@ -321,5 +321,20 @@ ok(cascOk && sawMult, 'Chaudron : grappes de 5+, grille 6×6 à chaque cascade, 
 const dT = Engine.newRun({ seed: 'DOR', meta: meta(), persist: false }); dT.chooseTable(); dT.state.table.machine = 'confiserie'; dT.state.upgrades.push('doree');
 ok(Machines.symbols(dT, 'confiserie').some(s => s.id === 'diamant' && s.pay.length === 3) && Machines.symbols(dT, 'chaudron').find(s => s.id === 'diamant').pay.length === 6, 'Machine dorée : un Diamant adapté à chaque machine');
 
+// 30. Duels : les multiplicateurs se multiplient, un duel peut ouvrir la ligne, rien ne reste collé en bonus
+{
+  const syms = CONFIG.games.machines.mousquetaires.symbols;
+  const r = { bet: 15, symbols: syms, wild: {} };
+  const g = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ id: 'dix' })));
+  g[3] = g[3].map(() => ({ id: 'valet' })); g[4] = g[4].map(() => ({ id: 'dame' }));
+  const one = Machines.mqEval(g, r, { 1: 5 }), two = Machines.mqEval(g, r, { 1: 5, 2: 10 }), lead = Machines.mqEval(g, r, { 0: 4, 1: 5 });
+  const w1 = one.wins[0], w2 = two.wins[0];
+  ok(w1 && w2 && w1.mult === 5 && w2.mult === 50 && Math.abs(w2.win / w1.win - 10) < 0.01, 'duels : ×5 et ×10 sur une ligne = ×50');
+  ok(lead.wins.length && lead.wins[0].symbol === 'dix' && lead.wins[0].mult === 20, 'un duel sur le 1er rouleau ouvre la ligne');
+  const dq = Engine.newRun({ seed: 'DUEL', meta: meta(), persist: false }); dq.chooseTable(); dq.state.table.machine = 'mousquetaires'; dq.state.chips = 1e6; dq.state.table.target = 1e12;
+  const rr = dq.startPlay('slots', { bet: dq.minBet('slots'), buy: true }).round;
+  ok(rr.spins.slice(1).every(sp => !Object.keys(sp.sticky).length && Object.keys(sp.wildReels).length === sp.duels.length), 'Duel à l\'aube : aucun duel ne reste d\'un tour à l\'autre');
+}
+
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

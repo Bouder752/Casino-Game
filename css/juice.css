@@ -814,3 +814,7 @@ html.cb .chip-25, html.cb .chipv.chip-25 { --c: #1e63d6; --e: #ffd23f; }
   .sl-deck .sl-step:disabled { display: none; }
 }
 .palace[data-machine="mousquetaires"] .palace-title span { letter-spacing: 1px; }
+
+/* Plusieurs duels sur un tour : la grille tremble */
+.mx-stage.mega { animation: shake .12s 6; }
+.mx-stage.mega .mx-wild { box-shadow: inset 0 0 0 3px #ffcf4a, 0 0 34px 8px rgba(255, 190, 60, .95); }

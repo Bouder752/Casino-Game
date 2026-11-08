@@ -6,7 +6,7 @@ const MachineView = (() => {
   const MC = CONFIG.games.machines;
   const INFO = {
     confiserie: { title: 'Confiserie', sub: 'Céleste', scatter: 'Montgolfières', fs: 'Des bulles multiplicatrices tombent pendant les tours', buy: 'tours gratuits avec des <b>bulles multiplicatrices</b> (×2 à ×100)' },
-    mousquetaires: { title: 'Chats', sub: 'Mousquetaires', scatter: 'Sceaux', fs: 'Duel à l\'aube : chaque duel reste jusqu\'à la fin', buy: 'tours « <b>Duel à l\'aube</b> » : chaque rouleau en duel reste wild jusqu\'à la fin' },
+    mousquetaires: { title: 'Chats', sub: 'Mousquetaires', scatter: 'Sceaux', fs: 'Duel à l\'aube : les duels éclatent bien plus souvent', buy: 'tours « <b>Duel à l\'aube</b> » où les duels éclatent bien plus souvent' },
     chaudron: { title: 'Chaudron', sub: 'Magique', scatter: 'Grimoires', fs: 'Les cases multiplicatrices restent jusqu\'à la fin', buy: 'tours gratuits où les <b>cases multiplicatrices</b> restent jusqu\'à la fin' },
   };
   const NAME = id => (SlotArt.NAMES[id] || id).replace(/ \(.*\)$/, '');
@@ -231,6 +231,14 @@ const MachineView = (() => {
         K.win(`Duel gagné : rouleau WILD ×${d.m}`, 'line show-feature');
         await sleep(650);
       }
+      // plusieurs duels : leurs multiplicateurs se multiplient sur les lignes qui les traversent
+      if (spin.duels.length >= 2) {
+        const prod = spin.duels.reduce((a, d) => a * d.m, 1);
+        stage.classList.remove('mega'); void stage.offsetWidth; stage.classList.add('mega');
+        Sfx.play('bigwin');
+        K.win(`${spin.duels.length} duels : ${spin.duels.map(d => '×' + d.m).join(' × ')} = ×${Util.fmt(prod)} !`, 'show show-feature');
+        await sleep(1300);
+      }
       if (!spin.wins.length) { if (spin.scatters >= D.scatter.min) { markWins(spin.scatterCells); await sleep(500); } return spin.total; }
       const W = stage.clientWidth, Hh = stage.clientHeight;
       els.lines.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
@@ -319,8 +327,8 @@ const MachineView = (() => {
       const lb = bet / D.lines.length;
       return `<p class="hint">${D.lines.length} lignes, de gauche à droite. Gains pour 3 · 4 · 5 symboles avec la mise actuelle (${Util.fmt(bet)}).</p>
         <table class="paytable">${syms.slice().reverse().map(s => `<tr>${sym(s.id)}<td>${s.pay.map(p => f(p * lb * D.scale)).join(' · ')}</td></tr>`).join('')}</table>
-        <div class="pt-special"><div class="pt-sym">${SlotArt.svg('engarde')}</div><p><b>En garde !</b> — rouleaux 2 à 4. Un duel éclate : le rouleau entier devient <b>WILD</b> avec un multiplicateur de ×2 à ×100. Sur une ligne, les multiplicateurs des rouleaux en duel s'additionnent.</p></div>
-        <div class="pt-special"><div class="pt-sym">${SlotArt.svg('sceau')}</div><p><b>Sceau royal (Bonus)</b> — rouleaux 1, 3 et 5. 3 Sceaux = <b>${D.scatter.spins} tours « Duel à l'aube »</b> : chaque rouleau en duel <b>reste WILD avec son multiplicateur</b> jusqu'à la fin. 3 Sceaux pendant le bonus = +${D.scatter.retrigger} tours.</p></div>${cer}`;
+        <div class="pt-special"><div class="pt-sym">${SlotArt.svg('engarde')}</div><p><b>En garde !</b> — sur les 5 rouleaux. Un duel éclate : le rouleau entier devient <b>WILD</b> avec un multiplicateur de ×2 à ×100. Sur une ligne, <b>les multiplicateurs des duels se multiplient entre eux</b> (×5 et ×10 = ×50) : 3, 4 ou 5 duels sur un même tour, c'est très rare… et énorme (gain max ${Util.fmt(CONFIG.games.slots.maxWin)} × la mise).</p></div>
+        <div class="pt-special"><div class="pt-sym">${SlotArt.svg('sceau')}</div><p><b>Sceau royal (Bonus)</b> — rouleaux 1, 3 et 5. 3 Sceaux = <b>${D.scatter.spins} tours « Duel à l'aube »</b> : les duels éclatent <b>environ 4 fois plus souvent</b> (ils ne restent pas d'un tour à l'autre). 3 Sceaux pendant le bonus = +${D.scatter.retrigger} tours.</p></div>${cer}`;
     }
 
     return { mount, play, stop, paytable, info: () => INFO[id], id: () => id };

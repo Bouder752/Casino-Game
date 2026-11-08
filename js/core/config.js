@@ -205,10 +205,10 @@ const CONFIG = {
         cols: 6, rows: 5, min: 8,
         // pay = × la mise pour 8-9 · 10-11 · 12+ symboles
         symbols: [
-          { id: 'meringue', w: 13, pay: [0.25, 0.75, 2] },
-          { id: 'dragee', w: 12, pay: [0.4, 0.9, 4] },
-          { id: 'caramel', w: 11, pay: [0.5, 1, 5] },
-          { id: 'cerise', w: 10, pay: [0.8, 1.2, 8] },
+          { id: 'meringue', w: 20, pay: [0.25, 0.75, 2] },
+          { id: 'dragee', w: 18, pay: [0.4, 0.9, 4] },
+          { id: 'caramel', w: 15, pay: [0.5, 1, 5] },
+          { id: 'cerise', w: 12, pay: [0.8, 1.2, 8] },
           { id: 'sept', w: 9, pay: [1, 1.5, 10] },
           { id: 'reglisse', w: 7, pay: [1.5, 2, 12] },
           { id: 'berlingot', w: 6, pay: [2, 5, 15] },
@@ -216,13 +216,14 @@ const CONFIG = {
           { id: 'macaron', w: 3, pay: [10, 25, 50] },
         ],
         diamant: { id: 'diamant', w: 2, pay: [15, 40, 100] },
-        scale: 2.7,     // réglé par simulation : ≈ 96 % (jeu de base et achat)
-        scatter: { id: 'montgolfiere', w: 1.3, min: 4, spins: 10, pay: [3, 5, 100], retriggerMin: 3, retrigger: 5, maxSpins: 30 },
-        bubble: { chance: 0.11, values: [[2, 16], [3, 16], [4, 14], [5, 12], [6, 10], [8, 9], [10, 8], [12, 5], [15, 4], [20, 3], [25, 2], [50, 0.9], [100, 0.4]] },
+        scale: 1.28,    // réglé par simulation : ≈ 96 % (jeu de base et achat)
+        scatter: { id: 'montgolfiere', w: 1.36, min: 4, spins: 10, pay: [3, 5, 100], retriggerMin: 3, retrigger: 5, maxSpins: 30 },
+        // ≈ une bulle tous les deux tours gratuits, peu de valeurs différentes
+        bubble: { chance: 0.018, values: [[2, 12], [3, 12], [5, 16], [10, 18], [15, 12], [25, 10], [50, 6.5], [100, 3.3]] },
       },
-      // « Chats Mousquetaires » : 5×5, 15 lignes. Le symbole « En garde ! » (rouleaux 2 à 4) lance un duel :
-      // le rouleau devient wild avec un multiplicateur (×2 à ×100), additionné sur la ligne.
-      // 3 Sceaux = 10 tours « Duel à l'aube » : les rouleaux en duel restent jusqu'à la fin.
+      // « Chats Mousquetaires » : 5×5, 15 lignes. Le symbole « En garde ! » (sur les 5 rouleaux) lance un duel :
+      // le rouleau devient wild avec un multiplicateur ; sur une ligne, les multiplicateurs se multiplient.
+      // 3 Sceaux = 10 tours « Duel à l'aube » : les duels tombent bien plus souvent (rien ne reste collé).
       mousquetaires: {
         cols: 5, rows: 5,
         lines: [
@@ -245,9 +246,9 @@ const CONFIG = {
         ],
         diamant: { id: 'diamant', w: 4, pay: [60, 250, 1000] },
         scale: 1.03,
-        duel: { id: 'engarde', chance: 0.03, reels: [1, 2, 3], mults: [[2, 30], [3, 20], [4, 14], [5, 10], [8, 8], [10, 6], [15, 4], [20, 3], [25, 2], [50, 1], [100, 0.4]] },
+        duel: { id: 'engarde', chance: 0.019, reels: [0, 1, 2, 3, 4], mults: [[2, 40], [3, 25], [4, 12], [5, 9], [10, 6], [25, 2.5], [50, 1], [100, 0.4]] },
         scatter: { id: 'sceau', chance: 0.135, reels: [0, 2, 4], min: 3, spins: 10, retrigger: 3, maxSpins: 30 },
-        fsDuel: 0.0315,    // chance d'un duel par rouleau 2-4 pendant les tours gratuits
+        fsDuel: 0.0795,    // chance d'un duel par rouleau pendant les tours gratuits (≈ 1 tour sur 3)
       },
       // « Chaudron Magique » : 6×6, grappes de 5 symboles ou plus, cascades.
       // Chaque case qui explose est marquée ; si elle explose encore, elle devient un multiplicateur
