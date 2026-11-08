@@ -388,7 +388,7 @@ const UI = (() => {
     paintMeter();
     const out = [];
     if (st.phase === 'play' && t) {
-      out.push(badge('maxbet', `<small>Mise</small><b class="num">${Util.fmt(H().minBet())}–${Util.fmt(H().maxBet(tab))}</b>`,
+      out.push(badge('maxbet', `<small>Mise</small><b class="num">${Util.fmt(H().minBet(tab))}–${Util.fmt(H().maxBet(tab))}</b>`,
         `<b>Mise minimale</b> : ${Math.round(CONFIG.progression.miseMinRatio * 100)} % du palier. <b>Mise maximale</b> : ${Math.round(H().maxBetRatio() * 100)} % du palier (cette part baisse à chaque étage : il te faut des multiplicateurs).`));
       out.push(badge('rr', `<b class="num">↻ ${st.charges.length}</b>`, `<b>Relances</b> : ${st.charges.length} pour cette table, pour refaire un tirage raté sans miser à nouveau (${CONFIG.progression.relancesParMise} par mise au plus).`));
     }
@@ -439,7 +439,7 @@ const UI = (() => {
   function startTableUI() {
     App.views().forEach(v => v.reset && v.reset());
     // mise proposée : 40 % de la mise max (≈ 10 % du palier), jamais sous la mise minimale
-    BetControls.forEach(b => { if (!b.compact && Number.isFinite(b.maxFn())) b.set(Math.max(H().minBet(), Math.round(b.maxFn() * 0.4))); });
+    BetControls.forEach(b => { if (!b.compact && Number.isFinite(b.maxFn())) b.set(Math.max(H().minBet(b.game), Math.round(b.maxFn() * (b.game === 'slots' ? 0.25 : 0.4)))); });
     enterGame();
     const t = S().table;
     if (t.boss) {

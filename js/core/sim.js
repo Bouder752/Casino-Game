@@ -95,7 +95,7 @@ const Sim = (() => {
   // dans la limite de la mise max ----
   function betSize(H, game) {
     const need = H.state.table.target - H.bankroll();
-    return Math.max(H.minBet(), Math.min(H.maxBet(game), Math.floor(H.chips()), Math.ceil(need)));
+    return Math.max(H.minBet(game), Math.min(H.maxBet(game), Math.floor(H.chips()), Math.ceil(need)));
   }
 
   function playRun(seed, opts = {}) {

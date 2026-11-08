@@ -55,8 +55,9 @@ const BetControls = [];
 
 // Contrôle de mise réutilisable (jetons)
 class BetControl {
-  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500], max = () => Infinity, compact = false }) {
+  constructor(container, { label, initial = 0, chips = [1, 5, 25, 100, 500], max = () => Infinity, compact = false, game = null }) {
     this.value = initial;
+    this.game = game;
     this.maxFn = max;
     this.base = initial;
     this.enabled = true;
@@ -115,7 +116,7 @@ class BetControl {
     // la mise ne peut pas dépasser ce qu'on a : on la ramène au maximum possible
     if (this.value > m && Number.isFinite(m) && this.enabled) this.value = Math.max(0, m);
     // jamais une mise à 0 tant qu'on peut encore miser le minimum
-    const lo = App.host && App.host.minBet ? App.host.minBet() : 1;
+    const lo = App.host && App.host.minBet ? App.host.minBet(this.game) : 1;
     if (this.enabled && !this.compact && this.value < lo && m >= lo) this.value = lo;
     this.amountEl.textContent = Util.fmt(this.value);
     this.maxEl.textContent = Number.isFinite(m) ? `max ${Util.fmt(m)}` : '';

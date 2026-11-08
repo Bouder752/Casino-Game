@@ -184,11 +184,93 @@ const CONFIG = {
         { id: 'siamois', w: 6, pay: [45, 135, 450] },
         { id: 'chatnoir', w: 5, pay: [72, 270, 900] },
       ],
-      wild: { id: 'palace', w: 4, reels: [1, 2, 3], mults: [{ m: 2, w: 3 }, { m: 3, w: 1 }] },
-      scatter: { id: 'pelote', w: 4.6, reels: [0, 1, 2, 3, 4], spins: 10, min: 3, pay: [1, 5, 20], retrigger: 5, maxSpins: 30 }, // une Pelote max par rouleau
+      // pendant les tours gratuits, les Cartons peuvent valoir ×5 (achat à 100 × la mise ≈ 96 %)
+      wild: { id: 'palace', w: 4, reels: [1, 2, 3], mults: [{ m: 2, w: 3 }, { m: 3, w: 1 }], fsMults: [{ m: 2, w: 2.5 }, { m: 3, w: 1.25 }, { m: 5, w: 0.25 }] },
+      scatter: { id: 'pelote', w: 4.1, reels: [0, 1, 2, 3, 4], spins: 10, min: 3, pay: [1, 5, 20], retrigger: 5, maxSpins: 30 }, // une Pelote max par rouleau
       diamant: { id: 'diamant', w: 6, pay: [180, 600, 2000] },   // ajouté par la Machine dorée
-      buy: { cost: 85, capMult: 2 },   // achat du bonus : 85 × la mise par tour (≈ 96 % de retour), au plus 2 × la mise max
+      buy: { cost: 100 },   // achat du bonus : 100 × la mise du tour, sur toutes les machines
       feature: { chance: 0.02, min: 2, max: 2 },  // le chat noir sème 2 Cartons simples (≈ 1 tour sur 50)
+      // Mises de la machine : bien plus basses qu'aux tables (l'achat du bonus coûte 100 × la mise)
+      bets: { maxScale: 0.2, minScale: 0.1 },
+      maxWin: 5000,   // gain max d'un tour (bonus compris) : 5 000 × la mise
+    },
+    // Machines tirées au hasard à chaque table (en plus des Chats des Toits).
+    // Retour visé ≈ 96 % (jeu de base et achat du bonus), comme les machines du marché.
+    machines: {
+      ids: ['toits', 'confiserie', 'mousquetaires', 'chaudron'],
+      cerisePay: 2,  // Triple Cerise sur les machines sans lignes : gains de cerises ×2
+      // « Confiserie Céleste » : 6×5, paie partout (8 symboles identiques ou plus), cascades.
+      // 4 Montgolfières = 10 tours gratuits avec des bulles multiplicatrices (×2 à ×100).
+      confiserie: {
+        cols: 6, rows: 5, min: 8,
+        // pay = × la mise pour 8-9 · 10-11 · 12+ symboles
+        symbols: [
+          { id: 'meringue', w: 13, pay: [0.25, 0.75, 2] },
+          { id: 'dragee', w: 12, pay: [0.4, 0.9, 4] },
+          { id: 'caramel', w: 11, pay: [0.5, 1, 5] },
+          { id: 'cerise', w: 10, pay: [0.8, 1.2, 8] },
+          { id: 'sept', w: 9, pay: [1, 1.5, 10] },
+          { id: 'reglisse', w: 7, pay: [1.5, 2, 12] },
+          { id: 'berlingot', w: 6, pay: [2, 5, 15] },
+          { id: 'guimauve', w: 5, pay: [2.5, 10, 25] },
+          { id: 'macaron', w: 3, pay: [10, 25, 50] },
+        ],
+        diamant: { id: 'diamant', w: 2, pay: [15, 40, 100] },
+        scale: 2.7,     // réglé par simulation : ≈ 96 % (jeu de base et achat)
+        scatter: { id: 'montgolfiere', w: 1.3, min: 4, spins: 10, pay: [3, 5, 100], retriggerMin: 3, retrigger: 5, maxSpins: 30 },
+        bubble: { chance: 0.11, values: [[2, 16], [3, 16], [4, 14], [5, 12], [6, 10], [8, 9], [10, 8], [12, 5], [15, 4], [20, 3], [25, 2], [50, 0.9], [100, 0.4]] },
+      },
+      // « Chats Mousquetaires » : 5×5, 15 lignes. Le symbole « En garde ! » (rouleaux 2 à 4) lance un duel :
+      // le rouleau devient wild avec un multiplicateur (×2 à ×100), additionné sur la ligne.
+      // 3 Sceaux = 10 tours « Duel à l'aube » : les rouleaux en duel restent jusqu'à la fin.
+      mousquetaires: {
+        cols: 5, rows: 5,
+        lines: [
+          [0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3], [4, 4, 4, 4, 4],
+          [0, 1, 2, 1, 0], [1, 2, 3, 2, 1], [2, 3, 4, 3, 2], [4, 3, 2, 3, 4], [3, 2, 1, 2, 3],
+          [2, 1, 0, 1, 2], [0, 1, 1, 1, 0], [4, 3, 3, 3, 4], [1, 0, 0, 0, 1], [3, 4, 4, 4, 3],
+        ],
+        // pay = × la mise par ligne (mise / 15) pour 3, 4 et 5 symboles
+        symbols: [
+          { id: 'dix', w: 22, pay: [5, 10, 25] },
+          { id: 'valet', w: 21, pay: [5, 10, 25] },
+          { id: 'dame', w: 19, pay: [5, 15, 30] },
+          { id: 'roi', w: 17, pay: [5, 15, 40] },
+          { id: 'as', w: 15, pay: [10, 20, 50] },
+          { id: 'cerise', w: 11, pay: [10, 25, 60] },
+          { id: 'sept', w: 8, pay: [15, 40, 100] },
+          { id: 'rapiere', w: 7, pay: [20, 50, 150] },
+          { id: 'chapeau', w: 5, pay: [25, 75, 250] },
+          { id: 'bourse', w: 4, pay: [40, 150, 500] },
+        ],
+        diamant: { id: 'diamant', w: 4, pay: [60, 250, 1000] },
+        scale: 1.03,
+        duel: { id: 'engarde', chance: 0.03, reels: [1, 2, 3], mults: [[2, 30], [3, 20], [4, 14], [5, 10], [8, 8], [10, 6], [15, 4], [20, 3], [25, 2], [50, 1], [100, 0.4]] },
+        scatter: { id: 'sceau', chance: 0.135, reels: [0, 2, 4], min: 3, spins: 10, retrigger: 3, maxSpins: 30 },
+        fsDuel: 0.0315,    // chance d'un duel par rouleau 2-4 pendant les tours gratuits
+      },
+      // « Chaudron Magique » : 6×6, grappes de 5 symboles ou plus, cascades.
+      // Chaque case qui explose est marquée ; si elle explose encore, elle devient un multiplicateur
+      // ×2 qui double à chaque explosion (×128 max). Pendant les tours gratuits, les cases restent.
+      chaudron: {
+        cols: 6, rows: 6, min: 5,
+        // pay = × la mise pour une grappe de 5-6 · 7-8 · 9-10 · 11-12 · 13-14 · 15+ symboles
+        tiers: [5, 7, 9, 11, 13, 15],
+        symbols: [
+          { id: 'fiole_bleue', w: 14, pay: [0.25, 0.4, 0.8, 1.5, 4, 10] },
+          { id: 'fiole_verte', w: 13, pay: [0.3, 0.5, 1, 2, 5, 15] },
+          { id: 'fiole_rose', w: 12, pay: [0.4, 0.6, 1.2, 3, 6, 20] },
+          { id: 'champignon', w: 11, pay: [0.5, 0.8, 1.5, 4, 8, 30] },
+          { id: 'cerise', w: 10, pay: [0.6, 1, 2, 5, 10, 40] },
+          { id: 'cristal', w: 9, pay: [0.8, 1.5, 3, 7, 15, 60] },
+          { id: 'sept', w: 8, pay: [1, 2, 4, 10, 25, 100] },
+        ],
+        diamant: { id: 'diamant', w: 4, pay: [2, 4, 8, 20, 50, 200] },
+        scale: 6.2,
+        scatter: { id: 'grimoire', w: 0.55, min: 3, spins: [10, 12, 15, 20], retrigger: [5, 6, 8, 10], maxSpins: 50 },
+        spotMax: 128,
+        fsBoost: { ids: ['fiole_bleue', 'fiole_verte', 'fiole_rose'], k: 2.18 },
+      },
     },
   },
 };

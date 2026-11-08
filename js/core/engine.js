@@ -49,7 +49,7 @@ const Engine = (() => {
     const saved = Storage.get(FREE_KEY, {});
     return {
       v: VERSION, mode: 'free', seed: saved.seed || RNG.randomSeed(), rng: saved.rng || { s: RNG.hashSeed(RNG.randomSeed()) },
-      chips: Number.isFinite(saved.chips) ? saved.chips : CONFIG.freeChips,
+      chips: Number.isFinite(saved.chips) ? saved.chips : CONFIG.freeChips, machine: saved.machine || 'toits',
       phase: 'play', table: null, jokers: [], upgrades: [], statuses: [], charges: [], debts: [], consumables: [],
       games: {}, uid: 1, stats: { plays: 0, wins: 0, losses: 0, best: 0, jokersOwned: [] },
     };
@@ -179,14 +179,21 @@ const Engine = (() => {
     H.maxBet = game => {
       if (!isRun) return Infinity;
       const target = state.table ? state.table.target : H.objective(state.etage, state.tableType);
-      const e = H.emit('maxBet', { value: target * H.maxBetRatio(), game });
-      const m = Math.max(5, Math.round(e.value));
+      const e = H.emit('maxBet', { value: target * H.maxBetRatio() * (game === 'slots' ? CONFIG.games.slots.bets.maxScale : 1), game });
+      const m = Math.max(game === 'slots' ? 1 : 5, Math.round(e.value));
       return game === 'uth' ? Math.max(2, Math.floor(m / 2)) : m;
     };
     H.maxBetRatio = (etage = state.etage || 1) => CONFIG.progression.miseMaxRatio * (stake() >= 6 ? 0.85 : 1)
       * Math.pow(CONFIG.progression.miseMaxDecroissance || 1, Math.max(0, Math.min(etage, CONFIG.progression.etagesPourGagner) - 1));
     // Mise minimale : une petite part du palier (impossible de « farmer » à 1 jeton)
-    H.minBet = () => (isRun && state.table && state.table.minBet ? state.table.minBet : CONFIG.progression.miseMin);
+    H.minBet = game => {
+      const m = isRun && state.table && state.table.minBet ? state.table.minBet : CONFIG.progression.miseMin;
+      // machines : mises 10 fois plus petites (l'achat du bonus vaut 100 × la mise)
+      return game === 'slots' ? Math.max(1, Math.round(m * CONFIG.games.slots.bets.minScale)) : m;
+    };
+    // Machine à sous en service : tirée au hasard à chaque table (jamais deux fois la même d'affilée)
+    H.slotMachine = () => (isRun ? (state.table && state.table.machine) || 'toits' : state.machine || 'toits');
+    H.setMachine = id => { if (!isRun && CONFIG.games.machines.ids.includes(id)) { state.machine = id; save(); notify('table'); } };
     H.excludedRanks = () => H.emit('deck.exclude', { ranks: [] }).ranks;
     H.query = (name, ctx) => H.emit(name, ctx);
 
@@ -304,7 +311,7 @@ const Engine = (() => {
       play.stake = round2(r.staked);
       (r.draws || []).forEach(d => {
         if (d.kind === 'card') H.emit('onCardDrawn', { game: id, card: d.card, play });
-        else H.emit('onDraw', { game: id, kind: d.kind, value: d.value, play });
+        else H.emit('onDraw', { game: id, kind: d.kind, value: d.value, per: d.per, play });
       });
       const e = {
         game: id, staked: round2(r.staked), back: round2(r.back), baseBack: round2(r.back), info: r.info || {},
@@ -463,6 +470,9 @@ const Engine = (() => {
         boss: state.tableType === 'boss' ? state.bossId : null, start: H.bankroll(),
       };
       t.minBet = Math.max(P.miseMin, Math.round(t.target * P.miseMinRatio));
+      // machine du jour : dérivée de la seed (même machine pour tous au défi du jour), sans toucher au hasard du jeu
+      const ids = CONFIG.games.machines.ids.filter(id => id !== state.lastMachine);
+      t.machine = state.lastMachine = ids[RNG.hashSeed(`${state.seed}:${state.etage}:${t.type}:${(state.stats && state.stats.tablesWon) || 0}`) % ids.length];
       state.charges = [];
       state.phase = 'play';
       H.addCharge({ uid: 'table', name: 'Relance', icon: '🔄' }, 'any', Math.max(0, P.relancesParTable - (stake() >= 2 ? 1 : 0)));
@@ -784,7 +794,7 @@ const Engine = (() => {
       if (!persist) return;
       state.pending = active ? { id: active.id, round: active.round, play: { game: active.play.game, steps: active.play.steps, prepaid: active.play.prepaid || 0, rerolls: active.play.rerolls || 0 } } : null;
       if (isRun && state.phase !== 'over') Storage.set(SAVE_KEY, state);
-      if (!isRun) Storage.set(FREE_KEY, { chips: state.chips, rng: state.rng, seed: state.seed });
+      if (!isRun) Storage.set(FREE_KEY, { chips: state.chips, rng: state.rng, seed: state.seed, machine: state.machine });
     }
     H.save = save;
     // Partie rechargée avec une main en cours : on la termine avec des choix prudents (rester, se coucher, accepter)

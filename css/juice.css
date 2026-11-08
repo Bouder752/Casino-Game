@@ -536,7 +536,7 @@ h1, h2, h3, .brand-name, .menu-logo h1, .modal-box h2, .intro-n, .shop-head h2, 
 }
 /* Téléphone : toute la machine (bouton Lancer compris) tient au-dessus de la barre des jokers */
 @media (max-width: 760px) {
-  .palace { --sym: max(48px, min(calc((100vw - 64px) / 5), calc((100dvh - var(--dock-h) - 400px) / 3))) !important; }
+  .palace { --sym: max(48px, min(calc((100vw - 64px) / 5), calc((100dvh - var(--dock-h) - 340px) / 3))) !important; }
   .sl-logo { margin-bottom: -14px; transform: scale(.72); transform-origin: 50% 70%; height: 44px; }
   .sl-deck { margin-top: 6px; gap: 6px; }
   .sl-cell { padding: 0 4px; }
@@ -703,3 +703,114 @@ html.cb .chip-5, html.cb .chipv.chip-5 { --c: #d81b60; }
 html.cb .chip-25, html.cb .chipv.chip-25 { --c: #1e63d6; --e: #ffd23f; }
 /* Le jeton posé ne cache plus le libellé des cases extérieures */
 .rl-cell.out .rl-chip { left: auto !important; right: 3px; margin: -15px 0 0 !important; width: 26px !important; height: 26px !important; }
+
+/* =====================================================================
+   Machines à grille : Confiserie Céleste, Chats Mousquetaires, Chaudron Magique
+   ===================================================================== */
+/* rouleaux des Toits masqués sans display:none (leurs dégradés SVG servent aussi aux autres machines) */
+.palace:not([data-machine="toits"]) #sl-reels { position: absolute !important; visibility: hidden; pointer-events: none; }
+.palace:not([data-machine="toits"]) #sl-sticky,
+.palace:not([data-machine="toits"]) #sl-lines { display: none !important; }
+.palace:not([data-machine="toits"]) .sl-logo-cat i { display: none; }
+.mx-stage {
+  --cell: min(calc(var(--sym) * 5 / var(--cols)), calc((var(--sym) * 3 + var(--mx-extra, 30px)) / var(--rows)));
+  position: relative; width: calc(var(--cols) * var(--cell)); height: calc(var(--rows) * var(--cell));
+  overflow: hidden; border-radius: 10px;
+}
+.mx-stage[hidden] { display: none; }
+.mx-grid, .mx-spots, .mx-reels { position: absolute; inset: 0; }
+.mx-grid { z-index: 2; }
+.mx-reels { z-index: 3; pointer-events: none; }
+.mx-cell { position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell); display: grid; place-items: center; will-change: transform; }
+.mx-cell svg { width: 84%; height: 84%; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45)); transition: opacity .2s; }
+.mx-cell .mx-mult {
+  position: absolute; font-family: 'Lilita One', Impact, sans-serif; font-size: calc(var(--cell) * .32); color: #fff;
+  -webkit-text-stroke: 2px #2a1a10; paint-order: stroke fill; text-shadow: 0 3px 0 #2a1a10;
+}
+.mx-stage.has-wins .mx-cell:not(.win) svg { opacity: .3; filter: saturate(.3); }
+.mx-cell.win svg { animation: mxWin .45s ease-in-out infinite alternate; }
+@keyframes mxWin { to { transform: scale(1.13); filter: drop-shadow(0 0 8px #fff3a0) drop-shadow(0 0 16px #ffb020); } }
+.mx-cell.land svg { animation: scatPulse .45s ease-in-out 4 alternate; }
+.mx-cell.fire svg { animation: bubbleFire .35s ease-in-out infinite alternate; }
+.mx-cell.fire .mx-mult { animation: bumpN .5s; }
+@keyframes bubbleFire { to { transform: scale(1.25); filter: drop-shadow(0 0 14px #e3b6ff) drop-shadow(0 0 24px #b56bff); } }
+.mx-cell.duel svg { animation: scatPulse .25s ease-in-out infinite alternate; }
+.mx-stage.tense { box-shadow: inset 0 0 0 3px #ff5ca8, inset 0 0 40px rgba(255, 92, 168, .6); }
+.mx-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.mx-lines .wl { fill: none; stroke: var(--c); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke; filter: drop-shadow(0 0 6px var(--c)); stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: drawLine .5s ease-out forwards; }
+/* Chaudron : cases marquées et multiplicatrices */
+.mx-spots { z-index: 1; }
+.mx-spots i { position: absolute; left: calc(var(--x) * var(--cell)); top: calc(var(--y) * var(--cell)); width: var(--cell); height: var(--cell); border-radius: 12px; transition: background .25s, box-shadow .25s; }
+.mx-spots i.on { background: radial-gradient(circle, rgba(110, 255, 200, .28), transparent 72%); box-shadow: inset 0 0 0 2px rgba(110, 255, 200, .55); }
+.mx-spots i.mult {
+  background: radial-gradient(circle, rgba(255, 210, 63, .55), rgba(255, 120, 40, .22) 72%); box-shadow: inset 0 0 0 3px #ffcf4a, 0 0 14px rgba(255, 190, 60, .7);
+  display: flex; align-items: flex-start; justify-content: flex-end; padding: 2px 4px; z-index: 0;
+  font-family: 'Lilita One', Impact, sans-serif; font-size: calc(var(--cell) * .26); color: #fff; -webkit-text-stroke: 1.5px #2a1a10; paint-order: stroke fill; font-style: normal;
+}
+.mx-spots i.up { animation: spotUp .55s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes spotUp { from { transform: scale(1.6); filter: brightness(2); } }
+.mx-spot-demo { display: grid; place-items: center; border-radius: 12px; background: radial-gradient(circle, rgba(255, 210, 63, .55), rgba(255, 120, 40, .22) 72%); box-shadow: inset 0 0 0 3px #ffcf4a; font-family: 'Lilita One', Impact, sans-serif; font-size: 22px; color: #fff; -webkit-text-stroke: 1.5px #2a1a10; paint-order: stroke fill; }
+/* Mousquetaires : rouleau en duel (wild avec multiplicateur) */
+.mx-wild {
+  position: absolute; top: 2px; bottom: 2px; left: calc(var(--x) * var(--cell) + 2px); width: calc(var(--cell) - 4px); border-radius: 12px;
+  background: linear-gradient(180deg, #e0303e, #7a0f1e); border: 3px solid #2a1a10;
+  box-shadow: inset 0 0 0 3px #ffcf4a, 0 0 22px rgba(255, 190, 60, .8);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.mx-wild.in { animation: wildIn .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes wildIn { from { transform: scaleY(.15); opacity: 0; } }
+.mxw-art { position: relative; width: 82%; aspect-ratio: 1; }
+.mxw-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mxw-art svg:last-child { transform: scaleX(-1); }
+.mx-wild.in:not(.won) .mxw-art svg:first-child { animation: clashL .2s ease-in-out infinite alternate; }
+.mx-wild.in:not(.won) .mxw-art svg:last-child { animation: clashR .2s ease-in-out infinite alternate; }
+@keyframes clashL { to { transform: translateX(10%) rotate(8deg); } }
+@keyframes clashR { from { transform: scaleX(-1); } to { transform: scaleX(-1) translateX(10%) rotate(8deg); } }
+.mxw-k { font-family: 'Lilita One', Impact, sans-serif; font-weight: 400; color: #ffcf4a; font-size: calc(var(--cell) * .26); -webkit-text-stroke: 1.5px #2a1a10; paint-order: stroke fill; }
+.mxw-m { font-family: 'Lilita One', Impact, sans-serif; font-weight: 400; color: #fff; font-size: calc(var(--cell) * .46); -webkit-text-stroke: 2.5px #2a1a10; paint-order: stroke fill; text-shadow: 0 3px 0 #2a1a10; }
+.mx-wild.won .mxw-m { animation: bumpN .5s; }
+/* Mode libre : choix de la machine */
+.mx-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.mx-pick .hint { width: 100%; margin: 0; }
+.paytable.small td { font-size: 12px; }
+
+/* ---- Habillage de chaque machine ---- */
+.palace[data-machine="confiserie"] .sl-frame { background: linear-gradient(145deg, #fff0fa 0%, #ff9ad0 25%, #c43c8a 50%, #ffd1ec 72%, #b8306f 100%); }
+.palace[data-machine="confiserie"] .sl-window { background: radial-gradient(ellipse at 50% 30%, #ffe9f6, #ffb8dc 55%, #c06ad8) !important; }
+.palace[data-machine="confiserie"] .sl-window::after { background: linear-gradient(180deg, rgba(120, 30, 90, .25) 0%, transparent 16%, transparent 84%, rgba(120, 30, 90, .3) 100%) !important; }
+.palace[data-machine="confiserie"] .sl-logo-cat { background: linear-gradient(180deg, #ff7ac0, #b0306f); box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--ink), 0 10px 30px rgba(0, 0, 0, .5), 0 0 50px rgba(255, 140, 200, .6); }
+.palace[data-machine="confiserie"] .palace-sky { background: linear-gradient(180deg, transparent, rgba(255, 170, 220, .15)); }
+
+.palace[data-machine="mousquetaires"] .sl-frame { background: linear-gradient(145deg, #f2f6ff 0%, #6f8fe8 22%, #1a2a6e 50%, #c9d6ff 72%, #233b8f 100%); }
+.palace[data-machine="mousquetaires"] .sl-window { background: radial-gradient(ellipse at 50% 30%, #2c3f8a, #121a45 70%) !important; }
+.palace[data-machine="mousquetaires"] .mx-stage { background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--cell) - 2px), rgba(255, 207, 74, .3) calc(var(--cell) - 2px), rgba(255, 207, 74, .3) var(--cell)); }
+.palace[data-machine="mousquetaires"] .sl-logo-cat { background: linear-gradient(180deg, #2f4cb0, #142060); box-shadow: 0 0 0 4px #ffcf4a, 0 0 0 7px var(--ink), 0 10px 30px rgba(0, 0, 0, .6), 0 0 50px rgba(120, 160, 255, .45); }
+
+.palace[data-machine="chaudron"] .sl-frame { background: linear-gradient(145deg, #e0fff2 0%, #3fd6a0 22%, #0f5a48 50%, #a6f0d0 72%, #136650 100%); }
+.palace[data-machine="chaudron"] .sl-window { background: radial-gradient(ellipse at 50% 40%, #2a1f4f, #120b26 75%) !important; }
+.palace[data-machine="chaudron"] .mx-stage { background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px); background-size: var(--cell) var(--cell); }
+.palace[data-machine="chaudron"] .sl-logo-cat { background: linear-gradient(180deg, #3a1f6a, #170b30); box-shadow: 0 0 0 4px #3fd6a0, 0 0 0 7px var(--ink), 0 10px 30px rgba(0, 0, 0, .6), 0 0 50px rgba(63, 214, 160, .45); }
+.palace.bonus[data-machine="confiserie"] .sl-frame,
+.palace.bonus[data-machine="mousquetaires"] .sl-frame,
+.palace.bonus[data-machine="chaudron"] .sl-frame { animation: buyGlow 1.6s ease-in-out infinite; }
+
+/* Téléphone : commandes de la machine sur une seule rangée (le solde est déjà en haut de l'écran),
+   ce qui laisse la place aux grilles de 5 et 6 rangées */
+@media (max-width: 760px) {
+  .palace { --mx-extra: 40px; }
+  .sl-deck { flex-wrap: nowrap !important; gap: 5px !important; }
+  .sl-deck .sl-bar { order: 0 !important; width: auto !important; flex: 1; min-width: 0; }
+  .sl-deck .sl-cell:first-child { display: none; }
+  .sl-deck .sl-cell { padding: 0 2px !important; }
+  .sl-deck .sl-cell b { font-size: 15px !important; }
+  .sl-deck .sl-step { width: 30px !important; height: 30px !important; }
+  .sl-deck .sl-buy { width: 56px !important; height: 56px !important; }
+  .sl-deck .sl-buy small { font-size: 8px !important; }
+  .sl-deck .sl-buy b { font-size: 13px !important; }
+  .sl-deck .sl-spin .btn { width: 58px !important; height: 58px !important; }
+  .sl-deck .sl-mini { flex-direction: column !important; gap: 4px; }
+  .sl-deck .sl-auto, .sl-deck .sl-turbo { width: 40px !important; height: 30px !important; }
+  .sl-deck .sl-auto small { display: none; }
+  .sl-deck .sl-step:disabled { display: none; }
+}
+.palace[data-machine="mousquetaires"] .palace-title span { letter-spacing: 1px; }

@@ -11,8 +11,9 @@ App.register((() => {
     fs: $('sl-fs'), lights: $('sl-lights'), sticky: $('sl-sticky'), intro: $('sl-intro'), palace: document.querySelector('#slots .palace'),
     ledBet: $('sl-led-bet'), ledWin: $('sl-led-win'), ledLabel: $('sl-led-label'), ledBal: $('sl-led-bal'),
     buy: $('sl-buy'), buyCost: $('sl-buy-cost'), minus: $('sl-minus'), plus: $('sl-plus'),
+    title: document.querySelector('#slots .palace-title'),
   };
-  const bet = new BetControl($('sl-bet'), { label: 'Mise', initial: 20, max: betLimit('slots') });
+  const bet = new BetControl($('sl-bet'), { label: 'Mise', initial: 2, max: betLimit('slots'), game: 'slots' });
   const msg = (t, c = '') => { els.msg.textContent = iconMsg(t, c); els.msg.className = 'msg ' + c; };
   const symbols = () => (App.host ? E.symbols(App.host) : C.symbols);
   const pool = x => [...symbols(), ...(C.wild.reels.includes(x) ? [C.wild] : []), ...(C.scatter.reels.includes(x) ? [C.scatter] : [])];
@@ -61,7 +62,14 @@ App.register((() => {
     els.ledLabel.textContent = label;
     els.ledWin.textContent = win == null ? '—' : Util.fmt(win);
   }
+  // Mode libre : on choisit sa machine
+  const picker = () => (App.host && !App.host.isRun ? `<div class="mx-pick"><p class="hint">Mode libre : choisis ta machine.</p>${Object.entries(TITLES).map(([k, [a, b]]) => `<button class="btn small ${k === machine ? 'primary' : ''}" data-machine="${k}">${a} ${b}</button>`).join('')}</div>` : '');
   function paytable() {
+    if (machine && machine !== 'toits') {
+      const wild = App.host ? App.host.query('slots.wild', { wild: null, ratio: 1, sources: [] }) : { wild: null };
+      els.pay.innerHTML = picker() + mx.paytable(bet.value, App.host ? Machines.symbols(App.host, machine) : CONFIG.games.machines[machine].symbols, wild);
+      return;
+    }
     const lb = bet.value / C.lines.length;
     const row = (id, pay) => `<tr><td class="pt-sym">${SlotArt.svg(id)}</td><td>${pay.map(p => Util.fmt(Math.round(p * lb * 100) / 100)).join(' · ')}</td></tr>`;
     const wild = App.host ? App.host.query('slots.wild', { wild: null, ratio: 1, sources: [] }) : { wild: null };
@@ -70,7 +78,13 @@ App.register((() => {
       <div class="pt-special"><div class="pt-sym">${SlotArt.svg('palace')}</div><p><b>Carton (Wild)</b> — rouleaux 2 à 4, remplace tous les symboles sauf la Pelote et multiplie le gain de la ligne par ×2 ou ×3.</p></div>
       <div class="pt-special"><div class="pt-sym">${SlotArt.svg('pelote')}</div><p><b>Pelote (Bonus)</b> — une par rouleau au plus, paie n'importe où : 3 = ×${C.scatter.pay[0]}, 4 = ×${C.scatter.pay[1]}, 5 = ×${C.scatter.pay[2]} la mise. 3 Pelotes = <b>${C.scatter.spins} tours gratuits</b> : chaque Carton reste collé jusqu'à la fin, et 3 Pelotes pendant le bonus ajoutent ${C.scatter.retrigger} tours.</p></div>
       ${wild.wild ? `<p class="wild-note">🍒 Triple Cerise : les cerises remplacent n'importe quel symbole (ligne complétée payée × ${String(wild.ratio).replace('.', ',')}).</p>` : ''}`;
+    els.pay.insertAdjacentHTML('afterbegin', picker());
   }
+  els.pay.addEventListener('click', e => {
+    const b = e.target.closest('[data-machine]');
+    if (!b || !App.host || App.host.isRun || App.host.busy()) return;
+    App.host.setMachine(b.dataset.machine); Sfx.play('click'); applyMachine();
+  });
 
   // Lancer animé jusqu'à la grille donnée (Web Animations : fluide, sur le compositeur),
   // avec suspense dès 2 Pelotes posées et arrêt rapide
@@ -137,6 +151,7 @@ App.register((() => {
   // Arrêt rapide : les rouleaux en cours accélèrent jusqu'à leur position finale
   function stopNow() {
     quick = true; skip = true;
+    mx.stop();
     anims.forEach(a => { if (a.playState === 'running') { const left = (a.effect.getTiming().duration - a.currentTime); if (left > 0) a.updatePlaybackRate(Math.max(1, left / Util.dur(220))); } });
   }
 
@@ -213,6 +228,12 @@ App.register((() => {
   }
 
   async function play(r) {
+    if (r.machine && r.machine !== 'toits') {
+      // l'une des trois machines à grille
+      const bonus = await mx.play(r);
+      if (bonus || r.total >= r.bet * 10) auto = 0;
+      return;
+    }
     const spins = r.spins;
     const sticky = {};
     drawSticky({});
@@ -255,18 +276,50 @@ App.register((() => {
         await splash(`<div class="sli-big">+${spins[k].retrigger}</div><div class="sli-t">tours gratuits</div>`, 1400, 'in small');
       }
     }
-    acc = Math.round(acc * 100) / 100;
     els.fs.hidden = true;
-    const paid = r.stake || r.bet;
-    const ratio = acc / paid;
-    const verdict = r.buy ? `${ratio.toFixed(1).replace('.', ',')} × le prix payé (${Util.fmt(paid)})` : `${(acc / r.bet).toFixed(1).replace('.', ',')} × la mise`;
-    const p = splash(`<div class="sli-k">${r.buy && acc < paid ? 'Bonus terminé… pas rentable cette fois' : 'Bonus terminé'}</div><div class="sli-big" id="sl-total">0</div><div class="sli-t">${verdict}</div>`, 3000, 'out' + (acc < paid ? ' meh' : ''));
-    await countUp($('sl-total'), Math.round(acc), 1600);
-    Sfx.play(acc >= paid ? 'bigwin' : 'push');
-    await p;
+    await bonusEnd(r, Math.min(r.total, acc));
     els.palace.classList.remove('bonus');
     Sfx.music('normal');
     drawSticky({});
+  }
+
+  // Fin du bonus : total qui défile, comparé honnêtement au prix payé
+  async function bonusEnd(r, acc) {
+    acc = Math.round(acc * 100) / 100;
+    const paid = r.stake || r.bet;
+    const ratio = acc / paid;
+    const verdict = r.buy ? `${ratio.toFixed(1).replace('.', ',')} × le prix payé (${Util.fmt(paid)})` : `${(acc / r.bet).toFixed(1).replace('.', ',')} × la mise`;
+    const p = splash(`<div class="sli-k">${r.capped ? 'Gain maximal atteint !' : r.buy && acc < paid ? 'Bonus terminé… pas rentable cette fois' : 'Bonus terminé'}</div><div class="sli-big" id="sl-total">0</div><div class="sli-t">${verdict}</div>`, 3000, 'out' + (acc < paid ? ' meh' : ''));
+    await countUp($('sl-total'), Math.round(acc), 1600);
+    Sfx.play(acc >= paid ? 'bigwin' : 'push');
+    await p;
+  }
+
+  // ---- Machine en service (tirée au hasard à chaque table) ----
+  const mx = MachineView.create($('mx-stage'), {
+    quick: () => quick || skip,
+    turbo: () => turbo,
+    win(t, cls) { els.win.textContent = t; els.win.className = 'sl-win' + (t ? ' ' + cls : ''); },
+    led: (v, label) => led(v == null ? null : Math.round(v), label),
+    splash: (html, ms, cls) => splash(html, ms, cls),
+    fs(html) { if (html == null) els.fs.hidden = true; else { els.fs.hidden = false; els.fs.innerHTML = html; } },
+    bonus(on) { els.palace.classList.toggle('bonus', on); Sfx.music(on ? 'bonus' : 'normal'); },
+    bonusEnd,
+  });
+  const TITLES = { toits: ['Les Chats', 'des Toits'], confiserie: ['Confiserie', 'Céleste'], mousquetaires: ['Chats', 'Mousquetaires'], chaudron: ['Chaudron', 'Magique'] };
+  let machine = null;
+  function applyMachine(force = false) {
+    const m = App.host && App.host.slotMachine ? App.host.slotMachine() : 'toits';
+    if (m === machine && !force) return;
+    const first = machine === null;
+    machine = m;
+    els.palace.dataset.machine = m;
+    const [a, b] = TITLES[m];
+    els.title.innerHTML = `${a}<span>${b}</span>`;
+    $('mx-stage').hidden = m === 'toits';
+    if (m !== 'toits') mx.mount(m); else $('mx-stage').innerHTML = '';
+    paytable();
+    if (!first) msg(`Nouvelle machine à cette table : ${a} ${b} !`, 'win');
   }
 
   async function after(res, animate = true) {
@@ -292,6 +345,7 @@ App.register((() => {
   }
   function spin(buy = false) {
     return App.animate(async () => {
+      applyMachine();
       const res = App.host.startPlay('slots', buy ? { bet: bet.value, buy: true } : { bet: bet.value });
       if (res.error) { Sfx.play('error'); return msg(res.error, 'warn'); }
       App.syncStake(res);
@@ -334,7 +388,7 @@ App.register((() => {
   const LADDER = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 600, 800];
   const ladder = () => { const out = []; for (let m = 1; m <= 1e9; m *= 1000) LADDER.forEach(v => out.push(v * m)); return out; };
   function step(dir) {
-    const lo = App.host ? App.host.minBet() : 1, hi = bet.maxFn();
+    const lo = App.host ? App.host.minBet('slots') : 1, hi = bet.maxFn();
     const vals = ladder().filter(v => v >= lo && v <= hi);
     if (!vals.length) return;
     const cur = bet.value;
@@ -354,16 +408,17 @@ App.register((() => {
     if (!App.host || App.host.busy()) return;
     const q = E.buyQuote(App.host, bet.value || 1);
     Sfx.play('click');
-    if (!q.ok) { Sfx.play('error'); return msg(q.cost < App.host.minBet() ? `Monte la mise : le bonus doit coûter au moins ${Util.fmt(App.host.minBet())}.` : `Il te faut ${Util.fmt(q.cost)} jetons pour acheter le bonus.`, 'warn'); }
-    UI.confirm(`<h2>Acheter le bonus ?</h2><p class="center"><b>${C.scatter.spins} tours gratuits</b> avec des Cartons collants, à <b>${Util.fmt(q.bet)}</b> par tour.</p><p class="center buy-price">Prix : <span class="wallet-chip s"></span> <b>${Util.fmt(q.cost)}</b></p>`, 'Acheter', () => spin(true));
+    if (!q.ok) { Sfx.play('error'); return msg(`Il te faut ${Util.fmt(q.cost)} jetons pour acheter le bonus (100 × la mise de ${Util.fmt(q.bet)}). Baisse la mise pour le payer moins cher.`, 'warn'); }
+    const what = machine && machine !== 'toits' ? `<b>${machine === 'chaudron' ? CONFIG.games.machines.chaudron.scatter.spins[0] : CONFIG.games.machines[machine].scatter.spins}</b> ${MachineView.INFO[machine].buy}` : `<b>${C.scatter.spins} tours gratuits</b> avec des Cartons collants`;
+    UI.confirm(`<h2>Acheter le bonus ?</h2><p class="center">${what}, à <b>${Util.fmt(q.bet)}</b> par tour.</p><p class="center buy-price">Prix : <span class="wallet-chip s"></span> <b>${Util.fmt(q.cost)}</b> <small>(100 × la mise)</small></p>`, 'Acheter', () => spin(true));
   };
   App.on('balance', v => { els.ledBal.textContent = Util.fmt(Math.round(v)); });
   drawStatic();
   bet.onChange = () => { paytable(); led(null); };
-  App.on('change', paytable);
+  App.on('change', () => { if (App.host && !App.host.busy()) applyMachine(); paytable(); });
   return {
     id: 'slots',
-    reset() { bet.setEnabled(true); bet.refresh(); paytable(); idle(); led(null); msg(''); els.fs.hidden = true; els.lines.innerHTML = ''; drawSticky({}); els.palace.classList.remove('bonus', 'tense'); },
-    refresh() { bet.refresh(); paytable(); },
+    reset() { bet.setEnabled(true); bet.refresh(); msg(''); applyMachine(); paytable(); idle(); led(null); els.fs.hidden = true; els.lines.innerHTML = ''; drawSticky({}); els.palace.classList.remove('bonus', 'tense'); },
+    refresh() { bet.refresh(); applyMachine(); paytable(); },
   };
 })());

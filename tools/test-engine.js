@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Tests du moteur : node tools/test-engine.js
 const api = require('./load-core')();
-const { Engine, Sim, RNG, Deck, CONFIG, JOKERS } = api;
+const { Engine, Sim, RNG, Deck, CONFIG, JOKERS, Machines } = api;
+const Games = api.Games;
 const P = CONFIG.progression;
 let fails = 0, passes = 0;
 const ok = (cond, msg) => { if (cond) passes++; else { fails++; console.log('ÉCHEC :', msg); } };
@@ -285,6 +286,40 @@ const cw = Engine.newRun({ seed: 'CERW', meta: meta(), persist: false }); cw.cho
 const cwr = api.Games.get('slots').start(cw, {}, { bet: cw.minBet() }, { steps: [] }).round;
 const circ = !cwr.wildSources.length || /"host"/.test(JSON.stringify(cwr));
 ok(!circ, 'machine + Cerise : un tour en cours reste sauvegardable');
+
+// 29. Machines : 4 machines tirées par table, mises basses, achat du bonus à 100 × la mise
+const mm = Engine.newRun({ seed: 'MACH', meta: meta(), persist: false }); mm.chooseTable();
+ok(mm.maxBet('slots') < mm.maxBet('bj') && mm.minBet('slots') <= mm.minBet() && mm.minBet('slots') >= 1, 'machines : mises plus basses qu\'aux tables');
+mm.state.chips = 1e6;
+const bq = Games.get('slots').buyQuote(mm, 3);
+ok(bq.cost === 300 && bq.bet === 3, 'achat du bonus : 100 × la mise (mise 3 → 300)');
+const seenM = new Set(); let prevM = null, repeat = false;
+for (let k = 0; k < 24; k++) { const T = Engine.newRun({ seed: 'M' + k, meta: meta(), persist: false }); T.chooseTable(); seenM.add(T.slotMachine()); }
+ok(seenM.size === 4, 'les 4 machines sortent selon la seed');
+const mt = Engine.newRun({ seed: 'MTAB', meta: meta(), persist: false });
+for (let k = 0; k < 6; k++) { mt.state.phase = 'choose'; mt.chooseTable(); const id = mt.slotMachine(); if (id === prevM) repeat = true; prevM = id; mt.state.stats.tablesWon++; }
+ok(!repeat, 'jamais deux fois la même machine d\'affilée');
+['confiserie', 'mousquetaires', 'chaudron', 'toits'].forEach(id => {
+  const T = Engine.newRun({ seed: 'MB' + id, meta: meta(), persist: false }); T.chooseTable(); T.state.table.machine = id; T.state.chips = 1e6; T.state.table.target = 1e12;
+  const b = T.minBet('slots'), before = T.chips();
+  const res = T.startPlay('slots', { bet: b, buy: true });
+  const st = res.settlement || T.act('accept').settlement;
+  ok(!res.error && res.round.machine === id && res.round.spins.length >= 11 && st.staked === 100 * b && Math.abs(T.chips() - before - st.net) < 1, `achat du bonus sur « ${id} » : ${res.round.spins.length - 1} tours gratuits pour ${100 * b}`);
+  ok(JSON.stringify(res.round).length > 0 && !/"host"/.test(JSON.stringify(res.round)), `« ${id} » : tour sauvegardable`);
+  ok(res.round.total <= b * CONFIG.games.slots.maxWin, `« ${id} » : gain plafonné à ${CONFIG.games.slots.maxWin} × la mise`);
+});
+// cascades : chaque étape retire les gagnants et la grille garde sa taille
+const cT = Engine.newRun({ seed: 'CASC', meta: meta(), persist: false }); cT.chooseTable(); cT.state.table.machine = 'chaudron'; cT.state.chips = 1e6; cT.state.table.target = 1e12;
+let cascOk = true, sawMult = false;
+for (let k = 0; k < 40; k++) {
+  const res = cT.startPlay('slots', { bet: cT.minBet('slots'), buy: k % 4 === 0 });
+  res.round.spins.forEach(sp => sp.steps.forEach(stp => { if (stp.grid.length !== 6 || stp.grid.some(c => c.length !== 6)) cascOk = false; stp.wins.forEach(w => { if (w.count < 5) cascOk = false; if (w.mult > 1) sawMult = true; }); }));
+  if (!res.settlement) cT.act('accept');
+}
+ok(cascOk && sawMult, 'Chaudron : grappes de 5+, grille 6×6 à chaque cascade, cases multiplicatrices');
+// Machine dorée et Triple Cerise valent sur toutes les machines
+const dT = Engine.newRun({ seed: 'DOR', meta: meta(), persist: false }); dT.chooseTable(); dT.state.table.machine = 'confiserie'; dT.state.upgrades.push('doree');
+ok(Machines.symbols(dT, 'confiserie').some(s => s.id === 'diamant' && s.pay.length === 3) && Machines.symbols(dT, 'chaudron').find(s => s.id === 'diamant').pay.length === 6, 'Machine dorée : un Diamant adapté à chaque machine');
 
 console.log(`${passes} réussis, ${fails} échec(s)`);
 process.exit(fails ? 1 : 0);

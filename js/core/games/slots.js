@@ -7,7 +7,7 @@ const SlotsEngine = (() => {
   const symbols = H => H.query('slots.symbols', { symbols: C.symbols.slice() }).symbols;
 
   // Tirage d'une grille ; sticky = wilds collés (tours gratuits)
-  function grid(H, syms, sticky = {}) {
+  function grid(H, syms, sticky = {}, free = false) {
     const g = [];
     for (let r = 0; r < C.reels; r++) {
       const col = [];
@@ -22,7 +22,7 @@ const SlotsEngine = (() => {
         // une seule Pelote par rouleau
         let s = H.rng.weighted(hasScatter ? noScatter : pool);
         if (s.id === C.scatter.id) hasScatter = true;
-        col.push(s.id === C.wild.id ? { id: s.id, m: H.rng.weighted(C.wild.mults).m } : { id: s.id });
+        col.push(s.id === C.wild.id ? { id: s.id, m: H.rng.weighted(free ? C.wild.fsMults : C.wild.mults).m } : { id: s.id });
       }
       g.push(col);
     }
@@ -105,7 +105,7 @@ const SlotsEngine = (() => {
       let left = C.scatter.spins, played = 0;
       while (left > 0 && played < C.scatter.maxSpins) {
         left--; played++;
-        const g = grid(H, r.symbols, sticky);
+        const g = grid(H, r.symbols, sticky, true);
         // au plus tard au 6e tour gratuit, au moins un Carton est collé
         if (played === 6 && !Object.keys(sticky).length) { const x = H.rng.pick(C.wild.reels), y = H.rng.int(C.rows); if (g[x][y].id !== C.scatter.id) g[x][y] = { id: C.wild.id, m: 2 }; }
         stick(g);
@@ -122,39 +122,52 @@ const SlotsEngine = (() => {
     r.done = r.stage === 'done';
   }
 
+  // Un tour complet de la machine en jeu (Toits ou l'une des trois autres), gain plafonné
+  function spinMachine(H, r) {
+    if (r.machine && r.machine !== 'toits') {
+      const spins = Machines.run(r.machine, H, r);
+      r.spins = spins;
+      r.total = r2(spins.reduce((a, s) => a + s.total, 0));
+      r.attempts.push(r.total);
+      r.stage = !r.buy && r.total < r.bet && H.charges('slots') > 0 ? 'decide' : 'done';
+      r.done = r.stage === 'done';
+    } else spinAll(H, r);
+    const cap = r.bet * C.maxWin;
+    if (r.total > cap) { r.total = cap; r.capped = true; r.attempts[r.attempts.length - 1] = cap; }
+  }
+  const r2 = v => Math.round(v * 100) / 100;
+
   return Games.register({
     id: 'slots', name: 'Machine', symbols, evaluate, grid,
-    // Prix et mise d'un achat de bonus : la mise par tour est ajustée pour rester sous le plafond
+    // Achat du bonus : toujours 100 × la mise du tour (donc la mise choisie fixe le prix)
     buyQuote(H, bet) {
-      const cap = H.maxBet('slots') * C.buy.capMult;
-      const b = Math.max(0.05, Math.min(bet, Math.floor(cap / C.buy.cost * 100) / 100));
+      const b = Math.max(H.minBet('slots'), Math.min(bet, H.maxBet('slots')));
       const cost = Math.round(b * C.buy.cost);
-      return { bet: b, cost, ok: cost >= H.minBet() && cost <= cap && H.canAfford(cost) };
+      return { bet: b, cost, ok: H.canAfford(cost) };
     },
     start(H, gs, { bet, buy = false }) {
       if (!(bet > 0)) return { error: 'Choisissez une mise.' };
+      if (bet > H.maxBet('slots')) return { error: `Mise maximale : ${H.maxBet('slots')}.` };
+      if (bet < H.minBet('slots')) return { error: `Mise minimale à cette table : ${H.minBet('slots')}.` };
       let stake = bet;
       if (buy) {
         const q = this.buyQuote(H, bet);
-        if (q.cost < H.minBet()) return { error: `Le bonus doit coûter au moins ${H.minBet()} (mise minimale).` };
-        if (!H.canAfford(q.cost)) return { error: `Il faut ${q.cost} jetons pour acheter le bonus.` };
+        if (!H.canAfford(q.cost)) return { error: `Il faut ${q.cost} jetons pour acheter le bonus (100 × la mise).` };
         bet = q.bet; stake = q.cost;
-      } else {
-        if (bet > H.maxBet('slots')) return { error: `Mise maximale : ${H.maxBet('slots')}.` };
-        if (bet < H.minBet()) return { error: `Mise minimale à cette table : ${H.minBet()}.` };
       }
       if (!H.stake(stake)) return { error: 'Solde insuffisant.' };
+      const machine = H.slotMachine();
       const wild = H.query('slots.wild', { wild: null, ratio: 1, sources: [] });
-      const r = { bet, stake, buy, attempts: [], symbols: symbols(H), wild: { wild: wild.wild, ratio: wild.ratio } };
+      const r = { bet, stake, buy, machine, attempts: [], symbols: machine === 'toits' ? symbols(H) : Machines.symbols(H, machine), wild: { wild: wild.wild, ratio: wild.ratio } };
       // les sources (jokers) ne sont pas sauvegardées : elles pointent vers le moteur
       Object.defineProperty(r, 'wildSources', { value: wild.sources, enumerable: false });
-      spinAll(H, r);
+      spinMachine(H, r);
       return { round: r };
     },
     actions: (H, gs, r) => (r.stage === 'decide' ? [{ id: 'reroll', label: `🔄 Relancer (${H.charges('slots')})${H.rerollCost() ? ` · −${H.rerollCost()}` : ''}`, ghost: true }, { id: 'accept', label: 'Accepter' }] : []),
     act(H, gs, r, id) {
       if (id === 'accept') { r.done = true; r.stage = 'done'; return; }
-      if (id === 'reroll' && H.useCharge('slots')) spinAll(H, r);
+      if (id === 'reroll' && H.useCharge('slots')) spinMachine(H, r);
     },
     resolve(H, gs, r) {
       if (r.spins.some(s => s.wildUsed)) (r.wildSources || []).forEach(me => me.flash('Joker !'));
@@ -162,7 +175,8 @@ const SlotsEngine = (() => {
       return {
         staked: r.stake || r.bet, back: r.total,
         info: { free: r.spins.length - 1, buy: !!r.buy },
-        draws: Array.from({ length: sevens }, () => ({ kind: 'symbol', value: 'sept' })),
+        // un 7 de machine vaut une part de la mise du tour (pas du prix d'un bonus acheté)
+        draws: Array.from({ length: sevens }, () => ({ kind: 'symbol', value: 'sept', per: r.bet })),
       };
     },
   });

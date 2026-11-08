@@ -32,7 +32,7 @@ const JOKER_DEFS = [
     onDraw(e, me) {
       // au Dice, seule la partie entière compte (pas les décimales)
       const n = e.kind === 'symbol' ? (e.value === 'sept' ? 1 : 0) : countSevens(e.game === 'dice' ? Math.floor(+e.value) : e.value);
-      if (n) e.play.flat(me, e.play.stake * J.septieme.stake * n, n > 1 ? `${n} × 7 tirés` : '7 tiré');
+      if (n) e.play.flat(me, (e.per || e.play.stake) * J.septieme.stake * n, n > 1 ? `${n} × 7 tirés` : '7 tiré');
     } },
   { id: 'molle', name: 'La Main Molle', icon: '🧤', tags: ['Blackjack'], desc: () => `Blackjack : tes mains perdues sont remboursées à ${pct(J.molle.refund)}.`,
     onLoss(e, me) { if (e.game === 'bj') e.flat(me, -e.gain * J.molle.refund, 'défaite remboursée'); } },
@@ -71,7 +71,7 @@ const JOKER_DEFS = [
       const s = e.info.bets['n' + e.info.n];
       if (s) e.adjust(me, s * (CONFIG.games.roulette.straight - 1) * (J.zero.straightMult - 1), 'plein payé double');
     } },
-  { id: 'cerise', name: 'Triple Cerise', icon: '🍒', tags: ['Machine'], desc: () => `Machine : les cerises remplacent n'importe quel symbole (ligne complétée payée ${pct(J.cerise.wildRatio)}).`,
+  { id: 'cerise', name: 'Triple Cerise', icon: '🍒', tags: ['Machine'], desc: () => `Machines : les cerises remplacent n'importe quel symbole sur les machines à lignes (ligne complétée payée ${pct(J.cerise.wildRatio)}) ; ailleurs, les gains de cerises sont ×${CONFIG.games.machines.cerisePay}.`,
     'slots.wild'(e, me) { e.wild = 'cerise'; e.ratio = J.cerise.wildRatio; e.sources.push(me); } },
   { id: 'pickpocket', name: 'Le Pickpocket', icon: '🕵️', tags: ['Roulette'], desc: () => `Roulette : quand un joueur IA gagne, tu empoches ${pct(J.pickpocket.pct)} de son gain (au plus ta mise).`,
     onSettle(e, me) { if (e.info && e.info.aiWin > 0) e.flat(me, Math.min(e.staked, e.info.aiWin * J.pickpocket.pct * me.host.scale(10) / 10), 'gains des voisins'); } },
@@ -305,8 +305,8 @@ const UPGRADE_DEFS = [
   { id: 'vip', name: 'Table VIP', icon: '👑', desc: () => `Mise max augmentée de ${pct(U.vip.maxBet - 1)}.`, maxBet(e) { e.value *= U.vip.maxBet; } },
   { id: 'truque', name: 'Sabot truqué', icon: '🗃️', desc: () => `Retire tous les ${U.truque.ranks.join(' et ')} du paquet (Blackjack et Hold'em).`,
     'deck.exclude'(e) { U.truque.ranks.forEach(r => { if (!e.ranks.includes(r)) e.ranks.push(r); }); } },
-  { id: 'doree', name: 'Machine dorée', icon: '💠', desc: () => `Ajoute un symbole Diamant ×${CONFIG.games.slots.diamant.pay} aux machines à sous.`,
-    'slots.symbols'(e) { if (!e.symbols.some(s => s.id === 'diamant')) e.symbols.push(CONFIG.games.slots.diamant); } },
+  { id: 'doree', name: 'Machine dorée', icon: '💠', desc: () => 'Ajoute un symbole Diamant, le mieux payé, à toutes les machines à sous.',
+    'slots.symbols'(e) { if (!e.symbols.some(s => s.id === 'diamant')) e.symbols.push(e.diamant || CONFIG.games.slots.diamant); } },
 ];
 UPGRADE_DEFS.forEach(d => Object.assign(d, { kind: 'upgrade', price: U[d.id].price }));
 const UPGRADES = Object.fromEntries(UPGRADE_DEFS.map(d => [d.id, d]));
